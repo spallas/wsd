@@ -1,5 +1,9 @@
+import os
+
 import tensorflow as tf
+import numpy as np
 from data_preprocessing import load_dataset
+from sklearn.metrics import f1_score, accuracy_score
 
 
 def _attention(input_x, input_mask, W_att):
@@ -11,14 +15,8 @@ def _attention(input_x, input_mask, W_att):
     return c
 
 
-def _load_train_data():
-    print("Model => Loading data...")
-    print("Model => Done")
-    return load_dataset()
-
-
-def _load_dev_data():
-    return None, None, None
+LOG_DIR = "../log/"
+SAVE_DIR = "../saved/"
 
 
 class Model:
@@ -33,20 +31,31 @@ class Model:
         self.start_learning_rate, \
             self.decay_steps, \
             self. decay_rate = config["learning_rate"]
+        data = load_dataset()
         self.x_train, self.y_train, self.y_pos, self.x_mask, \
-            self.sense_mask, self.embeddings, self.x_lengths = _load_train_data()
-        self.x_devel, self.y_devel, self.x_mask_dev = _load_dev_data()
-        self.num_epochs = 10
+            self.sense_mask, self.embeddings, self.x_lengths = data["train"]
+        self.x_dev, self.y_dev, self.y_pos_dev, self.x_mask_dev, \
+            self.sense_mask_dev, self.x_lengths_dev = data["dev"]
+        self.possible_senses = data["poss_dict"]
+        # a dict: k = index of word, v = list of sense ids
+        self.num_epochs = 3
 
-    def build_graph_and_train(self):
+        if not os.path.exists(SAVE_DIR):
+            os.mkdir(SAVE_DIR)
+        if not os.path.exists(LOG_DIR):
+            os.mkdir(LOG_DIR)
+
+    def build_graph_and_train(self, evaluating=False):
 
         num_senses = 25913 + 1  # size of senses one hot repr # what is this???
         num_pos = 12
         max_sent_size = 258  # ???
         l2_lambda = 0.001
 
+        summaries = []
+
         # losses = [] ...for multiple GPUs..
-        predictions = []
+        # predictions = []
         predictions_pos = []
 
         # =========== MODEL =========== #
@@ -66,7 +75,7 @@ class Model:
             global_step = tf.Variable(0, trainable=False, name="global_step")
             learning_rate = tf.train.exponential_decay(self.start_learning_rate, global_step,
                                                        self.decay_steps, self.decay_rate, staircase=True)
-            # Load embeddings???
+
             embeddings_output = tf.nn.embedding_lookup(embeddings, x)
 
             # LSTM
@@ -86,15 +95,13 @@ class Model:
 
             W_att = tf.Variable(tf.truncated_normal([2 * self.lstm_size, 1], mean=0.0, stddev=0.1, seed=0), name="W_att")
             c = tf.expand_dims(_attention(lstm_output[0], x_mask[0], W_att), 0)
-            for i in range(1, self.batch_size):
-                c = tf.concat([c, tf.expand_dims(_attention(lstm_output[i], x_mask[i], W_att), 0)], 0)
+            for b in range(1, self.batch_size):
+                c = tf.concat([c, tf.expand_dims(_attention(lstm_output[b], x_mask[b], W_att), 0)], 0)
 
             cc = tf.expand_dims(c, 1)
             c_final = tf.tile(cc, [1, max_sent_size, 1])
             h_final = tf.concat([c_final, lstm_output], 2)
             flat_h_final = tf.reshape(h_final, [-1, 4 * self.lstm_size])
-
-            # OUTPUT
 
             with tf.variable_scope("hidden_layer"):
                 W = tf.get_variable("W", shape=[4 * self.lstm_size, 2 * self.lstm_size],
@@ -103,6 +110,8 @@ class Model:
                 drop_flat_h_final = tf.nn.dropout(flat_h_final, self.input_dropout)
                 flat_hl = tf.matmul(drop_flat_h_final, W) + b
 
+            # OUTPUT
+
             with tf.variable_scope("softmax_layer"):
                 W = tf.get_variable("W", shape=[2 * self.lstm_size, num_senses],
                                     initializer=tf.truncated_normal_initializer(mean=0.0, stddev=0.1))
@@ -110,7 +119,7 @@ class Model:
                 drop_flat_hl = tf.nn.dropout(flat_hl, self.input_dropout)
                 flat_logits_sense = tf.matmul(drop_flat_hl, W) + b
                 logits = tf.reshape(flat_logits_sense, [self.batch_size, max_sent_size, num_senses])
-                predictions.append(tf.argmax(logits, 2))
+                # predictions.append(tf.argmax(logits, 2))
 
             # Multi-task learning, train network to predict also part of speech
             with tf.variable_scope("softmax_layer_pos"):
@@ -120,7 +129,7 @@ class Model:
                 drop_flat_hl = tf.nn.dropout(flat_hl, self.input_dropout)
                 flat_logits_pos = tf.matmul(drop_flat_hl, W) + b
                 logits_pos = tf.reshape(flat_logits_pos, [self.batch_size, max_sent_size, num_pos])
-                predictions_pos.append(tf.arg_max(logits_pos, 2))
+                predictions_pos.append(tf.argmax(logits_pos, 2))
 
             float_sense_mask = tf.cast(sense_mask, 'float')
             float_x_mask = tf.cast(x_mask, 'float')
@@ -136,32 +145,109 @@ class Model:
 
             train_op = optimizer.minimize(total_loss, global_step=global_step)
 
-        # =========== TRAINING =========== #
+            # SUMMARIES
 
-        num_batches = int(len(self.x_train) / self.batch_size)
+            summaries.append(tf.summary.scalar("loss", loss))
+            summaries.append(tf.summary.scalar("loss_pos", loss_pos))
+            summaries.append(tf.summary.scalar("total_loss", total_loss))
+            summaries.append(tf.summary.scalar("learning_rate", learning_rate))
+            for var in tf.trainable_variables():
+                summaries.append(tf.summary.histogram(var.op.name, var))
+            summary = tf.summary.merge(summaries)
+            saver = tf.train.Saver(tf.global_variables())
+
+        # =========== TRAINING =========== #
 
         with tf.Session(graph=graph) as sess:
 
+            num_batches = int(len(self.x_train) / self.batch_size)
+            if evaluating:
+                self.num_epochs = 1
+                num_batches = int(len(self.x_dev) / self.batch_size)
+
+                saver.restore(sess, tf.train.latest_checkpoint(SAVE_DIR))
+
+            print("Num batches = ", num_batches)
+            summary_writer = tf.summary.FileWriter(LOG_DIR, sess.graph)
+
             sess.run(tf.global_variables_initializer())
 
+            eval_predictions = []
+            truth = []
+            eval_predictions_pos = []
+            truth_pos = []
             for epoch in range(self.num_epochs):
 
-                for i in range(num_batches):
+                for b in range(num_batches):
 
-                    start = i * self.batch_size
-                    end = (i+1) * self.batch_size
+                    start = b * self.batch_size
+                    end = (b + 1) * self.batch_size
 
-                    bx = self.x_train[start:end]
-                    by = self.y_train[start:end]
-                    by_pos = self.y_pos[start:end]
-                    bx_mask = self.x_mask[start:end]
-                    bs_mask = self.sense_mask[start:end]
+                    if evaluating:
 
-                    sess.run(train_op, feed_dict={x: bx, y: by, x_mask: bx_mask, y_pos: by_pos,
-                                                  sense_mask: bs_mask, embeddings: self.embeddings})
-                    if i is 0:
-                        print("Done first batch")
+                        bx = self.x_dev[start:end]
+                        by = self.y_dev[start:end]
+                        by_pos = self.y_pos_dev[start:end]
+                        bx_mask = self.x_mask_dev[start:end]
+                        bs_mask = self.sense_mask_dev[start:end]
+                        _loss, _logits, pred_pos = sess.run([total_loss, logits, predictions_pos],
+                                                            feed_dict={x: bx, y: by, x_mask: bx_mask,
+                                                                       y_pos: by_pos, sense_mask: bs_mask,
+                                                                       embeddings: self.embeddings})
+                        predictions = []
+                        ground_truth = []
+
+                        for i in range(self.batch_size):
+                            for j in range(max_sent_size):
+                                # for s in range(num_senses):
+                                if bx_mask[i, j]:
+                                    if bs_mask[i, j]:
+                                        if bx[i, j] not in self.possible_senses:
+                                            predictions.append(25913)
+                                            # TODO: word never seen in training:
+                                            # append most frequent sense taken from external source
+                                        else:
+                                            possible_logits = []
+                                            possible = list(self.possible_senses[bx[i, j]])
+                                            for s in possible:
+                                                possible_logits.append(_logits[i, j, s])
+                                            predictions.append(possible[int(np.argmax(possible_logits))])
+                                            # predictions.append(self.possible_senses[bx[i, j]].most_common(1)[0][0]).02
+                                            # predictions.append(25913) 0.12
+                                        ground_truth.append(int(by[i, j]))
+                        eval_predictions += predictions
+                        truth += ground_truth
+                        # eval_predictions_pos += pred_pos
+
+                    else:  # => training
+                        bx = self.x_train[start:end]
+                        by = self.y_train[start:end]
+                        by_pos = self.y_pos[start:end]
+                        bx_mask = self.x_mask[start:end]
+                        bs_mask = self.sense_mask[start:end]
+
+                        _, step, _summary = sess.run([train_op, global_step, summary],
+                                                     feed_dict={x: bx, y: by, x_mask: bx_mask, y_pos: by_pos,
+                                                                sense_mask: bs_mask, embeddings: self.embeddings})
+
+                        if b is not 0 and b % 100 == 0:
+                            print()
+                        else:
+                            print("#", end="", flush=True)
+
+                if evaluating:
+                    f1_sense = f1_score(truth, eval_predictions, average="micro")
+                    acc_sense = accuracy_score(truth, eval_predictions)
+
+                    # f1_pos = f1_score(self.y_pos_dev, eval_predictions_pos, average="micro")
+                    # acc_pos = accuracy_score(self.y_pos_dev, eval_predictions_pos)
+
+                    print("Evaluated:")
+                    print("\tF1 for senses => ", f1_sense, " - Accuracy senses => ", acc_sense)
+                    # print("\tF1 for POS => ", f1_pos, " - Accuracy POS => ", acc_pos)
+                    break  # won't save session...
+
+                saver.save(sess, save_path=SAVE_DIR)
+
+                print("Epoch => ", epoch+1, ": Done")
         return
-
-    def evaluate(self):
-        pass

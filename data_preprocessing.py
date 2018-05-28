@@ -3,6 +3,7 @@ import numpy as np
 import itertools
 import xml.etree.ElementTree as Et
 
+from collections import Counter
 
 # ======== Please put all flags here ======== #
 LSTM_SIZE = 128
@@ -46,6 +47,17 @@ def load_dataset():
             senses.add(sense)
             docid2sense[word_id] = sense
 
+    dev_ids = []
+    dev_senses = set()
+    dev_docid2sense = {}
+
+    with open("../ALL.gold.key.bnids.txt") as f:
+        for line in f:
+            word_id, sense = line.strip().split(" ")
+            dev_ids.append(word_id)
+            dev_senses.add(sense)
+            dev_docid2sense[word_id] = sense
+
     num_train_senses = len(senses)
     print("data_preprocessing => total number of senses = {}".format(num_train_senses))
 
@@ -82,6 +94,37 @@ def load_dataset():
     max_sentence_len = max(sentence_lengths)
     print(max_sentence_len)
 
+    dev_sentences = []
+    dev_sentence_lengths = []
+    dev_sense_lists = []
+    dev_pos_lists = []
+    dev_sense_masks = []
+    dev_data_tree = Et.parse("../ALL.data.xml")
+    dev_corpus = dev_data_tree.getroot()
+
+    for text in dev_corpus:
+        for sentence in text:
+            word_list = []
+            sense_list = []
+            pos_list = []
+            sense_mask = []  # True when parsing instance, False otherwise
+            for word in sentence:
+                word_list.append(word.text)
+                pos_list.append(word.attrib["pos"])
+                if word.tag == "instance":
+                    sense_mask.append(True)
+                    sense = dev_docid2sense[word.attrib["id"]]
+                    sense_list.append(sense)
+                else:
+                    sense_mask.append(False)
+                    # sense_list.append(word.text)
+                    sense_list.append("bn:00000000x")
+            dev_sentences.append(word_list)
+            dev_sense_lists.append(sense_list)
+            dev_pos_lists.append(pos_list)
+            dev_sense_masks.append(sense_mask)
+            dev_sentence_lengths.append(len(word_list))
+
     # build sense vocabulary:
     id2sense = {}
     sense2id = {}
@@ -103,16 +146,57 @@ def load_dataset():
     x_mask = np.zeros((len(sentences), max_sentence_len), dtype=np.bool)
     sense_mask = np.zeros((len(sentences), max_sentence_len), dtype=np.bool)
 
+    # prepare numpy arrays
+    x_dev = np.zeros((len(dev_sentences), max_sentence_len), dtype=np.int32)
+    y_dev = np.zeros((len(dev_sentences), max_sentence_len))
+    y_pos_dev = np.zeros((len(dev_sentences), max_sentence_len))
+    x_mask_dev = np.zeros((len(dev_sentences), max_sentence_len), dtype=np.bool)
+    sense_mask_dev = np.zeros((len(dev_sentences), max_sentence_len), dtype=np.bool)
+
+    possible_senses = {}
+
     for i in range(len(sentences)):
         for j in range(max_sentence_len):
             if j < sentence_lengths[i]:
                 x_mask[i, j] = True
-                sense_mask[i, j] = sense_lists[i][j]
+                sense_mask[i, j] = sense_masks[i][j]
                 x_train[i, j] = word2id.get(sentences[i][j].lower(), 0)
                 y_train[i, j] = sense2id.get(sense_lists[i][j])
                 y_pos[i, j] = pos2id[pos_lists[i][j]]
 
-    return x_train, y_train, y_pos, x_mask, sense_mask, embeddings_list, sentence_lengths
+                if x_train[i, j] in possible_senses:
+                    possible_senses[x_train[i, j]].append(int(y_train[i, j]))
+                else:
+                    possible_senses[x_train[i, j]] = [int(y_train[i, j])]
+
+            if i < len(dev_sentences) and j < dev_sentence_lengths[i]:
+                x_mask_dev[i, j] = True
+                sense_mask_dev[i, j] = dev_sense_masks[i][j]
+                x_dev[i, j] = word2id.get(dev_sentences[i][j].lower(), 0)
+                y_dev[i, j] = sense2id.get(dev_sense_lists[i][j], num_train_senses)
+                # return index of unknown sense if the sense os not in the training dictionary
+                y_pos_dev[i, j] = pos2id[dev_pos_lists[i][j]]
+
+    for k in possible_senses:
+        possible_senses[k] = Counter(possible_senses[k])
+
+    return {
+        "train": (x_train, y_train, y_pos, x_mask, sense_mask, embeddings_list, sentence_lengths),
+        "dev": (x_dev, y_dev, y_pos_dev, x_mask_dev, sense_mask_dev, dev_sentence_lengths),
+        "poss_dict": possible_senses
+    }
+
+
+def get_train_set():
+    pass
+
+
+def get_dev_set():
+    pass
+
+
+def get_test_set():
+    pass
 
 
 def get_embeddings():
