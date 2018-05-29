@@ -21,7 +21,7 @@ def main(_):
 
     model.build_graph_and_train()
 
-    model.build_graph_and_train(evaluating=True)
+    model.build_graph_and_train(training=False)
 
     print("Trained and evaluated in: ", time.time() - start)
 
