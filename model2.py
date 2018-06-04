@@ -30,7 +30,8 @@ class Model2:
         self.dev_dict = data["dev_dict"]  # contains as keys the names of each corpus i.e.: senseval2, 3, etc.
         self.possible_senses = data["poss_dict"]
         # a dict: k = index of word, v = list of sense ids
-        self.num_epochs = 1
+        self.num_epochs = config["num_epochs"]
+        self.clipping = config["clip_grads"]
 
         if not os.path.exists(SAVE_DIR):
             os.mkdir(SAVE_DIR)
@@ -133,9 +134,15 @@ class Model2:
 
             total_loss = loss + loss_sen + loss_pos + l2_loss
 
-            optimizer = tf.train.AdamOptimizer(learning_rate)
+            optimizer = tf.train.GradientDescentOptimizer(learning_rate)
 
-            train_op = optimizer.minimize(total_loss, global_step=global_step)
+            grads_vars = optimizer.compute_gradients(total_loss)
+
+            clipped_grads = grads_vars
+            if self.clipping:
+                clipped_grads = [(tf.clip_by_norm(grad, 1), var) for grad, var in clipped_grads]
+
+            train_op = optimizer.apply_gradients(clipped_grads, global_step=global_step)
 
             # SUMMARIES
 
@@ -174,7 +181,7 @@ class Model2:
                                                                 embeddings: self.embeddings})
                         summary_writer.add_summary(_summary, step)
 
-                        if step is not 0 and step % 20 == 0:
+                        if step is not 0 and step % 50 == 0:
                             print(" Step: {}".format(step), flush=True)
                             print("Time for {} steps = {}".format(step, time.time() - begin))
                         print("#", end="", flush=True)

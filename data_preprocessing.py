@@ -1,30 +1,30 @@
 import pickle
 import numpy as np
 import xml.etree.ElementTree as Et
-
 from collections import Counter
 
 # ======== Please put all flags here ======== #
+
 LSTM_SIZE = 256
 WINDOW_SIZE = 64
-OVERLAP_SIZE = 0
+OVERLAP_SIZE = 3
 
-VOCABULARY_SIZE = 50_000 # 174558  # GloVe
-EMBEDDING_SIZE = 300  # GloVe
+BATCH_SIZE = 64
+LEARNING_RATE = (0.001, 500, 0.987)  # initial, decay steps, decay rate
+NUM_EPOCHS = 2
+DROPOUT_KEEP_PROB = 0.3
+CLIP_GRADS = True
 
-MY_VOCABULARY_SIZE = 50_000
-MY_EMBED_SIZE = 200
+VOCABULARY_SIZE = 50_000  # put a number up to num of words in GloVe (174558)
+EMBEDDING_SIZE = 300
 
 TRAIN_DATA = "../semcor.data.xml"
 GROUND_TRUTH = "../semcor.gold.key.bnids.txt"
+VAL_DATA = "../ALL.data.xml"
+VAL_TRUTH = "../ALL.gold.key.bnids.txt"
 EMBEDDINGS_FILE = "../embeddings35M.pkl"
 VOCABULARY_FILE = "../dataset35M.pkl"
-GLOVE_FILE = "../glove_word_embeds.txt"
-
-BATCH_SIZE = 64
-LEARNING_RATE = (0.001, 1000, 0.96)  # initial, decay steps, decay rate
-
-EVAL_CORPORA = ["senseval2", "senseval3", "semeval2007", "semeval2013", "semeval2015"]
+GLOVE_FILE = "../glove-51k.txt"
 
 # =========================================== #
 
@@ -40,7 +40,7 @@ def load_dataset():
 
     word2id, id2word, embeddings_matrix = load_embeddings()
 
-    with open("../semcor.gold.key.bnids.txt") as f:
+    with open(GROUND_TRUTH) as f:
         for line in f:
             word_id, sense = line.strip().split(" ")
             ids.append(word_id)
@@ -51,7 +51,7 @@ def load_dataset():
     dev_senses = set()
     dev_docid2sense = {}
 
-    with open("../ALL.gold.key.bnids.txt") as f:
+    with open(VAL_TRUTH) as f:
         for line in f:
             word_id, sense = line.strip().split(" ")
             dev_ids.append(word_id)
@@ -66,7 +66,7 @@ def load_dataset():
     sense_lists = []
     pos_lists = []
     sense_masks = []
-    data_tree = Et.parse("../semcor.data.xml")
+    data_tree = Et.parse(TRAIN_DATA)
     corpus = data_tree.getroot()
 
     for text in corpus:
@@ -139,7 +139,7 @@ def load_dataset():
         possible_senses[k] = Counter(possible_senses[k])
 
     dev = {}
-    dev_data_tree = Et.parse("../ALL.data.xml")
+    dev_data_tree = Et.parse(VAL_DATA)
     dev_corpora = dev_data_tree.getroot()
     prev = "senseval2"
     dev_sentences = []
@@ -238,6 +238,7 @@ def generate_batch(x, y, y_sen, y_pos, x_mask, sense_mask, train=True):
     global reset
     if reset:
         sent_i = word_j = 0
+        reset = False
     batch_x = np.zeros((BATCH_SIZE, WINDOW_SIZE))
     batch_y = np.zeros((BATCH_SIZE, WINDOW_SIZE))
     batch_y_sen = np.zeros((BATCH_SIZE, WINDOW_SIZE))
@@ -256,13 +257,15 @@ def generate_batch(x, y, y_sen, y_pos, x_mask, sense_mask, train=True):
                 word_j = (word_j + 1) % len(x[0])
                 if word_j == len(x[0]) - 1:
                     break
-        if train:  # don't overlap in evaluation
-            word_j -= OVERLAP_SIZE
         if not x_mask[sent_i, word_j] or word_j == len(x[0]) - 1:
             sent_i += 1
             if sent_i == len(x) - 1:
                 reset = True
                 break
+            if sent_i % 1000 == 0:
+                print("Sentence #:{}".format(sent_i))
+        elif train:  # don't overlap in evaluation
+            word_j -= OVERLAP_SIZE
 
     return batch_x, batch_y, batch_y_sen, batch_y_pos, batch_x_mask, batch_sense_mask, reset
 
@@ -296,11 +299,13 @@ def load_embeddings(from_glove=True):
 
 def get_params_dict():
     return {
-        "input_dropout": 0.4,
+        "input_dropout": DROPOUT_KEEP_PROB,
         "learning_rate": LEARNING_RATE,
         "batch_size": BATCH_SIZE,
+        "num_epochs": NUM_EPOCHS,
         "lstm_size": LSTM_SIZE,
         "vocab_size": VOCABULARY_SIZE,
         "embed_size": EMBEDDING_SIZE,
-        "window_size": WINDOW_SIZE
+        "window_size": WINDOW_SIZE,
+        "clip_grads": CLIP_GRADS
     }
