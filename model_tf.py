@@ -37,7 +37,7 @@ class Model:
         self.dev_dict = data["dev_dict"]  # contains as keys the names of each corpus i.e.: senseval2, 3, etc.
         self.possible_senses = data["poss_dict"]
         # a dict: k = index of word, v = list of sense ids
-        self.num_epochs = 3
+        self.num_epochs = 10
 
         if not os.path.exists(SAVE_DIR):
             os.mkdir(SAVE_DIR)
@@ -86,7 +86,7 @@ class Model:
 
             with tf.variable_scope("convolution"):
                 conv1 = tf.layers.conv1d(inputs=Wx_masked, filters=num_filters, kernel_size=[kernel_size],
-                                         padding='same', activation=tf.nn.relu, )
+                                         padding='same', activation=tf.nn.relu)
                 conv2 = tf.layers.conv1d(inputs=conv1, filters=num_filters, kernel_size=[kernel_size], padding='same')
 
             # LSTM
@@ -214,7 +214,7 @@ class Model:
                     saver.save(sess, save_path=SAVE_DIR)
                     print("Epoch => ", epoch + 1, ": Done")
 
-            else:  # evaluating
+            # else:  # evaluating after training
 
                 for corpus in self.dev_dict:
 
