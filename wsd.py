@@ -1,9 +1,7 @@
 import time
 
 import tensorflow as tf
-from model_tf import Model
-from model2 import Model2
-from data_preprocessing import get_params_dict
+from model import Model
 
 
 def installation_test():
@@ -20,7 +18,7 @@ def main(_):
 
     installation_test()
 
-    model = Model2(get_params_dict())
+    model = Model()
 
     start = time.time()
 

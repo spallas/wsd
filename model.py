@@ -3,17 +3,20 @@ import time
 
 import tensorflow as tf
 import numpy as np
-from data_preprocessing import load_dataset, generate_batch
+from data_preprocessing import load_dataset, generate_batch, get_params_dict
 from sklearn.metrics import f1_score, accuracy_score
 
 
-LOG_DIR = "../log2/"
-SAVE_DIR = "../saved2/"
+LOG_DIR = "../log/"
+SAVE_DIR = "../saved/"
 
 
-class Model2:
+class Model:
 
-    def __init__(self, config):
+    def __init__(self):
+
+        data = load_dataset()
+        config = get_params_dict()
 
         self.embedding_size = config["embed_size"]
         self.vocab_size = config["vocab_size"]
@@ -24,7 +27,6 @@ class Model2:
         self.start_learning_rate, \
             self.decay_steps, \
             self. decay_rate = config["learning_rate"]
-        data = load_dataset()
         self.x_train, self.y_train, self.y_sen, self.y_pos, self.x_mask, \
             self.sense_mask, self.embeddings, self.x_lengths = data["train"]
         self.dev_dict = data["dev_dict"]  # contains as keys the names of each corpus i.e.: senseval2, 3, etc.
@@ -32,7 +34,7 @@ class Model2:
         # a dict: k = index of word, v = list of sense ids
         self.num_epochs = config["num_epochs"]
         self.clipping = config["clip_grads"]
-
+        self.use_cnn, self.use_dropout, self.use_att = config["model"]
         if not os.path.exists(SAVE_DIR):
             os.mkdir(SAVE_DIR)
         if not os.path.exists(LOG_DIR):
@@ -44,6 +46,9 @@ class Model2:
         num_pos = 12
         window_size = self.window_size
         l2_lambda = 0.001
+        # conv nets parameters
+        kernel_size = 5
+        num_filters = 128
 
         summaries = []
 
@@ -72,16 +77,29 @@ class Model2:
             float_x_mask = tf.cast(x_mask, 'float')
 
             embeddings_output = tf.nn.embedding_lookup(embeddings, x)
+            lstm_input = embeddings_output
+
+            tile_x_mask = tf.tile(tf.expand_dims(float_x_mask, 2), [1, 1, self.embedding_size])
+            Wx_masked = tf.multiply(embeddings_output, tile_x_mask)
+
+            with tf.variable_scope("convolution"):
+                conv1 = tf.layers.conv1d(inputs=Wx_masked, filters=num_filters, kernel_size=[kernel_size],
+                                         padding='same', activation=tf.nn.relu)
+                conv2 = tf.layers.conv1d(inputs=conv1, filters=num_filters, kernel_size=[kernel_size], padding='same')
+
+            if self.use_cnn:
+                lstm_input = conv2
 
             # LSTM
 
             with tf.variable_scope("lstm1"):
                 cell_fw1 = tf.contrib.rnn.LSTMCell(self.lstm_size)
                 cell_bw1 = tf.contrib.rnn.LSTMCell(self.lstm_size)
-                # d_cell_fw1 = tf.contrib.rnn.DropoutWrapper(cell_fw1, input_keep_prob=self.input_dropout)
-                # d_cell_bw1 = tf.contrib.rnn.DropoutWrapper(cell_bw1, input_keep_prob=self.input_dropout)
-
-                (output_fw1, output_bw1), state = tf.nn.bidirectional_dynamic_rnn(cell_fw1, cell_bw1, embeddings_output,
+                d_cell_fw1 = tf.contrib.rnn.DropoutWrapper(cell_fw1, input_keep_prob=self.input_dropout)
+                d_cell_bw1 = tf.contrib.rnn.DropoutWrapper(cell_bw1, input_keep_prob=self.input_dropout)
+                if self.use_dropout:
+                    cell_fw1, cell_bw1 = d_cell_fw1, d_cell_bw1
+                (output_fw1, output_bw1), state = tf.nn.bidirectional_dynamic_rnn(cell_fw1, cell_bw1, lstm_input,
                                                                                   sequence_length=x_len, dtype='float',
                                                                                   scope="lstm1")
                 lstm_output1 = tf.concat([output_fw1, output_bw1], axis=-1)
@@ -89,14 +107,38 @@ class Model2:
             with tf.variable_scope("lstm2"):
                 cell_fw2 = tf.contrib.rnn.LSTMCell(self.lstm_size)
                 cell_bw2 = tf.contrib.rnn.LSTMCell(self.lstm_size)
-                # d_cell_fw2 = tf.contrib.rnn.DropoutWrapper(cell_fw2, input_keep_prob=self.input_dropout)
-                # d_cell_bw2 = tf.contrib.rnn.DropoutWrapper(cell_bw2, input_keep_prob=self.input_dropout)
-
+                d_cell_fw2 = tf.contrib.rnn.DropoutWrapper(cell_fw2, input_keep_prob=self.input_dropout)
+                d_cell_bw2 = tf.contrib.rnn.DropoutWrapper(cell_bw2, input_keep_prob=self.input_dropout)
+                if self.use_dropout:
+                    cell_fw2, cell_bw2 = d_cell_fw2, d_cell_bw2
                 (output_fw, output_bw), _ = tf.nn.bidirectional_dynamic_rnn(cell_fw2, cell_bw2, lstm_output1,
                                                                             sequence_length=x_len, dtype='float',
                                                                             scope="lstm2")
                 lstm_output = tf.concat([output_fw, output_bw], axis=-1)
-                flat_h = tf.reshape(lstm_output, [self.batch_size * window_size, tf.shape(lstm_output)[2]])
+
+            flat_layer = tf.reshape(lstm_output, [self.batch_size * window_size, tf.shape(lstm_output)[2]])
+
+            if self.use_att:
+                with tf.variable_scope("global_attention"):
+                    attention_mask = (tf.cast(x_mask, 'float') - 1) * 1e30
+                    W_att_global = tf.get_variable("W_att_global", shape=[2 * self.lstm_size, 1],
+                                                   initializer=tf.truncated_normal_initializer(mean=0.0, stddev=0.1))
+                    flat_h = tf.reshape(lstm_output, [self.batch_size * window_size, tf.shape(lstm_output)[2]])
+                    h_tanh = tf.tanh(flat_h)
+                    u_flat = tf.matmul(h_tanh, W_att_global)
+                    u = tf.reshape(u_flat, [self.batch_size, window_size]) + attention_mask
+                    a = tf.expand_dims(tf.nn.softmax(u, 1), 2)
+                    c = tf.reduce_sum(tf.multiply(lstm_output, a), axis=1)
+                    c_final = tf.tile(tf.expand_dims(c, 1), [1, window_size, 1])
+                    h_final = tf.concat([c_final, lstm_output], 2)
+                    flat_h_final = tf.reshape(h_final, [self.batch_size * window_size, tf.shape(h_final)[2]])
+
+                with tf.variable_scope("hidden_layer"):
+                    W = tf.get_variable("W", shape=[4 * self.lstm_size, 2 * self.lstm_size],
+                                        initializer=tf.truncated_normal_initializer(mean=0.0, stddev=0.1))
+                    b = tf.get_variable("b", shape=[2 * self.lstm_size], initializer=tf.zeros_initializer())
+                    drop_flat_h_final = tf.nn.dropout(flat_h_final, self.input_dropout)
+                    flat_layer = tf.matmul(drop_flat_h_final, W) + b
 
             # OUTPUT
 
@@ -104,16 +146,20 @@ class Model2:
                 W = tf.get_variable("W", shape=[2 * self.lstm_size, self.vocab_size],
                                     initializer=tf.truncated_normal_initializer(mean=0.0, stddev=0.1))
                 b = tf.get_variable("b", shape=[self.vocab_size], initializer=tf.zeros_initializer())
-                # drop_flat_hl = tf.nn.dropout(flat_hl, self.input_dropout)
-                flat_logits = tf.matmul(flat_h, W) + b
+                drop_flat_hl = tf.nn.dropout(flat_layer, self.input_dropout)
+                if self.use_dropout:
+                    flat_layer = drop_flat_hl
+                flat_logits = tf.matmul(flat_layer, W) + b
                 logits = tf.reshape(flat_logits, [self.batch_size, window_size, self.vocab_size])
 
             with tf.variable_scope("softmax_layer_sen"):
                 W = tf.get_variable("W", shape=[2 * self.lstm_size, num_senses],
                                     initializer=tf.truncated_normal_initializer(mean=0.0, stddev=0.1))
                 b = tf.get_variable("b", shape=[num_senses], initializer=tf.zeros_initializer())
-                # drop_flat_hl = tf.nn.dropout(flat_hl, self.input_dropout)
-                flat_logits_sense = tf.matmul(flat_h, W) + b
+                drop_flat_hl = tf.nn.dropout(flat_layer, self.input_dropout)
+                if self.use_dropout:
+                    flat_layer = drop_flat_hl
+                flat_logits_sense = tf.matmul(flat_layer, W) + b
                 logits_sen = tf.reshape(flat_logits_sense, [self.batch_size, window_size, num_senses])
 
             # Multi-task learning, train network to predict also part of speech
@@ -121,20 +167,20 @@ class Model2:
                 W = tf.get_variable("W", shape=[2 * self.lstm_size, num_pos],
                                     initializer=tf.truncated_normal_initializer(mean=0.0, stddev=0.1))
                 b = tf.get_variable("b", shape=[num_pos], initializer=tf.zeros_initializer())
-                # drop_flat_hl = tf.nn.dropout(flat_hl, self.input_dropout)
-                flat_logits_pos = tf.matmul(flat_h, W) + b
+                drop_flat_hl = tf.nn.dropout(flat_layer, self.input_dropout)
+                if self.use_dropout:
+                    flat_layer = drop_flat_hl
+                flat_logits_pos = tf.matmul(flat_layer, W) + b
                 logits_pos = tf.reshape(flat_logits_pos, [self.batch_size, window_size, num_pos])
                 predictions_pos.append(tf.argmax(logits_pos, 2))
 
             loss = tf.contrib.seq2seq.sequence_loss(logits, y, float_x_mask, name="loss")
             loss_sen = tf.contrib.seq2seq.sequence_loss(logits_sen, y_sen, float_sense_mask, name="loss_sen")
             loss_pos = tf.contrib.seq2seq.sequence_loss(logits_pos, y_pos, float_x_mask, name="loss_pos")
-
             l2_loss = l2_lambda * tf.losses.get_regularization_loss()
-
             total_loss = loss + loss_sen + loss_pos + l2_loss
 
-            optimizer = tf.train.GradientDescentOptimizer(learning_rate)
+            optimizer = tf.train.AdamOptimizer(learning_rate)
 
             grads_vars = optimizer.compute_gradients(total_loss)
 
