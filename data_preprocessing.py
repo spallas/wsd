@@ -351,7 +351,7 @@ def generate_batch(x, y, y_sen, y_pos, x_mask, sense_mask, train=True, test_ids=
                 word_j = word_j + 1
                 if word_j == len(x[0]) - 1:
                     break
-        if word_j == len(x[0]) - 1:
+        if word_j == len(x[0]) - 1 or not x_mask[sent_i, word_j]:
             word_j = 0
             sent_i += 1
             if sent_i == len(x):

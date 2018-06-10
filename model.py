@@ -8,7 +8,8 @@ from sklearn.metrics import f1_score, accuracy_score
 
 
 LOG_DIR = "../log/"
-SAVE_DIR = "..//saved"
+SAVE_DIR = "../saved/"
+SAVE_PATH = "../saved/model"
 
 
 class Model:
@@ -233,7 +234,7 @@ class Model:
                             print("Time for {} steps = {}".format(step, time.time() - begin))
                         print("#", end="", flush=True)
 
-                    saver.save(sess, save_path=SAVE_DIR)
+                    saver.save(sess, save_path=SAVE_PATH)
                     print("Epoch => ", epoch + 1, ": Done")
 
                     # =========== EVALUATING =========== #
@@ -243,7 +244,7 @@ class Model:
 
                         x_dev, y_dev, y_sen_dev, y_pos_dev, x_mask_dev, sense_mask_dev, sent_len = self.dev_dict[corpus]
 
-                        # saver.restore(sess, tf.train.latest_checkpoint(SAVE_DIR))
+                        # saver.restore(sess, tf.train.latest_checkpoint(SAVE_PATH))
 
                         eval_predictions = []
                         truth = []
@@ -287,7 +288,7 @@ class Model:
 
                 # =========== TESTING =========== #
 
-                # saver.restore(sess, tf.train.latest_checkpoint(SAVE_DIR))
+                # saver.restore(sess, tf.train.latest_checkpoint(SAVE_PATH))
 
                 x_test, x_ids_test, x_mask_test, y_pos_test, sense_mask_test = load_test_set(self.pos2id, self.word2id)
 
@@ -343,6 +344,5 @@ class Model:
                     result.append(sense)
         if len(result) == 0:
             result.append(self.sense2id.get(self.MFS.get(self.id2word[word_id], "bn:00000000x"), 25913))
-            # or better: most frequent sense
         return result
 
