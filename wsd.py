@@ -22,7 +22,7 @@ def main(_):
 
     start = time.time()
 
-    model.build_graph_and_train()
+    model.build_graph_and_train(training=True)
 
     print("Trained and evaluated in: ", time.time() - start)
 
