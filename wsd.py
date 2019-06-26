@@ -1,31 +1,8 @@
-import time
 
-import tensorflow as tf
-from model import Model
+from torch import nn, Tensor, optim
 
 
-def installation_test():
-    hello = tf.constant('Hello, TensorFlow!')
-    sess = tf.Session()
-    print(str(sess.run(hello)))
-    import platform
-    print("INFO: Python version: ", platform.sys.version)
-    print("INFO: Tensorflow version: ", str(tf.VERSION))
-    print("INFO: GPU found: ", tf.test.gpu_device_name())
+class WSDNet(nn.Module):
 
-
-def main(_):
-
-    installation_test()
-
-    model = Model()
-
-    start = time.time()
-
-    model.build_graph_and_train(training=True)
-
-    print("Trained and evaluated in: ", time.time() - start)
-
-
-if __name__ == "__main__":
-    tf.app.run()
+    def __init__(self):
+        pass

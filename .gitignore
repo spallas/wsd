@@ -99,6 +99,16 @@ ENV/
 
 # mypy
 .mypy_cache/
-.DS_Store
+
+test.txt
+*.pkl
+*.gz
+*.zip
+data/
+tmp/
+.DS_Store/
+logs/
 .idea/
-tests.py
+res/
+spark-warehouse/
+models/
