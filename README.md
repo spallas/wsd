@@ -26,4 +26,5 @@ As a training dataset we use both SemCor and the annotated glosses.
 
 ## Further Details
 
-Please refer to the wiki page for further details about the implementation.
+Please refer to the [wiki page](https://github.com/spallas/wsd/wiki) in this 
+repository for further details about the implementation.
