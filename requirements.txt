@@ -1,0 +1,4 @@
+nltk
+torch
+allennlp
+fairseq

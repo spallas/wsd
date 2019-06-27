@@ -9,7 +9,7 @@ inventory is taken from.
 
 ## Model
 
-The architecture is composed of ELMo embeddings plus a Transformer (x3)
+The architecture is composed of ELMo embeddings plus a TransformerXL (x3)
 on top with a final dense layer for tagging each word with the
 right lemma, pos, and sense identifier.
 
