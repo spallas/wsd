@@ -1,3 +1,4 @@
+tqdm
 nltk
 torch
 allennlp

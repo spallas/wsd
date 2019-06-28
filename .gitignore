@@ -111,4 +111,4 @@ logs/
 .idea/
 res/
 spark-warehouse/
-models/
+saved_weights/

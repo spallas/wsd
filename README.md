@@ -9,16 +9,24 @@ inventory is taken from.
 
 ## Model
 
-The architecture is composed of ELMo embeddings plus a TransformerXL (x3)
-on top with a final dense layer for tagging each word with the
-right lemma, pos, and sense identifier.
+The architecture is composed of contextualized embeddings plus 
+a Transformer on top with a final dense layer.
 
 To incorporate lexical knowledge at evaluation time where we score 
-each possible sense of a word with different scores:
-- the semantic similarity of the context with the gloss of the sense and it's 
-  direct hypernyms and hyponyms.
-- the accumulated probabilities of BERT language model for the lemma names
-  of the synset and of its direct hypernyms and hyponyms.
+each possible sense of a word with a Language-Model-derived score.
+
+To calculate this score we take for each possible synset the lemmas
+of the synset and we extend this list with the lemmas of the direct
+hypernyms and hyponyms (also 'related' ones?). Then for each lemma 
+in the synset list we calculate the probability from the language
+model for that lemma to appear as the next word in the text.
+To avoid having synset with longer lists score higher we consider 
+the following ways of aggregating the scores of each lemma in the 
+list:
+- max
+- mean
+- sum top 5
+- mean top 5
 
 ## Training data
 

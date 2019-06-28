@@ -4,20 +4,26 @@ import torch
 from torch import optim
 from torch.nn.utils import clip_grad_norm_
 
-from wsd import BaselineWSD
+from data_preprocessing import SemCorDataset, ElmoSemCorLoader
+from wsd import SimpleWSD
 
 
-def train():
+def train_elmo():
 
     learning_rate = 0.001
-    checkpoint_path = 'models/baseline/checkpoint.pt'
+    checkpoint_path = 'models/baseline_elmo/checkpoint.pt'
     num_epochs = 2
+    batch_size = 32
 
     # Using single GPU
     # noinspection PyUnresolvedReferences
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
-    model = BaselineWSD()
+    # Load data
+    dataset = SemCorDataset()
+    data_loader = ElmoSemCorLoader(dataset, batch_size=batch_size, win_size=32)
+    # Build model
+    model = SimpleWSD(data_loader)
     model.to(device)
 
     optimizer = optim.Adam(model.parameters(), lr=learning_rate)
@@ -36,11 +42,12 @@ def train():
 
     for epoch in range(last_epoch + 1, num_epochs):
         print(f'Epoch: {epoch}')
-
-        for step, batch in None:  # TODO
+        for step, (b_x, b_l, b_y) in data_loader:
             model.zero_grad()
+            model.h, model.cell = map(lambda x: x.to(device), model.init_hidden(len(b_y)))
 
-            loss = None  # TODO
+            scores = model(b_x.to(device), torch.tensor(b_l).to(device))
+            loss = model.loss(scores, b_y, device)
             loss.backward()  # compute gradients with back-propagation
 
             if step % 100 == 0:

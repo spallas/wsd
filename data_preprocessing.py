@@ -3,11 +3,13 @@ Load data from SemCor files and SemEval/SensEval files.
 """
 
 import xml.etree.ElementTree as Et
+from collections import Counter
 from typing import List, Dict
 
 from allennlp.modules.elmo import batch_to_ids
 from torch import Tensor
 from torch.utils.data import Dataset
+from tqdm import tqdm
 
 from utils import util
 
@@ -28,9 +30,11 @@ class SemCorDataset(Dataset):
         senses_list = []
         for sl in instance2senses.values():
             senses_list += sl
-        senses_list = list(set(senses_list))
+        c = Counter(senses_list)
         # Build sense to id index
-        sense2id: Dict[str, int] = {w: i for i, w in enumerate(senses_list, 1)}  # 0 for monosemic word
+        sense2id: Dict[str, int] = {w: i for i, w in enumerate(list(c.keys()), 1)}
+        # 0 for monosemic words, no sense associated
+        self.senses_count = {sense2id[k]: v for k, v in c.items()}
         instance2ids: Dict[str, List[int]] = {k: list(map(lambda x: sense2id[x], v)) for k, v in instance2senses.items()}
 
         self.elmo_documents: List[Tensor] = []
@@ -39,8 +43,7 @@ class SemCorDataset(Dataset):
         self.first_senses: List[List[int]] = []
         self.pos_tags: List[List[int]] = []
         self.vocab: Dict[str, int] = {'PAD': 0, 'UNK': 0}
-
-        for text in Et.parse(data_path).getroot():
+        for text in tqdm(Et.parse(data_path).getroot()):
             lemmas: List[str] = []
             pos_tags: List[int] = []
             senses: List[List[int]] = []
@@ -66,6 +69,7 @@ class SemCorDataset(Dataset):
         return self.docs[idx], self.first_senses[idx]
 
 
+# TODO: Fix lengths, fix end of batches.
 class SemCorDataLoader:
 
     def __init__(self,
@@ -120,6 +124,38 @@ class SemCorDataLoader:
             self.last_doc += self.batch_size
             self.last_offset = 0
         return b_x, lengths, b_y
+
+
+class ElmoSemCorLoader(SemCorDataLoader):
+
+    def __init__(self, dataset: SemCorDataset, batch_size: int, win_size: int, shuffle: bool = False,
+                 overlap_size: int = 0, return_all_senses: bool = False, return_pos_tags: bool = False):
+        super().__init__(dataset, batch_size, win_size, shuffle, overlap_size, return_all_senses, return_pos_tags)
+
+    def __next__(self):
+        if self.last_doc >= len(self.dataset.docs):
+            raise StopIteration
+        b_x = []
+        b_y = []
+        b_l = []
+        lengths = [len(d) for d in self.dataset.docs[self.last_doc: self.last_doc + self.batch_size]]
+        end_of_docs = max(lengths) <= self.last_offset + self.win_size
+        for i in range(self.batch_size):
+            text_span = self.dataset.docs[self.last_doc + i][self.last_offset: self.last_offset + self.win_size]
+            labels = self.dataset.first_senses[self.last_doc + i][self.last_offset: self.last_offset + self.win_size]
+            length = len(text_span)
+            # Padding
+            text_span += 'PAD' * (self.win_size - len(text_span))
+            labels += 0 * (self.win_size - len(labels))
+            b_x.append(text_span)
+            b_y.append(labels)
+            b_l.append(length)
+
+        self.last_offset += self.win_size - self.overlap_size
+        if end_of_docs:
+            self.last_doc += self.batch_size
+            self.last_offset = 0
+        return batch_to_ids(b_x), b_l, b_y
 
 
 if __name__ == '__main__':
