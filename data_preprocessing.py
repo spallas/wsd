@@ -145,8 +145,8 @@ class ElmoSemCorLoader(SemCorDataLoader):
             labels = self.dataset.first_senses[self.last_doc + i][self.last_offset: self.last_offset + self.win_size]
             length = len(text_span)
             # Padding
-            text_span += 'PAD' * (self.win_size - len(text_span))
-            labels += 0 * (self.win_size - len(labels))
+            text_span += ['PAD'] * (self.win_size - len(text_span))
+            labels += [0] * (self.win_size - len(labels))
             b_x.append(text_span)
             b_y.append(labels)
             b_l.append(length)
