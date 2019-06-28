@@ -21,8 +21,8 @@ class WSDNet(nn.Module):
 
 class SimpleWSD(nn.Module):
 
-    _ELMO_OPTIONS = ''
-    _ELMO_WEIGHTS = ''
+    _ELMO_OPTIONS = 'res/elmo/elmo_2x1024_128_2048cnn_1xhighway_options.json'
+    _ELMO_WEIGHTS = 'res/elmo/elmo_2x1024_128_2048cnn_1xhighway_weights.hdf5'
     _ELMO_SIZE = 128
     _HIDDEN_SIZE = 128
     _NUM_LAYERS = 1
