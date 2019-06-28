@@ -30,6 +30,7 @@ class SimpleWSD(nn.Module):
     def __init__(self, loader: SemCorDataLoader):
         super().__init__()
         self.tagset_size = len(loader.dataset.senses_count)
+        self.win_size = loader.win_size
         self.pad_tag_index = 0
         self.elmo = Elmo(self._ELMO_OPTIONS,
                          self._ELMO_WEIGHTS,
@@ -53,7 +54,7 @@ class SimpleWSD(nn.Module):
     def forward(self, char_ids, lengths):
 
         embeddings = self.elmo(char_ids)
-        x = embeddings
+        x = embeddings['elmo_representations'][1]
         hidden_states, (self.h, self.cell) = self.lstm(x, (self.h, self.cell))
         out = hidden_states
 
@@ -61,7 +62,7 @@ class SimpleWSD(nn.Module):
         y = y.contiguous().view(-1, y.shape[2])
         y = self.output_dense(y)
         y = nn.LogSoftmax(dim=1)(y)
-        tag_scores = y.view(self.batch_size, max(lengths), self.tagset_size)
+        tag_scores = y.view(self.batch_size, self.win_size, self.tagset_size)
         return tag_scores
 
     def loss(self, y, tags, device):

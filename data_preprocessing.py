@@ -69,7 +69,6 @@ class SemCorDataset(Dataset):
         return self.docs[idx], self.first_senses[idx]
 
 
-# TODO: Fix lengths, fix end of batches.
 class SemCorDataLoader:
 
     def __init__(self,
@@ -105,25 +104,30 @@ class SemCorDataLoader:
             y: Tensor - shape = (batch_size x win_size)
                       - y[i][j] = sense index in vocab
         """
+        if self.last_doc >= len(self.dataset.docs):
+            raise StopIteration
         b_x = []
         b_y = []
+        b_l = []
         lengths = [len(d) for d in self.dataset.docs[self.last_doc: self.last_doc + self.batch_size]]
         end_of_docs = max(lengths) <= self.last_offset + self.win_size
         for i in range(self.batch_size):
             text_span = self.dataset.docs[self.last_doc + i][self.last_offset: self.last_offset + self.win_size]
             text_span_ids = list(map(lambda x: self.dataset.vocab[x], text_span))
             labels = self.dataset.first_senses[self.last_doc + i][self.last_offset: self.last_offset + self.win_size]
+            length = len(text_span)
             # Padding
             text_span_ids += [self.dataset.vocab['PAD']] * (self.win_size - len(text_span_ids))
             labels += [self.dataset.vocab['PAD']] * (self.win_size - len(labels))
-            b_x.append(text_span_ids)
+            b_x.append(text_span)
             b_y.append(labels)
+            b_l.append(length)
 
         self.last_offset += self.win_size - self.overlap_size
         if end_of_docs:
             self.last_doc += self.batch_size
             self.last_offset = 0
-        return b_x, lengths, b_y
+        return b_x, b_l, b_y
 
 
 class ElmoSemCorLoader(SemCorDataLoader):

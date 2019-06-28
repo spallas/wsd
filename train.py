@@ -1,6 +1,7 @@
 import os
 
 import torch
+from sklearn.metrics import classification_report, f1_score
 from torch import optim
 from torch.nn.utils import clip_grad_norm_
 
@@ -8,10 +9,41 @@ from data_preprocessing import SemCorDataset, ElmoSemCorLoader
 from wsd import SimpleWSD
 
 
+def eval_elmo(model, device, eval_loader, best_f1_micro, epoch):
+
+    eval_report = 'logs/baseline_elmo_report.txt'
+    best_model_path = 'saved_weights/baseline_elmo/best_checkpoint.pt'
+
+    print("Evaluating...", flush=True)
+    model.eval()
+    with torch.no_grad():
+        pred, true, altern = [], [], []
+        for step, (b_x, b_l, b_y) in enumerate(eval_loader):
+            model.zero_grad()
+            model.h, model.cell = map(lambda x: x.to(device), model.init_hidden(len(b_y)))
+            tag_scores = model(b_x.to(device), torch.tensor(b_l).to(device))
+
+            pred += None  # TODO: select top synset
+
+        true_eval, pred_eval = [], []
+        with open(eval_report, 'w') as fo:
+            print(classification_report(true_eval, pred_eval, digits=3), file=fo)
+            f1 = f1_score(true_eval, pred_eval, average='micro')
+            print(f"F1 = {f1}")
+
+        if f1 > best_f1_micro:
+            best_f1_micro = f1
+            torch.save({
+                'epoch': epoch,
+                'model_state_dict': model.state_dict(),
+                'f1': best_f1_micro
+            }, best_model_path)
+
+
 def train_elmo():
 
     learning_rate = 0.001
-    checkpoint_path = 'models/baseline_elmo/checkpoint.pt'
+    checkpoint_path = 'saved_weights/baseline_elmo/checkpoint.pt'
     num_epochs = 2
     batch_size = 32
 
@@ -22,6 +54,10 @@ def train_elmo():
     # Load data
     dataset = SemCorDataset()
     data_loader = ElmoSemCorLoader(dataset, batch_size=batch_size, win_size=32)
+    eval_dataset = SemCorDataset(data_path='res/wsd-test/se07/se07.xml',
+                                 tags_path='res/wsd-test/se07/se07.txt')
+    eval_loader = ElmoSemCorLoader(eval_dataset, batch_size=batch_size,
+                                   win_size=32, overlap_size=8)
     # Build model
     model = SimpleWSD(data_loader)
     model.to(device)
@@ -42,7 +78,7 @@ def train_elmo():
 
     for epoch in range(last_epoch + 1, num_epochs):
         print(f'Epoch: {epoch}')
-        for step, (b_x, b_l, b_y) in data_loader:
+        for step, (b_x, b_l, b_y) in enumerate(data_loader):
             model.zero_grad()
             model.h, model.cell = map(lambda x: x.to(device), model.init_hidden(len(b_y)))
 
@@ -51,7 +87,7 @@ def train_elmo():
             loss.backward()  # compute gradients with back-propagation
 
             if step % 100 == 0:
-                print(f'\r{loss.item():.4f} ', end='')
+                print(f'\rLoss: {loss.item():.4f} ', end='')
                 if torch.cuda.is_available():  # check if memory is leaking
                     print(f'Allocated GPU memory: {torch.cuda.memory_allocated() / 1_000_000} MB', end='')
                 # possibly save progress
@@ -65,9 +101,8 @@ def train_elmo():
                         'current_loss': current_loss,
                         'min_loss': min_loss,
                     }, checkpoint_path)
-                    # TODO: evaluate
+                # eval_elmo(model, device, eval_loader, best_f1_micro, epoch)
 
             clip_grad_norm_(parameters=model.parameters(), max_norm=1.0)
             optimizer.step()  # update the weights
-
     return
