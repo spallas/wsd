@@ -61,6 +61,8 @@ class SemCorDataset(Dataset):
             self.pos_tags.append(pos_tags)
             self.senses.append(senses)
             self.first_senses.append([i[0] for i in senses])
+        self.docs = self.docs[:64]
+        self.first_senses = self.first_senses[:64]
 
     def __len__(self):
         return len(self.docs)
@@ -90,6 +92,7 @@ class SemCorDataLoader:
     def __iter__(self):
         self.last_doc = 0
         self.last_offset = 0
+        self.stop_iter = False
         return self
 
     def __next__(self):
@@ -104,7 +107,7 @@ class SemCorDataLoader:
             y: Tensor - shape = (batch_size x win_size)
                       - y[i][j] = sense index in vocab
         """
-        if self.last_doc >= len(self.dataset.docs):
+        if self.stop_iter:
             raise StopIteration
         b_x = []
         b_y = []
@@ -112,6 +115,9 @@ class SemCorDataLoader:
         lengths = [len(d) for d in self.dataset.docs[self.last_doc: self.last_doc + self.batch_size]]
         end_of_docs = max(lengths) <= self.last_offset + self.win_size
         for i in range(self.batch_size):
+            if self.last_doc + i >= len(self.dataset.docs) - 1:
+                self.stop_iter = True
+                break
             text_span = self.dataset.docs[self.last_doc + i][self.last_offset: self.last_offset + self.win_size]
             text_span_ids = list(map(lambda x: self.dataset.vocab[x], text_span))
             labels = self.dataset.first_senses[self.last_doc + i][self.last_offset: self.last_offset + self.win_size]
@@ -137,7 +143,7 @@ class ElmoSemCorLoader(SemCorDataLoader):
         super().__init__(dataset, batch_size, win_size, shuffle, overlap_size, return_all_senses, return_pos_tags)
 
     def __next__(self):
-        if self.last_doc >= len(self.dataset.docs):
+        if self.stop_iter:
             raise StopIteration
         b_x = []
         b_y = []
@@ -145,6 +151,9 @@ class ElmoSemCorLoader(SemCorDataLoader):
         lengths = [len(d) for d in self.dataset.docs[self.last_doc: self.last_doc + self.batch_size]]
         end_of_docs = max(lengths) <= self.last_offset + self.win_size
         for i in range(self.batch_size):
+            if self.last_doc + i >= len(self.dataset.docs) - 1:
+                self.stop_iter = True
+                break
             text_span = self.dataset.docs[self.last_doc + i][self.last_offset: self.last_offset + self.win_size]
             labels = self.dataset.first_senses[self.last_doc + i][self.last_offset: self.last_offset + self.win_size]
             length = len(text_span)

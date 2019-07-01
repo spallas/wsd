@@ -1,5 +1,6 @@
 import os
 
+import numpy as np
 import torch
 from sklearn.metrics import classification_report, f1_score
 from torch import optim
@@ -8,26 +9,44 @@ from torch.nn.utils import clip_grad_norm_
 from data_preprocessing import SemCorDataset, ElmoSemCorLoader
 from wsd import SimpleWSD
 
+torch.manual_seed(42)
+np.random.seed(42)
 
-def eval_elmo(model, device, eval_loader, best_f1_micro, epoch):
+
+def eval_elmo(model, device, eval_loader, best_f1_micro, epoch, dataset):
 
     eval_report = 'logs/baseline_elmo_report.txt'
     best_model_path = 'saved_weights/baseline_elmo/best_checkpoint.pt'
 
-    print("Evaluating...", flush=True)
+    print("\nEvaluating...", flush=True)
     model.eval()
     with torch.no_grad():
-        pred, true, altern = [], [], []
+        pred, true = [], []
         for step, (b_x, b_l, b_y) in enumerate(eval_loader):
             model.zero_grad()
             model.h, model.cell = map(lambda x: x.to(device), model.init_hidden(len(b_y)))
-            tag_scores = model(b_x.to(device), torch.tensor(b_l).to(device))
-
-            pred += None  # TODO: select top synset
-
-        true_eval, pred_eval = [], []
+            scores = model(b_x.to(device), torch.tensor(b_l).to(device))
+            pred += torch.max(scores, -1)[1].tolist()
+            true += b_y
+        print(f"Len true = {len(true)}\nLen pred = {len(pred)}")
+        print(f"{pred}")
+        print(f"{true}")
+        true_eval, pred_eval = [item for sublist in true for item in sublist], \
+                               [item for sublist in pred for item in sublist]
+        te, pe = [], []
+        for i in range(len(true_eval)):
+            if true_eval[i] == 0:
+                continue
+            else:
+                te.append(true_eval[i])
+                pe.append(pred_eval[i])
+        true_eval, pred_eval = te, pe
         with open(eval_report, 'w') as fo:
-            print(classification_report(true_eval, pred_eval, digits=3), file=fo)
+            print(classification_report(
+                        np.array(true_eval),
+                        np.array(pred_eval),
+                        digits=3),
+                  file=fo)
             f1 = f1_score(true_eval, pred_eval, average='micro')
             print(f"F1 = {f1}")
 
@@ -48,7 +67,6 @@ def train_elmo():
     batch_size = 32
 
     # Using single GPU
-    # noinspection PyUnresolvedReferences
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
     # Load data
@@ -72,11 +90,14 @@ def train_elmo():
         optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
         last_epoch = checkpoint['epoch']
         min_loss = checkpoint['min_loss']
+        print(f"Loaded checkpoint from: {checkpoint_path}")
+        if last_epoch >= num_epochs:
+            print("Training finished for this checkpoint")
     else:
         last_epoch = 0
         min_loss = 1e3
 
-    for epoch in range(last_epoch + 1, num_epochs):
+    for epoch in range(last_epoch + 1, num_epochs + 1):
         print(f'Epoch: {epoch}')
         for step, (b_x, b_l, b_y) in enumerate(data_loader):
             model.zero_grad()
@@ -101,7 +122,7 @@ def train_elmo():
                         'current_loss': current_loss,
                         'min_loss': min_loss,
                     }, checkpoint_path)
-                # eval_elmo(model, device, eval_loader, best_f1_micro, epoch)
+                eval_elmo(model, device, eval_loader, best_f1_micro, epoch, dataset)
 
             clip_grad_norm_(parameters=model.parameters(), max_norm=1.0)
             optimizer.step()  # update the weights

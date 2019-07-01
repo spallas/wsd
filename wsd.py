@@ -67,12 +67,14 @@ class SimpleWSD(nn.Module):
 
     def loss(self, y, tags, device):
         y_true = torch.tensor(tags).view(-1).to(device)
+        if  all([x == 0 for l in tags for x in l]):
+            print("All zeros tags")
         y = y.view(-1, self.tagset_size)
         mask = (y_true != self.pad_tag_index).float()
         num_tokens = int(torch.sum(mask).item())
 
         y_l = y[range(y.shape[0]), y_true] * mask
-        ce_loss = - torch.sum(y_l) / num_tokens  # Negative LogLikelihood
+        ce_loss = - torch.sum(y_l) / (num_tokens + 1)  # Negative LogLikelihood
         return ce_loss
 
 
