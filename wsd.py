@@ -67,8 +67,6 @@ class SimpleWSD(nn.Module):
 
     def loss(self, y, tags, device):
         y_true = torch.tensor(tags).view(-1).to(device)
-        if  all([x == 0 for l in tags for x in l]):
-            print("All zeros tags")
         y = y.view(-1, self.tagset_size)
         mask = (y_true != self.pad_tag_index).float()
         num_tokens = int(torch.sum(mask).item())

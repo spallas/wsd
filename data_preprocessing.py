@@ -61,8 +61,6 @@ class SemCorDataset(Dataset):
             self.pos_tags.append(pos_tags)
             self.senses.append(senses)
             self.first_senses.append([i[0] for i in senses])
-        self.docs = self.docs[:64]
-        self.first_senses = self.first_senses[:64]
 
     def __len__(self):
         return len(self.docs)
