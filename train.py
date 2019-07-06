@@ -140,11 +140,52 @@ class BaseTrainer:
                     'f1': self.best_f1_micro
                 }, best_model_path)
 
-    def test(self):
+    def test(self,
+             eval_report='logs/baseline_elmo_report_test.txt',
+             best_model_path='saved_weights/baseline_elmo/best_checkpoint.pt'):
         """
         Evaluate on all test dataset.
         """
-        pass
+        test_dataset = SemCorDataset(data_path='res/wsd-train/test_data.xml',
+                                     tags_path='res/wsd-train/test_tags.txt',
+                                     sense2id=self.data_loader.dataset.sense2id)
+        test_loader = ElmoLemmaPosLoader(test_dataset, batch_size=32, win_size=32)
+
+        if os.path.exists(best_model_path):
+            checkpoint = torch.load(best_model_path)
+            self.model.load_state_dict(checkpoint['model_state_dict'])
+        else:
+            raise ValueError("Could not find any best model checkpoint.")
+
+        print("\nEvaluating on concatenation of all dataset...", flush=True)
+        self.model.eval()
+        with torch.no_grad():
+            pred, true = [], []
+            for step, (b_x, b_str, b_p, b_l, b_y) in enumerate(test_loader):
+                self.model.zero_grad()
+                self.model.h, self.model.cell = map(lambda x: x.to(self.device),
+                                                    self.model.init_hidden(len(b_y)))
+                scores = self.model(b_x.to(self.device), torch.tensor(b_l).to(self.device))
+                pred += self._select_senses(scores, b_x, b_str, b_p, b_l)
+                true += b_y
+            true_eval, pred_eval = [item for sublist in true for item in sublist], \
+                                   [item for sublist in pred for item in sublist]
+            te, pe = [], []
+            for i in range(len(true_eval)):
+                if true_eval[i] == 0:
+                    continue
+                else:
+                    te.append(true_eval[i])
+                    pe.append(pred_eval[i])
+            true_eval, pred_eval = te, pe
+            with open(eval_report, 'w') as fo:
+                print(classification_report(
+                          true_eval,
+                          pred_eval,
+                          digits=3),
+                      file=fo)
+                f1 = f1_score(true_eval, pred_eval, average='micro')
+                print(f"F1 = {f1}")
 
 
 class WSDNetTrainer(BaseTrainer):

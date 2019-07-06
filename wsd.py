@@ -24,8 +24,8 @@ class SimpleWSD(nn.Module):
     _ELMO_OPTIONS = 'res/elmo/elmo_2x1024_128_2048cnn_1xhighway_options.json'
     _ELMO_WEIGHTS = 'res/elmo/elmo_2x1024_128_2048cnn_1xhighway_weights.hdf5'
     _ELMO_SIZE = 128
-    _HIDDEN_SIZE = 128
-    _NUM_LAYERS = 1
+    _HIDDEN_SIZE = 1024
+    _NUM_LAYERS = 2
 
     def __init__(self, loader: SemCorDataLoader):
         super().__init__()
