@@ -214,8 +214,10 @@ class ElmoLemmaPosLoader(SemCorDataLoader):
             pos_tags = self.dataset.pos_tags[n][m]
             length = len(text_span)
             # Padding
-            text_span += ['.'] * (self.win_size - len(text_span))
-            labels += [0] * (self.win_size - len(labels))
+            text_span += ['.'] * (self.win_size - length)
+            labels += [0] * (self.win_size - length)
+            pos_tags += ['.'] * (self.win_size - length)
+
             b_x.append(text_span)
             b_y.append(labels)
             b_l.append(length)

@@ -2,12 +2,19 @@ import os
 
 import numpy as np
 import torch
+from nltk.corpus.reader import Synset
 from sklearn.metrics import classification_report, f1_score
+from scipy.special import softmax
 from torch import optim
 from torch.nn.utils import clip_grad_norm_
 
+from nltk.corpus import wordnet as wn
+from typing import List, Set
+
+from utils import util
 from data_preprocessing import SemCorDataset, ElmoSemCorLoader, ElmoLemmaPosLoader
 from wsd import SimpleWSD
+
 
 torch.manual_seed(42)
 np.random.seed(42)
@@ -17,8 +24,8 @@ class BaseTrainer:
 
     def __init__(self,
                  learning_rate=0.001,
-                 num_epochs=20,
-                 batch_size=32,
+                 num_epochs=40,
+                 batch_size=64,
                  checkpoint_path='saved_weights/baseline_elmo/checkpoint.pt'):
         self.learning_rate = learning_rate
         self.num_epochs = num_epochs
@@ -88,12 +95,41 @@ class BaseTrainer:
             self.optimizer.step()  # update the weights
 
     def train(self):
+        self.model.train()
         for epoch in range(self.last_epoch + 1, self.num_epochs + 1):
             print(f'\nEpoch: {epoch}')
             self.train_epoch(epoch)
 
     def _select_senses(self, b_scores, b_vec, b_str, b_pos, b_lengths):
-        return torch.max(b_scores, -1)[1].tolist()  # max[1] are the indices
+        """
+        Get the max of scores only of possible senses for a given lemma+pos
+        :param b_scores: shape = (batch_s x win_s x sense_vocab_s)
+        :param b_vec:
+        :param b_str:
+        :param b_pos:
+        :param b_lengths:
+        :return:
+        """
+        def to_ids(s: List[Synset]):
+            return [self.data_loader.dataset.sense2id[x.name()] for x in s]
+
+        def set2padded(s: Set[int]):
+            arr = np.array(list(s))
+            return np.pad(arr, (0, b_scores.shape[-1] - len(s)), 'edge')
+
+        b_impossible_senses = []
+        # we will set to 0 senses not in WordNet for given lemma.
+        for i, sent in enumerate(b_str):
+            impossible_senses = []
+            for j, lemma in enumerate(sent):
+                sense_ids = to_ids(wn.synsets(lemma, pos=util.id2wnpos[b_pos[i][j]]))
+                padded = set2padded(set(range(b_scores.shape[-1])) - set(sense_ids))
+                impossible_senses.append(padded)
+            b_impossible_senses.append(impossible_senses)
+        b_scores = b_scores.numpy()
+        b_impossible_senses = np.array(b_impossible_senses)
+        np.put_along_axis(b_scores, b_impossible_senses, -np.inf, axis=-1)
+        return np.argmax(b_scores, -1).tolist()
 
     def evaluate(self,
                  num_epoch,
@@ -121,8 +157,8 @@ class BaseTrainer:
                     te.append(true_eval[i])
                     pe.append(pred_eval[i])
             true_eval, pred_eval = te, pe
-            print(f"True: {true_eval}")
-            print(f"Pred: {pred_eval}")
+            print(f"True: {true_eval[:25]} ...")
+            print(f"Pred: {pred_eval[:25]} ...")
             with open(eval_report, 'w') as fo:
                 print(classification_report(
                           true_eval,
@@ -168,16 +204,15 @@ class BaseTrainer:
                 scores = self.model(b_x.to(self.device), torch.tensor(b_l).to(self.device))
                 pred += self._select_senses(scores, b_x, b_str, b_p, b_l)
                 true += b_y
-            true_eval, pred_eval = [item for sublist in true for item in sublist], \
+            true_flat, pred_flat = [item for sublist in true for item in sublist], \
                                    [item for sublist in pred for item in sublist]
-            te, pe = [], []
-            for i in range(len(true_eval)):
-                if true_eval[i] == 0:
+            true_eval, pred_eval = [], []
+            for i in range(len(true_flat)):
+                if true_flat[i] == 0:
                     continue
                 else:
-                    te.append(true_eval[i])
-                    pe.append(pred_eval[i])
-            true_eval, pred_eval = te, pe
+                    true_eval.append(true_flat[i])
+                    pred_eval.append(pred_flat[i])
             with open(eval_report, 'w') as fo:
                 print(classification_report(
                           true_eval,
@@ -186,6 +221,47 @@ class BaseTrainer:
                       file=fo)
                 f1 = f1_score(true_eval, pred_eval, average='micro')
                 print(f"F1 = {f1}")
+
+
+class WSDTrainerLM(BaseTrainer):
+
+    def _select_senses(self, b_scores, b_vec, b_str, b_pos, b_lengths):
+        """
+        Use Language model to get a second score and use geometric mean on scores.
+        :param b_scores:
+        :param b_vec:
+        :param b_str:
+        :param b_pos:
+        :param b_lengths:
+        :return:
+        """
+        def to_ids(s: List[Synset]):
+            return [self.data_loader.dataset.sense2id[x.name()] for x in s]
+
+        def set2padded(s: Set[int]):
+            arr = np.array(list(s))
+            return np.pad(arr, (0, b_scores.shape[-1] - len(s)), 'edge')
+
+        b_impossible_senses = []
+        # we will set to 0 senses not in WordNet for given lemma.
+        for i, sent in enumerate(b_str):
+            impossible_senses = []
+            for j, lemma in enumerate(sent):
+                sense_ids = to_ids(wn.synsets(lemma, pos=util.id2wnpos[b_pos[i][j]]))
+                padded = set2padded(set(range(b_scores.shape[-1])) - set(sense_ids))
+                impossible_senses.append(padded)
+            b_impossible_senses.append(impossible_senses)
+        b_scores = b_scores.numpy()
+        b_scores = softmax(b_scores, -1)
+        b_impossible_senses = np.array(b_impossible_senses)
+        np.put_along_axis(b_scores, b_impossible_senses, 0, axis=-1)
+
+        lm_scores = []
+        # for each sent in batch
+        #   for each masked word:
+        #       get probabilities of all possible lemmas of all possible synsets.
+
+        return np.argmax(b_scores, -1).tolist()
 
 
 class WSDNetTrainer(BaseTrainer):
