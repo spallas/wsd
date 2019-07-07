@@ -90,6 +90,7 @@ class BaseTrainer:
                         'min_loss': min_loss,
                     }, self.checkpoint_path)
                 self.evaluate(epoch_i)
+                self.model.train()  # return to train mode
 
             clip_grad_norm_(parameters=self.model.parameters(), max_norm=1.0)
             self.optimizer.step()  # update the weights
