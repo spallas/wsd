@@ -16,8 +16,8 @@ from utils import util
 class SemCorDataset(Dataset):
 
     def __init__(self,
-                 data_path='res/wsd-train/semcor_data.xml',
-                 tags_path='res/wsd-train/semcor_tags.txt',
+                 data_path='res/wsd-train/semcor+glosses_data.xml',
+                 tags_path='res/wsd-train/semcor+glosses_tags.txt',
                  sense2id: Dict[str, int] = None):
         """
         Load from XML and txt files sentences and tags.

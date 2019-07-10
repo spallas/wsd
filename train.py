@@ -11,6 +11,7 @@ from sklearn.exceptions import UndefinedMetricWarning
 from sklearn.metrics import classification_report, f1_score
 from torch import optim
 from torch.nn.utils import clip_grad_norm_
+from torch.utils.tensorboard import SummaryWriter
 
 from data_preprocessing import SemCorDataset, ElmoSemCorLoader, ElmoLemmaPosLoader
 from utils import util
@@ -27,42 +28,58 @@ class BaseTrainer:
                  learning_rate=0.001,
                  num_epochs=40,
                  batch_size=64,
-                 checkpoint_path='saved_weights/baseline_elmo/checkpoint.pt'):
+                 checkpoint_path='saved_weights/baseline_elmo/checkpoint.pt',
+                 is_training=False):
+
         self.learning_rate = learning_rate
         self.num_epochs = num_epochs
         self.batch_size = batch_size
         self.checkpoint_path = checkpoint_path
+        self._plot_server = None
 
         # Using single GPU
         self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+        if is_training:
+            self._setup_training()
+        else:
+            self._setup_testing()
 
+    def _setup_training(self):
         # Load data
         dataset = SemCorDataset()
-        self.data_loader = ElmoSemCorLoader(dataset, batch_size=batch_size, win_size=32)
+        self.data_loader = ElmoSemCorLoader(dataset, batch_size=self.batch_size, win_size=32)
         eval_dataset = SemCorDataset(data_path='res/wsd-test/se07/se07.xml',
                                      tags_path='res/wsd-test/se07/se07.txt',
                                      sense2id=dataset.sense2id)
-        self.eval_loader = ElmoLemmaPosLoader(eval_dataset, batch_size=batch_size,
+        self.eval_loader = ElmoLemmaPosLoader(eval_dataset, batch_size=self.batch_size,
                                               win_size=32, overlap_size=8)
         # Build model
         self.model = SimpleWSD(self.data_loader)
         self.model.to(self.device)
 
-        self.optimizer = optim.Adam(self.model.parameters(), lr=learning_rate)
+        self.optimizer = optim.Adam(self.model.parameters(), lr=self.learning_rate)
         self.best_f1_micro = 0.0
 
-        if os.path.exists(checkpoint_path):
-            checkpoint = torch.load(checkpoint_path)
+        if os.path.exists(self.checkpoint_path):
+            checkpoint = torch.load(self.checkpoint_path)
             self.model.load_state_dict(checkpoint['model_state_dict'])
             self.optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
             self.last_epoch = checkpoint['epoch']
             self.min_loss = checkpoint['min_loss']
-            print(f"Loaded checkpoint from: {checkpoint_path}")
-            if self.last_epoch >= num_epochs:
+            print(f"Loaded checkpoint from: {self.checkpoint_path}")
+            if self.last_epoch >= self.num_epochs:
                 print("Training finished for this checkpoint")
         else:
             self.last_epoch = 0
             self.min_loss = 1e3
+
+    def _setup_testing(self):
+        # Load data
+        dataset = SemCorDataset()
+        self.data_loader = ElmoSemCorLoader(dataset, batch_size=self.batch_size, win_size=32)
+        # Build model
+        self.model = SimpleWSD(self.data_loader)
+        self.model.to(self.device)
 
     def train_epoch(self, epoch_i):
         for step, (b_x, b_l, b_y) in enumerate(self.data_loader):
@@ -102,37 +119,6 @@ class BaseTrainer:
             print(f'\nEpoch: {epoch}')
             self.train_epoch(epoch)
 
-    def _select_senses(self, b_scores, b_vec, b_str, b_pos, b_lengths, b_labels):
-        """
-        Get the max of scores only of possible senses for a given lemma+pos
-        :param b_scores: shape = (batch_s x win_s x sense_vocab_s)
-        :param b_vec:
-        :param b_str:
-        :param b_pos:
-        :param b_lengths:
-        :return:
-        """
-        def to_ids(synsets):
-            return [self.data_loader.dataset.sense2id[x.name()] for x in synsets]
-
-        def set2padded(s: Set[int]):
-            arr = np.array(list(s))
-            return np.pad(arr, (0, b_scores.shape[-1] - len(s)), 'edge')
-
-        b_impossible_senses = []
-        # we will set to 0 senses not in WordNet for given lemma.
-        for i, sent in enumerate(b_str):
-            impossible_senses = []
-            for j, lemma in enumerate(sent):
-                sense_ids = to_ids(wn.synsets(lemma, pos=util.id2wnpos[b_pos[i][j]]))
-                padded = set2padded(set(range(b_scores.shape[-1])) - set(sense_ids))
-                impossible_senses.append(padded)
-            b_impossible_senses.append(impossible_senses)
-        b_scores = b_scores.cpu().numpy()
-        b_impossible_senses = np.array(b_impossible_senses)
-        np.put_along_axis(b_scores, b_impossible_senses, -np.inf, axis=-1)
-        return np.argmax(b_scores, -1).tolist()
-
     def evaluate(self,
                  num_epoch,
                  eval_report='logs/baseline_elmo_report.txt',
@@ -162,10 +148,10 @@ class BaseTrainer:
             print(f"Pred: {pred_eval[:25]} ...")
             with open(eval_report, 'w') as fo:
                 print(classification_report(
-                          true_eval,
-                          pred_eval,
-                          digits=3),
-                      file=fo)
+                    true_eval,
+                    pred_eval,
+                    digits=3),
+                    file=fo)
                 f1 = f1_score(true_eval, pred_eval, average='micro')
                 print(f"F1 = {f1}")
 
@@ -222,6 +208,42 @@ class BaseTrainer:
                       file=fo)
                 f1 = f1_score(true_eval, pred_eval, average='micro')
                 print(f"F1 = {f1}")
+
+    def _select_senses(self, b_scores, b_vec, b_str, b_pos, b_lengths, b_labels):
+        """
+        Get the max of scores only of possible senses for a given lemma+pos
+        :param b_scores: shape = (batch_s x win_s x sense_vocab_s)
+        :param b_vec:
+        :param b_str:
+        :param b_pos:
+        :param b_lengths:
+        :return:
+        """
+        def to_ids(synsets):
+            return [self.data_loader.dataset.sense2id[x.name()] for x in synsets]
+
+        def set2padded(s: Set[int]):
+            arr = np.array(list(s))
+            return np.pad(arr, (0, b_scores.shape[-1] - len(s)), 'edge')
+
+        b_impossible_senses = []
+        # we will set to 0 senses not in WordNet for given lemma.
+        for i, sent in enumerate(b_str):
+            impossible_senses = []
+            for j, lemma in enumerate(sent):
+                sense_ids = to_ids(wn.synsets(lemma, pos=util.id2wnpos[b_pos[i][j]]))
+                padded = set2padded(set(range(b_scores.shape[-1])) - set(sense_ids))
+                impossible_senses.append(padded)
+            b_impossible_senses.append(impossible_senses)
+        b_scores = b_scores.cpu().numpy()
+        b_impossible_senses = np.array(b_impossible_senses)
+        np.put_along_axis(b_scores, b_impossible_senses, -np.inf, axis=-1)
+        return np.argmax(b_scores, -1).tolist()
+
+    def _plot(self, name, value, step):
+        if not self._plot_server:
+            self._plot_server = SummaryWriter(log_dir='logs')
+        self._plot_server.add_scalar(name, value, step)
 
 
 class WSDTrainerLM(BaseTrainer):
