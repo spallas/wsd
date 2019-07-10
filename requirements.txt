@@ -1,3 +1,4 @@
+scipy
 numpy
 scikit-learn
 tqdm
@@ -5,3 +6,4 @@ nltk
 torch
 allennlp
 fairseq
+pytorch-pretrained-bert

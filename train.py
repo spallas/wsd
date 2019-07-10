@@ -1,21 +1,22 @@
 import os
+import warnings
+from typing import Set
 
 import numpy as np
 import torch
-from nltk.corpus.reader import Synset
-from sklearn.metrics import classification_report, f1_score
+from nltk.corpus import wordnet as wn
+from pytorch_pretrained_bert import BertForMaskedLM, BertTokenizer
 from scipy.special import softmax
+from sklearn.exceptions import UndefinedMetricWarning
+from sklearn.metrics import classification_report, f1_score
 from torch import optim
 from torch.nn.utils import clip_grad_norm_
 
-from nltk.corpus import wordnet as wn
-from typing import List, Set
-
-from utils import util
 from data_preprocessing import SemCorDataset, ElmoSemCorLoader, ElmoLemmaPosLoader
+from utils import util
 from wsd import SimpleWSD
 
-
+warnings.filterwarnings("ignore", category=UndefinedMetricWarning)
 torch.manual_seed(42)
 np.random.seed(42)
 
@@ -101,7 +102,7 @@ class BaseTrainer:
             print(f'\nEpoch: {epoch}')
             self.train_epoch(epoch)
 
-    def _select_senses(self, b_scores, b_vec, b_str, b_pos, b_lengths):
+    def _select_senses(self, b_scores, b_vec, b_str, b_pos, b_lengths, b_labels):
         """
         Get the max of scores only of possible senses for a given lemma+pos
         :param b_scores: shape = (batch_s x win_s x sense_vocab_s)
@@ -111,8 +112,8 @@ class BaseTrainer:
         :param b_lengths:
         :return:
         """
-        def to_ids(s: List[Synset]):
-            return [self.data_loader.dataset.sense2id[x.name()] for x in s]
+        def to_ids(synsets):
+            return [self.data_loader.dataset.sense2id[x.name()] for x in synsets]
 
         def set2padded(s: Set[int]):
             arr = np.array(list(s))
@@ -146,18 +147,17 @@ class BaseTrainer:
                 self.model.h, self.model.cell = map(lambda x: x.to(self.device),
                                                     self.model.init_hidden(len(b_y)))
                 scores = self.model(b_x.to(self.device), torch.tensor(b_l).to(self.device))
-                pred += self._select_senses(scores, b_x, b_str, b_p, b_l)
+                pred += self._select_senses(scores, b_x, b_str, b_p, b_l, b_y)
                 true += b_y
-            true_eval, pred_eval = [item for sublist in true for item in sublist], \
+            true_flat, pred_flat = [item for sublist in true for item in sublist], \
                                    [item for sublist in pred for item in sublist]
-            te, pe = [], []
-            for i in range(len(true_eval)):
-                if true_eval[i] == 0:
+            true_eval, pred_eval = [], []
+            for i in range(len(true_flat)):
+                if true_flat[i] == 0:
                     continue
                 else:
-                    te.append(true_eval[i])
-                    pe.append(pred_eval[i])
-            true_eval, pred_eval = te, pe
+                    true_eval.append(true_flat[i])
+                    pred_eval.append(pred_flat[i])
             print(f"True: {true_eval[:25]} ...")
             print(f"Pred: {pred_eval[:25]} ...")
             with open(eval_report, 'w') as fo:
@@ -203,7 +203,7 @@ class BaseTrainer:
                 self.model.h, self.model.cell = map(lambda x: x.to(self.device),
                                                     self.model.init_hidden(len(b_y)))
                 scores = self.model(b_x.to(self.device), torch.tensor(b_l).to(self.device))
-                pred += self._select_senses(scores, b_x, b_str, b_p, b_l)
+                pred += self._select_senses(scores, b_x, b_str, b_p, b_l, b_y)
                 true += b_y
             true_flat, pred_flat = [item for sublist in true for item in sublist], \
                                    [item for sublist in pred for item in sublist]
@@ -226,22 +226,39 @@ class BaseTrainer:
 
 class WSDTrainerLM(BaseTrainer):
 
-    def _select_senses(self, b_scores, b_vec, b_str, b_pos, b_lengths):
+    def __init__(self, learning_rate=0.001, num_epochs=40, batch_size=64,
+                 checkpoint_path='saved_weights/baseline_elmo/checkpoint.pt'):
+        super().__init__(learning_rate, num_epochs, batch_size, checkpoint_path)
+        # Load BERT
+        self.bert_tokenizer = BertTokenizer.from_pretrained('bert-base-uncased')
+        self.language_model = BertForMaskedLM.from_pretrained('bert-base-uncased')
+        self.language_model.eval()
+        self.all_syn_lemmas = {}
+
+    def _select_senses(self, b_scores, b_vec, b_str, b_pos, b_lengths, b_labels):
         """
         Use Language model to get a second score and use geometric mean on scores.
-        :param b_scores:
+        :param b_scores: shape = (batch_s x win_s x sense_vocab_s)
         :param b_vec:
         :param b_str:
         :param b_pos:
         :param b_lengths:
         :return:
         """
-        def to_ids(s: List[Synset]):
-            return [self.data_loader.dataset.sense2id[x.name()] for x in s]
+        def to_ids(synsets):
+            return [self.data_loader.dataset.sense2id[x.name()] for x in synsets]
 
         def set2padded(s: Set[int]):
             arr = np.array(list(s))
             return np.pad(arr, (0, b_scores.shape[-1] - len(s)), 'edge')
+
+        def get_lemmas(synset):
+            lemmas = synset.lemma_names()
+            for s in synset.hyponyms():
+                lemmas += s.lemma_names()
+            for s in synset.hypernyms():
+                lemmas += s.lemma_names()
+            return lemmas
 
         b_impossible_senses = []
         # we will set to 0 senses not in WordNet for given lemma.
@@ -257,10 +274,34 @@ class WSDTrainerLM(BaseTrainer):
         b_impossible_senses = np.array(b_impossible_senses)
         np.put_along_axis(b_scores, b_impossible_senses, 0, axis=-1)
 
-        lm_scores = []
-        # for each sent in batch
-        #   for each masked word:
-        #       get probabilities of all possible lemmas of all possible synsets.
+        # Update b_scores with geometric mean with language model score.
+        for i, sent in enumerate(b_str):
+            for k, w in enumerate(sent):
+                if b_labels[i][k] != 0:  # i.e. sense tagged word
+                    text = ['[CLS]'] + sent + ['[SEP]']
+                    text[k+1] = '[MASK]'
+                    tokenized_text = []
+                    for ww in text:
+                        tokenized_text += self.bert_tokenizer.tokenize(ww)
+                    masked_index = tokenized_text.index('[MASK]')
+                    indexed_tokens = self.bert_tokenizer.convert_tokens_to_ids(tokenized_text)
+                    tokens_tensor = torch.tensor([indexed_tokens])
+                    predictions = self.language_model(tokens_tensor)
+                    probabilities = torch.nn.Softmax(dim=0)(predictions[0, masked_index])
+
+                    for S in wn.synsets(w, pos=util.id2wnpos[b_pos[i][k]]):
+                        s_id = self.data_loader.dataset.sense2id[S.name()]
+                        if S not in self.all_syn_lemmas:
+                            self.all_syn_lemmas[S] = get_lemmas(S)
+                        syn_tok_ids = []
+                        for lemma in self.all_syn_lemmas[S]:
+                            tokenized = self.bert_tokenizer.tokenize(lemma)
+                            tok_ids = self.bert_tokenizer.convert_tokens_to_ids(tokenized)
+                            syn_tok_ids += tok_ids
+                        top_k = torch.topk(probabilities[syn_tok_ids, ], k=5)[0].tolist() \
+                            if len(syn_tok_ids) > 5 else probabilities[syn_tok_ids, ].tolist()
+                        s_score = sum(top_k)
+                        b_scores[i, k, s_id] = (b_scores[i, k, s_id] * s_score) ** 0.5
 
         return np.argmax(b_scores, -1).tolist()
 
