@@ -25,189 +25,56 @@ np.random.seed(42)
 class BaseTrainer:
 
     def __init__(self,
-                 learning_rate=0.001,
                  num_epochs=40,
-                 batch_size=64,
-                 checkpoint_path='saved_weights/baseline_elmo/checkpoint.pt',
-                 is_training=False):
+                 batch_size=32,
+                 checkpoint_path='saved_weights/baseline_elmo_checkpoint.pt',
+                 log_interval=400,
+                 train_data='res/wsd-train/semcor+glosses_data.xml',
+                 train_tags='res/wsd-train/semcor+glosses_tags.txt',
+                 eval_data='res/wsd-test/se07/se07.xml',
+                 eval_tags='res/wsd-test/se07/se07.txt',
+                 test_data='res/wsd-train/test_data.xml',
+                 test_tags='res/wsd-train/test_tags.txt',
+                 report_path='logs/baseline_elmo_report.txt',
+                 is_training=True):
 
-        self.learning_rate = learning_rate
         self.num_epochs = num_epochs
         self.batch_size = batch_size
         self.checkpoint_path = checkpoint_path
+        self.log_interval = log_interval
         self._plot_server = None
+        self.report_path = report_path
+        self.model = None
+        self.optimizer = None
+        self.min_loss = np.inf
+        self.data_loader = None
+
+        self.best_model_path = self.checkpoint_path + '.best'
 
         # Using single GPU
         self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
         if is_training:
-            self._setup_training()
+            self._setup_training(train_data, train_tags, eval_data, eval_tags)
         else:
-            self._setup_testing()
+            self._setup_testing(train_data, train_tags, test_data, test_tags)
 
-    def _setup_training(self):
-        # Load data
-        dataset = SemCorDataset()
-        self.data_loader = ElmoSemCorLoader(dataset, batch_size=self.batch_size, win_size=32)
-        eval_dataset = SemCorDataset(data_path='res/wsd-test/se07/se07.xml',
-                                     tags_path='res/wsd-test/se07/se07.txt',
-                                     sense2id=dataset.sense2id)
-        self.eval_loader = ElmoLemmaPosLoader(eval_dataset, batch_size=self.batch_size,
-                                              win_size=32, overlap_size=8)
-        # Build model
-        self.model = SimpleWSD(self.data_loader)
-        self.model.to(self.device)
+    def _setup_training(self, train_data, train_tags, eval_data, eval_tags):
+        raise NotImplementedError("Do not use base class, use concrete classes instead.")
 
-        self.optimizer = optim.Adam(self.model.parameters(), lr=self.learning_rate)
-        self.best_f1_micro = 0.0
-
-        if os.path.exists(self.checkpoint_path):
-            checkpoint = torch.load(self.checkpoint_path)
-            self.model.load_state_dict(checkpoint['model_state_dict'])
-            self.optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
-            self.last_epoch = checkpoint['epoch']
-            self.min_loss = checkpoint['min_loss']
-            print(f"Loaded checkpoint from: {self.checkpoint_path}")
-            if self.last_epoch >= self.num_epochs:
-                print("Training finished for this checkpoint")
-        else:
-            self.last_epoch = 0
-            self.min_loss = 1e3
-
-    def _setup_testing(self):
-        # Load data
-        dataset = SemCorDataset()
-        self.data_loader = ElmoSemCorLoader(dataset, batch_size=self.batch_size, win_size=32)
-        # Build model
-        self.model = SimpleWSD(self.data_loader)
-        self.model.to(self.device)
+    def _setup_testing(self, train_data, train_tags, test_data, test_tags):
+        raise NotImplementedError("Do not use base class, use concrete classes instead.")
 
     def train_epoch(self, epoch_i):
-        for step, (b_x, b_l, b_y) in enumerate(self.data_loader):
-            self.model.zero_grad()
-            self.model.h, self.model.cell = map(lambda x: x.to(self.device),
-                                                self.model.init_hidden(len(b_y)))
-
-            scores = self.model(b_x.to(self.device), torch.tensor(b_l).to(self.device))
-            loss = self.model.loss(scores, b_y, self.device)
-            loss.backward()  # compute gradients with back-propagation
-
-            if step % 100 == 0:
-                print(f'\rLoss: {loss.item():.4f} ', end='')
-                if torch.cuda.is_available():  # check if memory is leaking
-                    print(f'Allocated GPU memory: '
-                          f'{torch.cuda.memory_allocated() / 1_000_000} MB', end='')
-                # possibly save progress
-                current_loss = loss.item()
-                if current_loss < self.min_loss:
-                    min_loss = current_loss
-                    torch.save({
-                        'epoch': epoch_i,
-                        'model_state_dict': self.model.state_dict(),
-                        'optimizer_state_dict': self.optimizer.state_dict(),
-                        'current_loss': current_loss,
-                        'min_loss': min_loss,
-                    }, self.checkpoint_path)
-                self.evaluate(epoch_i)
-                self.model.train()  # return to train mode
-
-            clip_grad_norm_(parameters=self.model.parameters(), max_norm=1.0)
-            self.optimizer.step()  # update the weights
+        raise NotImplementedError("Do not use base class, use concrete classes instead.")
 
     def train(self):
-        self.model.train()
-        for epoch in range(self.last_epoch + 1, self.num_epochs + 1):
-            print(f'\nEpoch: {epoch}')
-            self.train_epoch(epoch)
+        raise NotImplementedError("Do not use base class, use concrete classes instead.")
 
-    def evaluate(self,
-                 num_epoch,
-                 eval_report='logs/baseline_elmo_report.txt',
-                 best_model_path='saved_weights/baseline_elmo/best_checkpoint.pt'):
+    def evaluate(self, num_epoch):
+        raise NotImplementedError("Do not use base class, use concrete classes instead.")
 
-        print("\nEvaluating...", flush=True)
-        self.model.eval()
-        with torch.no_grad():
-            pred, true = [], []
-            for step, (b_x, b_str, b_p, b_l, b_y) in enumerate(self.eval_loader):
-                self.model.zero_grad()
-                self.model.h, self.model.cell = map(lambda x: x.to(self.device),
-                                                    self.model.init_hidden(len(b_y)))
-                scores = self.model(b_x.to(self.device), torch.tensor(b_l).to(self.device))
-                pred += self._select_senses(scores, b_x, b_str, b_p, b_l, b_y)
-                true += b_y
-            true_flat, pred_flat = [item for sublist in true for item in sublist], \
-                                   [item for sublist in pred for item in sublist]
-            true_eval, pred_eval = [], []
-            for i in range(len(true_flat)):
-                if true_flat[i] == 0:
-                    continue
-                else:
-                    true_eval.append(true_flat[i])
-                    pred_eval.append(pred_flat[i])
-            print(f"True: {true_eval[:25]} ...")
-            print(f"Pred: {pred_eval[:25]} ...")
-            with open(eval_report, 'w') as fo:
-                print(classification_report(
-                    true_eval,
-                    pred_eval,
-                    digits=3),
-                    file=fo)
-                f1 = f1_score(true_eval, pred_eval, average='micro')
-                print(f"F1 = {f1}")
-
-            if f1 > self.best_f1_micro:
-                self.best_f1_micro = f1
-                torch.save({
-                    'epoch': num_epoch,
-                    'model_state_dict': self.model.state_dict(),
-                    'f1': self.best_f1_micro
-                }, best_model_path)
-
-    def test(self,
-             eval_report='logs/baseline_elmo_report_test.txt',
-             best_model_path='saved_weights/baseline_elmo/best_checkpoint.pt'):
-        """
-        Evaluate on all test dataset.
-        """
-        test_dataset = SemCorDataset(data_path='res/wsd-train/test_data.xml',
-                                     tags_path='res/wsd-train/test_tags.txt',
-                                     sense2id=self.data_loader.dataset.sense2id)
-        test_loader = ElmoLemmaPosLoader(test_dataset, batch_size=32, win_size=32)
-
-        if os.path.exists(best_model_path):
-            checkpoint = torch.load(best_model_path)
-            self.model.load_state_dict(checkpoint['model_state_dict'])
-        else:
-            raise ValueError("Could not find any best model checkpoint.")
-
-        print("\nEvaluating on concatenation of all dataset...", flush=True)
-        self.model.eval()
-        with torch.no_grad():
-            pred, true = [], []
-            for step, (b_x, b_str, b_p, b_l, b_y) in enumerate(test_loader):
-                self.model.zero_grad()
-                self.model.h, self.model.cell = map(lambda x: x.to(self.device),
-                                                    self.model.init_hidden(len(b_y)))
-                scores = self.model(b_x.to(self.device), torch.tensor(b_l).to(self.device))
-                pred += self._select_senses(scores, b_x, b_str, b_p, b_l, b_y)
-                true += b_y
-            true_flat, pred_flat = [item for sublist in true for item in sublist], \
-                                   [item for sublist in pred for item in sublist]
-            true_eval, pred_eval = [], []
-            for i in range(len(true_flat)):
-                if true_flat[i] == 0:
-                    continue
-                else:
-                    true_eval.append(true_flat[i])
-                    pred_eval.append(pred_flat[i])
-            with open(eval_report, 'w') as fo:
-                print(classification_report(
-                          true_eval,
-                          pred_eval,
-                          digits=3),
-                      file=fo)
-                f1 = f1_score(true_eval, pred_eval, average='micro')
-                print(f"F1 = {f1}")
+    def test(self):
+        raise NotImplementedError("Do not use base class, use concrete classes instead.")
 
     def _select_senses(self, b_scores, b_vec, b_str, b_pos, b_lengths, b_labels):
         """
@@ -245,12 +112,197 @@ class BaseTrainer:
             self._plot_server = SummaryWriter(log_dir='logs')
         self._plot_server.add_scalar(name, value, step)
 
+    def _print_metrics(self, true_eval, pred_eval):
+        with open(self.report_path, 'w') as fo:
+            print(classification_report(
+                true_eval,
+                pred_eval,
+                digits=3),
+                file=fo)
+        f1 = f1_score(true_eval, pred_eval, average='micro')
+        print(f"F1 = {f1}")
+        return f1
 
-class WSDTrainerLM(BaseTrainer):
+    def _maybe_checkpoint(self, loss, epoch_i):
+        current_loss = loss.item()
+        if current_loss < self.min_loss:
+            min_loss = current_loss
+            torch.save({
+                'epoch': epoch_i,
+                'model_state_dict': self.model.state_dict(),
+                'optimizer_state_dict': self.optimizer.state_dict(),
+                'current_loss': current_loss,
+                'min_loss': min_loss,
+            }, self.checkpoint_path)
 
-    def __init__(self, learning_rate=0.001, num_epochs=40, batch_size=64,
-                 checkpoint_path='saved_weights/baseline_elmo/checkpoint.pt'):
-        super().__init__(learning_rate, num_epochs, batch_size, checkpoint_path)
+    def _load_best(self):
+        if os.path.exists(self.best_model_path):
+            checkpoint = torch.load(self.best_model_path)
+            self.model.load_state_dict(checkpoint['model_state_dict'])
+        else:
+            raise ValueError("Could not find any best model checkpoint.")
+
+    def _save_best(self, f1, epoch_i):
+        if f1 > self.best_f1_micro:
+            self.best_f1_micro = f1
+            torch.save({
+                'epoch': epoch_i,
+                'model_state_dict': self.model.state_dict(),
+                'f1': self.best_f1_micro
+            }, self.best_model_path)
+
+    @staticmethod
+    def _gpu_mem_info():
+        if torch.cuda.is_available():  # check if memory is leaking
+            print(f'Allocated GPU memory: '
+                  f'{torch.cuda.memory_allocated() / 1_000_000} MB', end='')
+
+
+class ElmoTrainer(BaseTrainer):
+
+    def __init__(self,
+                 hidden_size=1024,
+                 num_layers=2,
+                 learning_rate=0.001,
+                 elmo_weights='res/elmo/elmo_2x1024_128_2048cnn_1xhighway_weights.hdf5',
+                 elmo_options='res/elmo/elmo_2x1024_128_2048cnn_1xhighway_options.json',
+                 elmo_size=128,
+                 **kwargs):
+        self.learning_rate = learning_rate
+        self.elmo_weights = elmo_weights
+        self.elmo_options = elmo_options
+        self.elmo_size = elmo_size
+        self.num_layers = num_layers
+        self.hidden_size = hidden_size
+        super().__init__(**kwargs)
+
+    def _setup_training(self, train_data, train_tags, eval_data, eval_tags):
+        # Load data
+        dataset = SemCorDataset(train_data, train_tags)
+        self.data_loader = ElmoSemCorLoader(dataset, batch_size=self.batch_size, win_size=32)
+        eval_dataset = SemCorDataset(data_path=eval_data,
+                                     tags_path=eval_tags,
+                                     sense2id=dataset.sense2id)
+        self.eval_loader = ElmoLemmaPosLoader(eval_dataset, batch_size=self.batch_size,
+                                              win_size=32, overlap_size=8)
+        # Build model
+        self.model = SimpleWSD(self.data_loader,
+                               self.elmo_weights, self.elmo_options,
+                               self.elmo_size, self.hidden_size, self.num_layers)
+        self.model.to(self.device)
+
+        self.optimizer = optim.Adam(self.model.parameters(), lr=self.learning_rate)
+        self.best_f1_micro = 0.0
+
+        if os.path.exists(self.checkpoint_path):
+            checkpoint = torch.load(self.checkpoint_path)
+            self.model.load_state_dict(checkpoint['model_state_dict'])
+            self.optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
+            self.last_epoch = checkpoint['epoch']
+            self.min_loss = checkpoint['min_loss']
+            print(f"Loaded checkpoint from: {self.checkpoint_path}")
+            if self.last_epoch >= self.num_epochs:
+                print("Training finished for this checkpoint")
+        else:
+            self.last_epoch = 0
+            self.min_loss = 1e3
+
+    def _setup_testing(self, train_data, train_tags, test_data, test_tags):
+        # Load data
+        dataset = SemCorDataset(train_data, train_tags)
+        dataset = SemCorDataset(data_path=test_data,
+                                tags_path=test_tags,
+                                sense2id=dataset.sense2id)
+        self.test_loader = ElmoLemmaPosLoader(dataset, batch_size=self.batch_size, win_size=32)
+        # Build model
+        self.model = SimpleWSD(self.test_loader)
+        self.model.to(self.device)
+
+    def train_epoch(self, epoch_i):
+        for step, (b_x, b_l, b_y) in enumerate(self.data_loader):
+            self.model.zero_grad()
+            self.model.h, self.model.cell = map(lambda x: x.to(self.device),
+                                                self.model.init_hidden(len(b_y)))
+
+            scores = self.model(b_x.to(self.device), torch.tensor(b_l).to(self.device))
+            loss = self.model.loss(scores, b_y, self.device)
+            loss.backward()
+
+            if step % self.log_interval == 0:
+                print(f'\rLoss: {loss.item():.4f} ', end='')
+                self._plot('Train loss', loss.item(), step)
+                self._gpu_mem_info()
+                self._maybe_checkpoint(loss, epoch_i)
+                f1 = self.evaluate(epoch_i)
+                self._plot('Dev F1)', f1, step)
+                self.model.train()  # return to train mode after evaluation
+
+            clip_grad_norm_(parameters=self.model.parameters(), max_norm=1.0)
+            self.optimizer.step()  # update the weights
+
+    def train(self):
+        self.model.train()
+        for epoch in range(self.last_epoch + 1, self.num_epochs + 1):
+            print(f'\nEpoch: {epoch}')
+            self.train_epoch(epoch)
+
+    def evaluate(self, num_epoch):
+        print("\nEvaluating...", flush=True)
+        self.model.eval()
+        with torch.no_grad():
+            pred, true = [], []
+            for step, (b_x, b_str, b_p, b_l, b_y) in enumerate(self.eval_loader):
+                self.model.zero_grad()
+                self.model.h, self.model.cell = map(lambda x: x.to(self.device),
+                                                    self.model.init_hidden(len(b_y)))
+                scores = self.model(b_x.to(self.device), torch.tensor(b_l).to(self.device))
+                pred += self._select_senses(scores, b_x, b_str, b_p, b_l, b_y)
+                true += b_y
+            true_flat, pred_flat = [item for sublist in true for item in sublist], \
+                                   [item for sublist in pred for item in sublist]
+            true_eval, pred_eval = [], []
+            for i in range(len(true_flat)):
+                if true_flat[i] == 0:
+                    continue
+                else:
+                    true_eval.append(true_flat[i])
+                    pred_eval.append(pred_flat[i])
+            f1 = self._print_metrics(true_eval, pred_eval)
+            self._save_best(f1, num_epoch)
+        return f1
+
+    def test(self):
+        """
+        Evaluate on all test dataset.
+        """
+        print("\nEvaluating on concatenation of all dataset...", flush=True)
+        self._load_best()
+        self.model.eval()
+        with torch.no_grad():
+            pred, true = [], []
+            for step, (b_x, b_str, b_p, b_l, b_y) in enumerate(self.test_loader):
+                self.model.zero_grad()
+                self.model.h, self.model.cell = map(lambda x: x.to(self.device),
+                                                    self.model.init_hidden(len(b_y)))
+                scores = self.model(b_x.to(self.device), torch.tensor(b_l).to(self.device))
+                pred += self._select_senses(scores, b_x, b_str, b_p, b_l, b_y)
+                true += b_y
+            true_flat, pred_flat = [item for sublist in true for item in sublist], \
+                                   [item for sublist in pred for item in sublist]
+            true_eval, pred_eval = [], []
+            for i in range(len(true_flat)):
+                if true_flat[i] == 0:
+                    continue
+                else:
+                    true_eval.append(true_flat[i])
+                    pred_eval.append(pred_flat[i])
+            self._print_metrics(true_eval, pred_eval)
+
+
+class TrainerLM(ElmoTrainer):
+
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
         # Load BERT
         self.bert_tokenizer = BertTokenizer.from_pretrained('bert-base-uncased')
         self.language_model = BertForMaskedLM.from_pretrained('bert-base-uncased')
@@ -329,4 +381,20 @@ class WSDTrainerLM(BaseTrainer):
 
 
 class WSDNetTrainer(BaseTrainer):
-    pass
+    def _setup_training(self, train_data, train_tags, eval_data, eval_tags):
+        pass
+
+    def _setup_testing(self, train_data, train_tags, test_data, test_tags):
+        pass
+
+    def train_epoch(self, epoch_i):
+        pass
+
+    def train(self):
+        pass
+
+    def evaluate(self, num_epoch):
+        pass
+
+    def test(self):
+        pass

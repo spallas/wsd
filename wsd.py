@@ -7,9 +7,32 @@ from models import Attention
 
 
 class WSDNet(nn.Module):
+    """
+    Multi-Task network for WSD
+    """
+
+    def __init__(self):
+        super().__init__()
+        pass
+
+    def forward(self, *inputs):
+        pass
+
+
+class ElmoTransformerWSD(nn.Module):
 
     _ELMO_OPTIONS = ''
     _ELMO_WEIGHTS = ''
+
+    def __init__(self):
+        super().__init__()
+        pass
+
+    def forward(self, *inputs):
+        pass
+
+
+class BertTransformerWSD(nn.Module):
 
     def __init__(self):
         super().__init__()
@@ -27,29 +50,39 @@ class SimpleWSD(nn.Module):
     _HIDDEN_SIZE = 1024
     _NUM_LAYERS = 2
 
-    def __init__(self, loader: SemCorDataLoader):
+    def __init__(self, loader: SemCorDataLoader,
+                 elmo_weights=_ELMO_WEIGHTS,
+                 elmo_options=_ELMO_OPTIONS,
+                 elmo_size=_ELMO_SIZE,
+                 hidden_size=_HIDDEN_SIZE,
+                 num_layers=_NUM_LAYERS):
         super().__init__()
+        self.elmo_weights = elmo_weights
+        self.elmo_options = elmo_options
+        self.elmo_size = elmo_size
+        self.hidden_size = hidden_size
+        self.num_layers = num_layers
         self.tagset_size = len(loader.dataset.senses_count)
         self.win_size = loader.win_size
         self.pad_tag_index = 0
-        self.elmo = Elmo(self._ELMO_OPTIONS,
-                         self._ELMO_WEIGHTS,
+        self.elmo = Elmo(self.elmo_options,
+                         self.elmo_weights,
                          2, dropout=0)
-        self.embedding_size = 2 * self._ELMO_SIZE
+        self.embedding_size = 2 * self.elmo_size
         self.lstm = nn.LSTM(self.embedding_size,
-                            hidden_size=self._HIDDEN_SIZE,
-                            num_layers=self._NUM_LAYERS,
+                            hidden_size=self.hidden_size,
+                            num_layers=self.num_layers,
                             bidirectional=True,
                             batch_first=True)
-        self.attention = Attention(self._HIDDEN_SIZE)
-        self.output_dense = nn.Linear(self._HIDDEN_SIZE * 4, self.tagset_size)  # 2 directions * (state + attn)
+        self.attention = Attention(self.hidden_size)
+        self.output_dense = nn.Linear(self.hidden_size * 4, self.tagset_size)  # 2 directions * (state + attn)
         self.batch_size = loader.batch_size
         self.h, self.cell = self.init_hidden(self.batch_size)
 
     def init_hidden(self, batch_size):
         self.batch_size = batch_size
-        return (torch.zeros(self._NUM_LAYERS * 2, self.batch_size, self._HIDDEN_SIZE),  # hidden state
-                torch.zeros(self._NUM_LAYERS * 2, self.batch_size, self._HIDDEN_SIZE))  # cell state
+        return (torch.zeros(self.num_layers * 2, self.batch_size, self.hidden_size),  # hidden state
+                torch.zeros(self.num_layers * 2, self.batch_size, self.hidden_size))  # cell state
 
     def forward(self, char_ids, lengths):
 
