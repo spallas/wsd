@@ -1,5 +1,14 @@
+from collections import namedtuple
+
 import torch
 from torch import nn
+
+from fairseq.models.transformer import TransformerEncoder
+
+
+Args = namedtuple('Args', ['dropout', 'max_source_positions',
+                           'encoder_learned_pos', 'no_token_positional_embeddings',
+                           'encoder_normalized_before'])
 
 
 class Attention(nn.Module):
@@ -21,3 +30,15 @@ class Attention(nn.Module):
         c = hidden_states.transpose(1, 2) @ a  # shape: B x 2*H x 1
         c = c.expand(-1, -1, hidden_states.shape[1])  # replicate for each time step, shape: B x 2*H x T
         return torch.cat((hidden_states, c.transpose(1, 2)), dim=-1)
+
+
+# TODO: Work in progress...
+class WSDTransformerEncoder(nn.Module):
+
+    def __init__(self):
+        super().__init__()
+        self.transformer_encoder = TransformerEncoder(Args(0.0, 10, 10, 10, False), None, None)
+        pass
+
+    def forward(self, *inputs):
+        pass
