@@ -233,6 +233,24 @@ class ElmoLemmaPosLoader(SemCorDataLoader):
         return batch_to_ids(b_x), b_x, b_p, b_l, b_y
 
 
+class BertLemmaPosLoader(SemCorDataLoader):
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+    def __next__(self):
+        """
+        Produce one batch.
+        :return: Tuple with:
+            - TODO: Tensor?
+            - lemmas: List[List[str]]
+            - pos_tags: List[List[int]]
+            - lengths: List[int]
+            - labels: List[List[int]]
+        """
+        pass
+
+
 if __name__ == '__main__':
 
     data_loader = SemCorDataLoader(SemCorDataset(), batch_size=4, win_size=5, shuffle=False)

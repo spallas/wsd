@@ -1,6 +1,9 @@
 
 from collections import defaultdict
+from typing import List
+
 from nltk.corpus import wordnet as wn
+from pytorch_pretrained_bert import BertTokenizer
 
 # MAPS for Part Of Speech #############
 
@@ -28,3 +31,23 @@ id2wnpos[3] = 'a'
 id2wnpos[4] = 'r'
 
 #######################################
+
+
+def example_to_input(lemma_list: List[str],
+                     tags_list: List[int],
+                     tok: BertTokenizer):
+    subword_list, tags_map = tok.convert_tokens_to_ids(tok.tokenize('[CLS]')), []
+    for w in lemma_list:
+        tags_map.append(len(subword_list))
+        subword_list += tok.convert_tokens_to_ids(tok.tokenize(w))
+    subword_list += tok.convert_tokens_to_ids(tok.tokenize('[SEP]'))
+    mapped_tags = [0] * len(subword_list)
+    # mapped_pos = [0] * len(subword_list)
+    # mapped_lemmas = ["[UNK]"] * len(subword_list)
+    # mapped_altern = [[]] * len(subword_list)
+    for i, j in enumerate(tag_map):
+        mapped_tags[j] = tags_list[i]
+        # mapped_pos[j] = example['pos'][i]
+        # mapped_lemmas[j] = example['lemmas'][i]
+        # mapped_altern[j] = example['alternatives'][i]
+    return subword_list, mapped_tags
