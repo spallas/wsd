@@ -7,6 +7,7 @@ from collections import Counter, defaultdict
 from typing import List, Dict
 
 from allennlp.modules.elmo import batch_to_ids
+from pytorch_transformers import BertTokenizer
 from torch.utils.data import Dataset
 from tqdm import tqdm
 
@@ -237,23 +238,66 @@ class BertLemmaPosLoader(SemCorDataLoader):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        self.bert_tokenizer = BertTokenizer.from_pretrained('bert-base-uncased')
 
     def __next__(self):
         """
         Produce one batch.
         :return: Tuple with:
-            - TODO: Tensor?
+            - tokens_tensor: WARNING length of SentencePiece tokenized
+                             text is different from list of lemmas for example
+                             use the starts vector to reconstruct original length
+            - starts: List[List[int]]
             - lemmas: List[List[str]]
             - pos_tags: List[List[int]]
             - lengths: List[int]
             - labels: List[List[int]]
         """
-        pass
+        stop_iter = False
+        b_t, b_x, b_l, b_p, b_y, b_s = [], [], [], [], [], []
+        lengths = [len(d) for d in self.dataset.docs[self.last_doc: self.last_doc + self.batch_size]]
+        end_of_docs = self.last_offset + self.win_size >= max(lengths)
+        for i in range(self.batch_size):
+            if self.last_doc + i >= len(self.dataset.docs):
+                stop_iter = True
+                break
+            n = self.last_doc + i
+            m = slice(self.last_offset, self.last_offset + self.win_size)
+            text_span = self.dataset.docs[n][m]
+            bert_tokens = []
+            starts = []
+            for w in text_span:
+                starts.append(len(bert_tokens))
+                bert_tokens += self.bert_tokenizer.encode(w)
+            labels = self.dataset.first_senses[n][m]
+            pos_tags = self.dataset.pos_tags[n][m]
+            length = len(bert_tokens)
+            # Padding
+            text_span += ['.'] * (self.win_size - length)
+            labels += [0] * (self.win_size - length)
+            pos_tags += ['.'] * (self.win_size - length)
+
+            b_t.append(bert_tokens)
+            b_s.append(starts)
+            b_x.append(text_span)
+            b_y.append(labels)
+            b_l.append(length)
+            b_p.append(pos_tags)
+
+        self.last_offset += self.win_size - self.overlap_size
+        if end_of_docs:
+            self.last_doc += self.batch_size
+            self.last_offset = 0
+            if stop_iter or self.last_doc >= len(self.dataset.docs):
+                raise StopIteration
+
+        return b_t, b_x, b_p, b_l, b_y, b_s
 
 
 if __name__ == '__main__':
 
-    data_loader = SemCorDataLoader(SemCorDataset(), batch_size=4, win_size=5, shuffle=False)
+    data_loader = SemCorDataLoader(SemCorDataset(), batch_size=4,
+                                   win_size=5, shuffle=False)
 
     for idx, (bx, l, by) in enumerate(data_loader):
         print(bx)

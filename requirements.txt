@@ -1,11 +1,12 @@
 scipy
 numpy
-scikit-learn
 tqdm
+scikit-learn
 nltk
 torch
 allennlp
 fairseq
-pytorch-pretrained-bert
+pytorch-transformers
 future
 pillow
+dataclasses-json
