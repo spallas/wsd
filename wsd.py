@@ -15,7 +15,7 @@ class BaselineWSD(nn.Module):
         self.tagset_size = num_senses
         self.win_size = max_len
         self.pad_tag_index = 0
-        self.ce_loss = CrossEntropyLoss(size_average=True, ignore_index=0)
+        self.ce_loss = CrossEntropyLoss(ignore_index=0)
 
     def forward(self, *inputs):
         pass

@@ -239,7 +239,8 @@ class TrainerLM(BaseTrainer):
                     masked_index = tokenized_text.index('[MASK]')
                     indexed_tokens = self.bert_tokenizer.convert_tokens_to_ids(tokenized_text)
                     tokens_tensor = torch.tensor([indexed_tokens])
-                    predictions = self.language_model(tokens_tensor)
+                    outputs = self.language_model(tokens_tensor)
+                    predictions = outputs[0]
                     probabilities = torch.nn.Softmax(dim=0)(predictions[0, masked_index])
 
                     for S in wn.synsets(w, pos=util.id2wnpos[b_pos[i][k]]):
