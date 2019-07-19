@@ -449,8 +449,7 @@ class TransformerTrainer(BaseTrainer):
         self.model.eval()
         self.model.to(self.device)
 
-    @staticmethod
-    def _aggregate_and_pad(scores, b_s):
+    def _aggregate_and_pad(self, scores, b_s):
         """
 
         :param scores: Tensor, shape = batch, seq_len, num_senses
@@ -468,7 +467,7 @@ class TransformerTrainer(BaseTrainer):
             for j, a in enumerate(ag):
                 ag[j] = torch.mean(a, dim=-2)
             length = len(ag)
-            ag += [torch.tensor([.0] * scores.shape[-1])] * (win_size - length)
+            ag += [torch.tensor([.0] * scores.shape[-1]).to(self.device)] * (win_size - length)
             batch_a_scores.append(torch.cat(ag).reshape(len(ag), -1))
         return torch.cat(batch_a_scores).reshape(len(batch_a_scores), len(ag), -1)
 
