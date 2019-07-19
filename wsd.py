@@ -52,13 +52,14 @@ class ElmoTransformerWSD(nn.Module):
 
 class BertTransformerWSD(BaselineWSD):
 
-    def __init__(self, num_senses, max_len, config: TransformerConfig):
+    def __init__(self, device, num_senses, max_len, config: TransformerConfig):
         super().__init__(num_senses, max_len)
         self.bert_config = BertConfig.from_pretrained('bert-base-uncased')
         self.bert_embedding = BertModel(self.bert_config)
         self.config = config
         self.transformer_layer = WSDTransformerEncoder(self.config)
         self.output_dense = nn.Linear(self.bert_config.hidden_size, self.tagset_size)
+        self.device = device
 
     def _aggregate_bert(self, x, starts):
         # how to do efficiently?
@@ -72,7 +73,9 @@ class BertTransformerWSD(BaselineWSD):
         :return:
         """
         max_len = token_ids.shape[1]  # self.bert_config.max_position_embeddings
-        attention_mask = torch.arange(max_len).expand(len(lengths), max_len) < lengths.unsqueeze(1)
+        attention_mask = torch.arange(max_len)\
+                              .expand(len(lengths), max_len)\
+                              .to(self.device) < lengths.unsqueeze(1)
         x, _ = self.bert_embedding(token_ids, attention_mask=attention_mask)
         x = x.transpose(1, 0)  # make batch second dim for fairseq transformer.
         for _ in range(self.config.num_layers):

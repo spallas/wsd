@@ -429,9 +429,8 @@ class TransformerTrainer(BaseTrainer):
         self.eval_loader = BertLemmaPosLoader(eval_dataset, batch_size=self.batch_size,
                                               win_size=32, overlap_size=8)
         # Build model
-        self.model = BertTransformerWSD(len(self.sense2id) + 1,
-                                        32,
-                                        self.config)
+        self.model = BertTransformerWSD(self.device, len(self.sense2id) + 1,
+                                        32, self.config)
         self.model.to(self.device)
         self.optimizer = optim.Adam(self.model.parameters(), lr=self.config.learning_rate)
         self._maybe_load_checkpoint()
@@ -444,9 +443,8 @@ class TransformerTrainer(BaseTrainer):
                                 sense2id=self.sense2id)
         self.test_loader = BertLemmaPosLoader(dataset, batch_size=self.batch_size,
                                               win_size=32, overlap_size=8)
-        self.model = BertTransformerWSD(len(self.sense2id) + 1,
-                                        32,
-                                        self.config)
+        self.model = BertTransformerWSD(self.device, len(self.sense2id) + 1,
+                                        32, self.config)
         self._load_best()
         self.model.eval()
         self.model.to(self.device)
