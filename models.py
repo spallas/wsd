@@ -1,14 +1,9 @@
-from collections import namedtuple
-
 import torch
+from fairseq.models.transformer import TransformerEncoderLayer
 from torch import nn
+import math
 
-from fairseq.models.transformer import TransformerEncoder
-
-
-Args = namedtuple('Args', ['dropout', 'max_source_positions',
-                           'encoder_learned_pos', 'no_token_positional_embeddings',
-                           'encoder_normalized_before'])
+from utils.config import TransformerConfig
 
 
 class Attention(nn.Module):
@@ -32,13 +27,21 @@ class Attention(nn.Module):
         return torch.cat((hidden_states, c.transpose(1, 2)), dim=-1)
 
 
-# TODO: Work in progress...
 class WSDTransformerEncoder(nn.Module):
 
-    def __init__(self):
+    def __init__(self, config: TransformerConfig):
         super().__init__()
-        self.transformer_encoder = TransformerEncoder(Args(0.0, 10, 10, 10, False), None, None)
-        pass
+        self.transformer_encoder = TransformerEncoderLayer(config)
+        self.scale = math.sqrt(config.encoder_embed_dim)
 
-    def forward(self, *inputs):
-        pass
+    def forward(self, x: torch.Tensor, encoder_padding_mask):
+        """
+        Args:
+            x (Tensor): input to the layer of shape `(seq_len, batch, embed_dim)`
+            encoder_padding_mask (ByteTensor): binary ByteTensor of shape
+                `(batch, src_len)` where padding elements are indicated by ``1``.
+        Returns:
+            encoded output of shape `(seq_len, batch, embed_dim)`
+        """
+        x = x * self.scale
+        return self.transformer_encoder(x, encoder_padding_mask)

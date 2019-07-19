@@ -37,7 +37,8 @@ class BaseTrainer:
                  test_data='res/wsd-train/test_data.xml',
                  test_tags='res/wsd-train/test_tags.txt',
                  report_path='logs/baseline_elmo_report.txt',
-                 is_training=True):
+                 is_training=True,
+                 **kwargs):
 
         self.num_epochs = num_epochs
         self.batch_size = batch_size
@@ -411,9 +412,7 @@ class ElmoTrainerLM(TrainerLM):
 
 class TransformerTrainer(BaseTrainer):
 
-    def __init__(self,
-                 config: TransformerConfig,
-                 **kwargs):
+    def __init__(self, config: TransformerConfig, **kwargs):
         self.config = config
         super().__init__(**kwargs)
 
@@ -430,7 +429,7 @@ class TransformerTrainer(BaseTrainer):
                                               win_size=32, overlap_size=8)
         # Build model
         self.model = BertTransformerWSD(len(self.sense2id) + 1,
-                                        self.data_loader.win_size,
+                                        32,
                                         self.config)
         self.model.to(self.device)
         self.optimizer = optim.Adam(self.model.parameters(), lr=self.config.learning_rate)
@@ -445,7 +444,7 @@ class TransformerTrainer(BaseTrainer):
         self.test_loader = BertLemmaPosLoader(dataset, batch_size=self.batch_size,
                                               win_size=32, overlap_size=8)
         self.model = BertTransformerWSD(len(self.sense2id) + 1,
-                                        self.data_loader.win_size,
+                                        32,
                                         self.config)
         self._load_best()
         self.model.eval()
@@ -463,22 +462,22 @@ class TransformerTrainer(BaseTrainer):
         batch_a_scores = []
         for i, starts in enumerate(b_s):
             ag = []  # aggregated scores
+            k = -1
             for k in range(len(starts) - 1):
-                ag.append(scores[starts[k]:starts[k+1]])
-            ag.append(scores[starts[k+1]:])
+                ag.append(scores[i][starts[k]:starts[k+1]])
+            ag.append(scores[i][starts[k+1]:])
             for j, a in enumerate(ag):
                 ag[j] = torch.mean(a, dim=-2)
             length = len(ag)
-            ag += [.0] * (win_size - length)
-            batch_a_scores.append(ag)
-        return torch.tensor(batch_a_scores)
+            ag += [torch.tensor([.0] * scores.shape[-1])] * (win_size - length)
+            batch_a_scores.append(torch.cat(ag).reshape(len(ag), -1))
+        return torch.cat(batch_a_scores).reshape(len(batch_a_scores), len(ag), -1)
 
     def train_epoch(self, epoch_i):
         for step, (b_t, b_x, b_p, b_l, b_y, b_s) in enumerate(self.data_loader):
             self.model.zero_grad()
-            for i, t in b_t:
-                b_t[i] = [0] * (max([len(l) for l in b_t]) - len(t))
-
+            for i, t in enumerate(b_t):
+                b_t[i] += [0] * (max([len(l) for l in b_t]) - len(t))
             scores = self.model(torch.tensor(b_t).to(self.device),
                                 torch.tensor(b_l).to(self.device))
             scores = self._aggregate_and_pad(scores, b_s)
@@ -510,6 +509,8 @@ class TransformerTrainer(BaseTrainer):
         with torch.no_grad():
             pred, true = [], []
             for step, (b_t, b_x, b_p, b_l, b_y, b_s) in enumerate(self.eval_loader):
+                for i, t in enumerate(b_t):
+                    b_t[i] += [0] * (max([len(l) for l in b_t]) - len(t))
                 scores = self.model(torch.tensor(b_t).to(self.device),
                                     torch.tensor(b_l).to(self.device))
                 scores = self._aggregate_and_pad(scores, b_s)
@@ -536,6 +537,8 @@ class TransformerTrainer(BaseTrainer):
         with torch.no_grad():
             pred, true = [], []
             for step, (b_t, b_x, b_p, b_l, b_y, b_s) in enumerate(self.test_loader):
+                for i, t in enumerate(b_t):
+                    b_t[i] += [0] * (max([len(l) for l in b_t]) - len(t))
                 scores = self.model(torch.tensor(b_t).to(self.device),
                                     torch.tensor(b_l).to(self.device))
                 pred += self._select_senses(scores, b_t, b_x, b_p, b_l, b_y)
@@ -570,3 +573,10 @@ class WSDNetTrainer(BaseTrainer):
 
     def test(self):
         pass
+
+
+if __name__ == '__main__':
+
+    c = TransformerConfig.from_json_file('conf/large_elmo_conf.json')
+    tr = TransformerTrainer(c, **c.__dict__)
+    tr.train()

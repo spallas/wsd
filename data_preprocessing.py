@@ -19,7 +19,8 @@ class SemCorDataset(Dataset):
     def __init__(self,
                  data_path='res/wsd-train/semcor+glosses_data.xml',
                  tags_path='res/wsd-train/semcor+glosses_tags.txt',
-                 sense2id: Dict[str, int] = None):
+                 sense2id: Dict[str, int] = None,
+                 is_training=True):
         """
         Load from XML and txt files sentences and tags.
         :param data_path: path to XML SemCor-like file.
@@ -63,13 +64,17 @@ class SemCorDataset(Dataset):
                     senses.append(word_senses)
                     if lemma not in self.vocab:
                         self.vocab[lemma] = len(self.vocab)
+            if len(lemmas) < 10 and is_training:
+                continue  # skip too short docs
+            if all([x == 0 for x in [i[0] for i in senses]]):
+                continue  # skip not tagged docs
             self.docs.append(lemmas)
             self.pos_tags.append(pos_tags)
             self.senses.append(senses)
             self.first_senses.append([i[0] for i in senses])
         # sort documents by length to minimize padding.
         z = zip(self.docs, self.pos_tags, self.senses, self.first_senses)
-        sorted_z = sorted(z, key=lambda x: len(x[0]))
+        sorted_z = sorted(z, key=lambda x: len(x[0]))  # , reverse=True)
         self.docs, self.pos_tags, self.senses, self.first_senses = map(lambda x: list(x), zip(*sorted_z))
 
     def __len__(self):
@@ -116,7 +121,8 @@ class SemCorDataLoader:
         b_x, b_l, b_y = [], [], []
         lengths = [len(d) for d in self.dataset.docs[self.last_doc: self.last_doc + self.batch_size]]
         end_of_docs = max(lengths) <= self.last_offset + self.win_size
-        for i in range(self.batch_size):
+        i = 0
+        while len(b_x) < self.batch_size:
             if self.last_doc + i >= len(self.dataset.docs):
                 stop_iter = True
                 break
@@ -130,6 +136,10 @@ class SemCorDataLoader:
             text_span += ['PAD'] * (self.win_size - len(text_span))
             text_span_ids += [self.dataset.vocab['PAD']] * (self.win_size - len(text_span_ids))
             labels += [self.dataset.vocab['PAD']] * (self.win_size - len(labels))
+
+            i += 1
+            if all([x == 0 for x in labels]):
+                continue  # skip batch elem if no annotation
             b_x.append(text_span)
             b_y.append(labels)
             b_l.append(length)
@@ -158,7 +168,8 @@ class ElmoSemCorLoader(SemCorDataLoader):
         b_x, b_l, b_y = [], [], []
         lengths = [len(d) for d in self.dataset.docs[self.last_doc: self.last_doc + self.batch_size]]
         end_of_docs = self.last_offset + self.win_size >= max(lengths)
-        for i in range(self.batch_size):
+        i = 0
+        while len(b_x) < self.batch_size:
             if self.last_doc + i >= len(self.dataset.docs):
                 stop_iter = True
                 break
@@ -170,6 +181,10 @@ class ElmoSemCorLoader(SemCorDataLoader):
             # Padding
             text_span += ['.'] * (self.win_size - len(text_span))
             labels += [0] * (self.win_size - len(labels))
+
+            i += 1
+            if all([x == 0 for x in labels]):
+                continue  # skip batch elem if no annotation
             b_x.append(text_span)
             b_y.append(labels)
             b_l.append(length)
@@ -204,7 +219,8 @@ class ElmoLemmaPosLoader(SemCorDataLoader):
         b_x, b_l, b_p, b_y = [], [], [], []
         lengths = [len(d) for d in self.dataset.docs[self.last_doc: self.last_doc + self.batch_size]]
         end_of_docs = self.last_offset + self.win_size >= max(lengths)
-        for i in range(self.batch_size):
+        i = 0
+        while len(b_x) < self.batch_size:
             if self.last_doc + i >= len(self.dataset.docs):
                 stop_iter = True
                 break
@@ -217,7 +233,12 @@ class ElmoLemmaPosLoader(SemCorDataLoader):
             # Padding
             text_span += ['.'] * (self.win_size - length)
             labels += [0] * (self.win_size - length)
-            pos_tags += ['.'] * (self.win_size - length)
+            pos_tags += [0] * (self.win_size - length)
+
+            i += 1
+
+            if all([x == 0 for x in labels]):
+                continue  # skip batch elem if no annotation
 
             b_x.append(text_span)
             b_y.append(labels)
@@ -257,31 +278,37 @@ class BertLemmaPosLoader(SemCorDataLoader):
         b_t, b_x, b_l, b_p, b_y, b_s = [], [], [], [], [], []
         lengths = [len(d) for d in self.dataset.docs[self.last_doc: self.last_doc + self.batch_size]]
         end_of_docs = self.last_offset + self.win_size >= max(lengths)
-        for i in range(self.batch_size):
+        i = 0
+        while len(b_x) < self.batch_size:
             if self.last_doc + i >= len(self.dataset.docs):
                 stop_iter = True
                 break
             n = self.last_doc + i
             m = slice(self.last_offset, self.last_offset + self.win_size)
             text_span = self.dataset.docs[n][m]
+            labels = self.dataset.first_senses[n][m]
+            pos_tags = self.dataset.pos_tags[n][m]
+
             bert_tokens = []
             starts = []
             for w in text_span:
                 starts.append(len(bert_tokens))
                 bert_tokens += self.bert_tokenizer.encode(w)
-            labels = self.dataset.first_senses[n][m]
-            pos_tags = self.dataset.pos_tags[n][m]
-            length = len(bert_tokens)
+            bert_len = len(bert_tokens)
+            text_len = len(text_span)
             # Padding
-            text_span += ['.'] * (self.win_size - length)
-            labels += [0] * (self.win_size - length)
-            pos_tags += ['.'] * (self.win_size - length)
+            text_span += ['.'] * (self.win_size - text_len)
+            labels += [0] * (self.win_size - text_len)
+            pos_tags += [0] * (self.win_size - text_len)
 
+            i += 1
+            if all([x == 0 for x in labels]):
+                continue  # skip batch elem if no annotation
             b_t.append(bert_tokens)
             b_s.append(starts)
             b_x.append(text_span)
             b_y.append(labels)
-            b_l.append(length)
+            b_l.append(bert_len)
             b_p.append(pos_tags)
 
         self.last_offset += self.win_size - self.overlap_size

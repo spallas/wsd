@@ -51,12 +51,11 @@ class TransformerConfig(Config):
     learning_rate: float = 0.001
     num_layers: int = 4
 
-    encoder_embed_dim = 512
-    embed_dim = 512
+    encoder_embed_dim = 768
     encoder_attention_heads = 8
     attention_dropout = 0.5
     dropout = 0.5
-    encoder_normalized_before = True
+    encoder_normalize_before = True
     encoder_ffn_embed_dim = 512
 
     activation_fn = 'gelu_accurate'
