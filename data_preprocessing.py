@@ -6,6 +6,7 @@ import xml.etree.ElementTree as Et
 from collections import Counter, defaultdict
 from typing import List, Dict
 
+import torch
 from allennlp.modules.elmo import batch_to_ids
 from pytorch_transformers import BertTokenizer
 from torch.utils.data import Dataset
@@ -290,26 +291,31 @@ class BertLemmaPosLoader(SemCorDataLoader):
             pos_tags = self.dataset.pos_tags[n][m]
 
             bert_tokens = []
-            starts = []
+            slices = []
+            j = 0
             for w in text_span:
-                starts.append(len(bert_tokens))
                 bert_tokens += self.bert_tokenizer.encode(w)
+                slices.append(slice(j, len(bert_tokens)))
+                j = len(bert_tokens)
             bert_len = len(bert_tokens)
             text_len = len(text_span)
             # Padding
             text_span += ['.'] * (self.win_size - text_len)
-            labels += [0] * (self.win_size - text_len)
+            # labels += [0] * (self.win_size - text_len)
             pos_tags += [0] * (self.win_size - text_len)
 
             i += 1
             if all([x == 0 for x in labels]):
                 continue  # skip batch elem if no annotation
             b_t.append(bert_tokens)
-            b_s.append(starts)
+            b_s.append(slices)
             b_x.append(text_span)
+            labels = torch.tensor(labels)
             b_y.append(labels)
             b_l.append(bert_len)
             b_p.append(pos_tags)
+
+        b_y = torch.nn.utils.rnn.pad_sequence(b_y, batch_first=True)
 
         self.last_offset += self.win_size - self.overlap_size
         if end_of_docs:

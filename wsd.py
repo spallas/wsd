@@ -37,56 +37,6 @@ class BaselineWSD(nn.Module):
         return self.ce_loss(scores, y_true)
 
 
-class ElmoTransformerWSD(nn.Module):
-
-    _ELMO_OPTIONS = ''
-    _ELMO_WEIGHTS = ''
-
-    def __init__(self):
-        super().__init__()
-        pass
-
-    def forward(self, *inputs):
-        pass
-
-
-class BertTransformerWSD(BaselineWSD):
-
-    def __init__(self, device, num_senses, max_len, config: TransformerConfig):
-        super().__init__(num_senses, max_len)
-        self.bert_config = BertConfig.from_pretrained('bert-base-uncased')
-        self.bert_embedding = BertModel(self.bert_config)
-        self.config = config
-        self.transformer_layer = WSDTransformerEncoder(self.config)
-        self.output_dense = nn.Linear(self.bert_config.hidden_size, self.tagset_size)
-        self.device = device
-
-    def _aggregate_bert(self, x, starts):
-        # how to do efficiently?
-        pass
-
-    def forward(self, token_ids, lengths):
-        """
-
-        :param lengths: List[int] shape = `(batch)`
-        :param token_ids: (Tensor) shape `(batch, seq_len)`
-        :return:
-        """
-        max_len = token_ids.shape[1]  # self.bert_config.max_position_embeddings
-        attention_mask = torch.arange(max_len)\
-                              .expand(len(lengths), max_len)\
-                              .to(self.device) < lengths.unsqueeze(1)
-        x, _ = self.bert_embedding(token_ids, attention_mask=attention_mask)
-        x = x.transpose(1, 0)  # make batch second dim for fairseq transformer.
-        for _ in range(self.config.num_layers):
-            x = self.transformer_layer(x, 1 - attention_mask)
-
-        x = x.transpose(1, 0)  # restore shape
-        x = self.output_dense(x)
-
-        return x
-
-
 class SimpleWSD(BaselineWSD):
 
     _ELMO_OPTIONS = 'res/elmo/elmo_2x1024_128_2048cnn_1xhighway_options.json'
@@ -143,6 +93,69 @@ class SimpleWSD(BaselineWSD):
         y = nn.LogSoftmax(dim=1)(y)
         tag_scores = y.view(self.batch_size, self.win_size, self.tagset_size)
         return tag_scores
+
+
+class ElmoTransformerWSD(nn.Module):
+
+    _ELMO_OPTIONS = ''
+    _ELMO_WEIGHTS = ''
+
+    def __init__(self):
+        super().__init__()
+        pass
+
+    def forward(self, *inputs):
+        pass
+
+
+class BertTransformerWSD(BaselineWSD):
+
+    def __init__(self, device, num_senses, max_len, config: TransformerConfig):
+        super().__init__(num_senses, max_len)
+        self.bert_config = BertConfig.from_pretrained('bert-base-uncased')
+        self.bert_embedding = BertModel(self.bert_config)
+        self.config = config
+        self.transformer_layer = WSDTransformerEncoder(self.config)
+        self.output_dense = nn.Linear(self.config.encoder_embed_dim, self.tagset_size)
+        self.device = device
+
+    def _aggregate_bert(self, x, starts):
+        # how to do efficiently?
+        pass
+
+    def forward(self, token_ids, lengths, slices):
+        """
+
+        :param slices: List[Slice]
+        :param lengths: List[int] shape = `(batch)`
+        :param token_ids: (Tensor) shape `(batch, seq_len)`
+        :return:
+        """
+        max_len = token_ids.shape[1]  # self.bert_config.max_position_embeddings
+        attention_mask = torch.arange(max_len)\
+                              .expand(len(lengths), max_len)\
+                              .to(self.device) < lengths.unsqueeze(1)
+        x, _ = self.bert_embedding(token_ids, attention_mask=attention_mask)
+        x = x.transpose(1, 0)  # make batch second dim for fairseq transformer.
+        for _ in range(self.config.num_layers):
+            x = self.transformer_layer(x, 1 - attention_mask)
+
+        x = x.transpose(1, 0)  # restore batch first
+
+        batch = []
+        for i in range(x.shape[0]):  # different slices across batch
+            b = torch.cat([torch.mean(x[i, sl, :], dim=-2) for sl in slices[i]])\
+                     .reshape(-1, self.config.encoder_embed_dim)
+            batch.append(b)
+        x = torch.nn.utils.rnn.pad_sequence(batch, batch_first=True)
+        x = self.output_dense(x)
+
+        return x
+
+    def loss(self, scores, tags, device=None):
+        y_true = tags.view(-1)
+        scores = scores.view(-1, self.tagset_size)
+        return self.ce_loss(scores, y_true)
 
 
 class WSDNet(nn.Module):

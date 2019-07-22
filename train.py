@@ -449,37 +449,14 @@ class TransformerTrainer(BaseTrainer):
         self.model.eval()
         self.model.to(self.device)
 
-    def _aggregate_and_pad(self, scores, b_s):
-        """
-
-        :param scores: Tensor, shape = batch, seq_len, num_senses
-        :param b_s: notice: elements have variable lengths
-        :return:
-        """
-        win_size = 32
-        batch_a_scores = []
-        for i, starts in enumerate(b_s):
-            ag = []  # aggregated scores
-            k = -1
-            for k in range(len(starts) - 1):
-                ag.append(scores[i][starts[k]:starts[k+1]])
-            ag.append(scores[i][starts[k+1]:])
-            for j, a in enumerate(ag):
-                ag[j] = torch.mean(a, dim=-2)
-            length = len(ag)
-            ag += [torch.tensor([.0] * scores.shape[-1]).to(self.device)] * (win_size - length)
-            batch_a_scores.append(torch.cat(ag).reshape(len(ag), -1))
-        return torch.cat(batch_a_scores).reshape(len(batch_a_scores), len(ag), -1)
-
     def train_epoch(self, epoch_i):
         for step, (b_t, b_x, b_p, b_l, b_y, b_s) in enumerate(self.data_loader):
             self.model.zero_grad()
             for i, t in enumerate(b_t):
                 b_t[i] += [0] * (max([len(l) for l in b_t]) - len(t))
             scores = self.model(torch.tensor(b_t).to(self.device),
-                                torch.tensor(b_l).to(self.device))
-            scores = self._aggregate_and_pad(scores, b_s)
-            loss = self.model.loss(scores, b_y, self.device)
+                                torch.tensor(b_l).to(self.device), b_s)
+            loss = self.model.loss(scores, b_y.to(self.device))
             # provide starts to aggregate scores of sub-words
             loss.backward()
 
@@ -510,10 +487,9 @@ class TransformerTrainer(BaseTrainer):
                 for i, t in enumerate(b_t):
                     b_t[i] += [0] * (max([len(l) for l in b_t]) - len(t))
                 scores = self.model(torch.tensor(b_t).to(self.device),
-                                    torch.tensor(b_l).to(self.device))
-                scores = self._aggregate_and_pad(scores, b_s)
+                                    torch.tensor(b_l).to(self.device), b_s)
                 pred += self._select_senses(scores, b_t, b_x, b_p, b_l, b_y)
-                true += b_y
+                true += b_y.tolist()
             true_flat, pred_flat = [item for sublist in true for item in sublist], \
                                    [item for sublist in pred for item in sublist]
             true_eval, pred_eval = [], []
@@ -538,9 +514,9 @@ class TransformerTrainer(BaseTrainer):
                 for i, t in enumerate(b_t):
                     b_t[i] += [0] * (max([len(l) for l in b_t]) - len(t))
                 scores = self.model(torch.tensor(b_t).to(self.device),
-                                    torch.tensor(b_l).to(self.device))
+                                    torch.tensor(b_l).to(self.device), b_s)
                 pred += self._select_senses(scores, b_t, b_x, b_p, b_l, b_y)
-                true += b_y
+                true += b_y.tolist()
             true_flat, pred_flat = [item for sublist in true for item in sublist], \
                                    [item for sublist in pred for item in sublist]
             true_eval, pred_eval = [], []
@@ -574,7 +550,6 @@ class WSDNetTrainer(BaseTrainer):
 
 
 if __name__ == '__main__':
-
-    c = TransformerConfig.from_json_file('conf/large_elmo_conf.json')
-    tr = TransformerTrainer(c, **c.__dict__)
-    tr.train()
+    c = TransformerConfig.from_json_file('conf/transformer_wsd_conf.json')
+    t = TransformerTrainer(c, **c.__dict__)
+    t.train()
