@@ -1,6 +1,6 @@
 {
   "num_epochs": 40,
-  "batch_size": 64,
+  "batch_size": 100,
   "checkpoint_path": "drive/My Drive/wsd/transformer_wsd_checkpoint.pt",
   "log_interval": 1000,
   "train_data":"res/wsd-train/semcor+glosses_data.xml",
@@ -9,7 +9,5 @@
   "eval_tags" :"res/wsd-test/se07/se07.txt",
   "test_data" :"res/wsd-train/test_data.xml",
   "test_tags" :"res/wsd-train/test_tags.txt",
-  "report_path": "drive/My Drive/wsd/transformer_wsd_report.txt",
-  "num_layers": 2,
-  "learning_rate": 0.001
+  "report_path": "drive/My Drive/wsd/transformer_wsd_report.txt"
 }

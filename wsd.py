@@ -131,23 +131,24 @@ class BertTransformerWSD(BaselineWSD):
         :param token_ids: (Tensor) shape `(batch, seq_len)`
         :return:
         """
-        max_len = token_ids.shape[1]  # self.bert_config.max_position_embeddings
+        max_len = token_ids.shape[1]
         attention_mask = torch.arange(max_len)\
                               .expand(len(lengths), max_len)\
                               .to(self.device) < lengths.unsqueeze(1)
         x, _ = self.bert_embedding(token_ids, attention_mask=attention_mask)
-        x = x.transpose(1, 0)  # make batch second dim for fairseq transformer.
+        x = x.transpose(1, 0)  # make batch second dim for transformer layer
         for _ in range(self.config.num_layers):
             x = self.transformer_layer(x, 1 - attention_mask)
 
         x = x.transpose(1, 0)  # restore batch first
-
-        batch = []
-        for i in range(x.shape[0]):  # different slices across batch
-            b = torch.cat([torch.mean(x[i, sl, :], dim=-2) for sl in slices[i]])\
-                     .reshape(-1, self.config.encoder_embed_dim)
-            batch.append(b)
-        x = torch.nn.utils.rnn.pad_sequence(batch, batch_first=True)
+        # aggregate bert sub-words and pad to max len
+        x = torch.nn.utils.rnn.pad_sequence(
+            [torch.cat([torch.mean(x[i, sl, :], dim=-2)
+                        for sl in slices[i]])\
+                  .reshape(-1, self.config.encoder_embed_dim)
+             for i in range(x.shape[0])
+             ],
+            batch_first=True)
         x = self.output_dense(x)
 
         return x

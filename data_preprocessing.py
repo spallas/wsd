@@ -269,7 +269,7 @@ class BertLemmaPosLoader(SemCorDataLoader):
             - tokens_tensor: WARNING length of SentencePiece tokenized
                              text is different from list of lemmas for example
                              use the starts vector to reconstruct original length
-            - starts: List[List[int]]
+            - slices: List[List[Slice]]
             - lemmas: List[List[str]]
             - pos_tags: List[List[int]]
             - lengths: List[int]
@@ -286,9 +286,9 @@ class BertLemmaPosLoader(SemCorDataLoader):
                 break
             n = self.last_doc + i
             m = slice(self.last_offset, self.last_offset + self.win_size)
-            text_span = self.dataset.docs[n][m]
-            labels = self.dataset.first_senses[n][m]
-            pos_tags = self.dataset.pos_tags[n][m]
+            text_span = ['[CLS]'] + self.dataset.docs[n][m] + ['[SEP]']
+            labels = [0] + self.dataset.first_senses[n][m] + [0]
+            pos_tags = [0] + self.dataset.pos_tags[n][m] + [0]
 
             bert_tokens = []
             slices = []
@@ -301,7 +301,6 @@ class BertLemmaPosLoader(SemCorDataLoader):
             text_len = len(text_span)
             # Padding
             text_span += ['.'] * (self.win_size - text_len)
-            # labels += [0] * (self.win_size - text_len)
             pos_tags += [0] * (self.win_size - text_len)
 
             i += 1
@@ -310,10 +309,11 @@ class BertLemmaPosLoader(SemCorDataLoader):
             b_t.append(bert_tokens)
             b_s.append(slices)
             b_x.append(text_span)
-            labels = torch.tensor(labels)
-            b_y.append(labels)
             b_l.append(bert_len)
             b_p.append(pos_tags)
+
+            labels = torch.tensor(labels)
+            b_y.append(labels)
 
         b_y = torch.nn.utils.rnn.pad_sequence(b_y, batch_first=True)
 

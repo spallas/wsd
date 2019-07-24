@@ -48,10 +48,10 @@ class TransformerConfig(Config):
     checkpoint_path: str = 'saved_weights/transformer_wsd_checkpoint.pt'
     report_path: str = 'logs/transformer_wsd_report.txt'
 
-    learning_rate: float = 0.001
-    num_layers: int = 4
+    learning_rate: float = 0.0001
+    num_layers: int = 6
 
-    encoder_embed_dim = 768
+    encoder_embed_dim = 512
     encoder_attention_heads = 8
     attention_dropout = 0.5
     dropout = 0.5
@@ -59,7 +59,7 @@ class TransformerConfig(Config):
     encoder_ffn_embed_dim = 512
 
     activation_fn = 'gelu_accurate'
-    activation_dropout = 0.5
+    activation_dropout = 0.1
 
     @staticmethod
     def from_json_file(file_name, **kwargs):
