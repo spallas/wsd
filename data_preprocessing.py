@@ -300,8 +300,8 @@ class BertLemmaPosLoader(SemCorDataLoader):
             bert_len = len(bert_tokens)
             text_len = len(text_span)
             # Padding
-            text_span += ['.'] * (self.win_size - text_len)
-            pos_tags += [0] * (self.win_size - text_len)
+            text_span += ['[PAD]'] * (self.win_size + 2 - text_len)
+            pos_tags += [0] * (self.win_size + 2 - text_len)
 
             i += 1
             if all([x == 0 for x in labels]):
