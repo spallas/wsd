@@ -13,7 +13,8 @@ from torch import optim
 from torch.nn.utils import clip_grad_norm_
 from torch.utils.tensorboard import SummaryWriter
 
-from data_preprocessing import SemCorDataset, ElmoSemCorLoader, ElmoLemmaPosLoader, BertLemmaPosLoader
+from data_preprocessing import SemCorDataset, ElmoSemCorLoader, \
+    ElmoLemmaPosLoader, BertLemmaPosLoader
 from utils import util
 from utils.config import TransformerConfig
 from wsd import SimpleWSD, BertTransformerWSD
@@ -51,6 +52,7 @@ class BaseTrainer:
         self.min_loss = np.inf
         self.data_loader = None
         self.sense2id = None
+        self.last_step = 0
 
         self.best_model_path = self.checkpoint_path + '.best'
 
@@ -132,6 +134,7 @@ class BaseTrainer:
             min_loss = current_loss
             torch.save({
                 'epoch': epoch_i,
+                'last_step': self.last_step,
                 'model_state_dict': self.model.state_dict(),
                 'optimizer_state_dict': self.optimizer.state_dict(),
                 'current_loss': current_loss,
@@ -145,6 +148,7 @@ class BaseTrainer:
             self.model.load_state_dict(checkpoint['model_state_dict'])
             self.optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
             self.last_epoch = checkpoint['epoch']
+            self.last_step = checkpoint['last_step']
             self.min_loss = checkpoint['min_loss']
             self.best_f1_micro = checkpoint['f1']
             print(f"Loaded checkpoint from: {self.checkpoint_path}")
@@ -152,6 +156,7 @@ class BaseTrainer:
                 print("Training finished for this checkpoint")
         else:
             self.last_epoch = 0
+            self.last_step = 0
             self.min_loss = 1e3
             self.best_f1_micro = 0.0
 
@@ -411,7 +416,7 @@ class ElmoTrainerLM(TrainerLM):
             self._print_metrics(true_eval, pred_eval)
 
 
-class TransformerTrainer(BaseTrainer):
+class TransformerTrainer(TrainerLM):
 
     def __init__(self, config: TransformerConfig, **kwargs):
         self.config = config
@@ -450,7 +455,7 @@ class TransformerTrainer(BaseTrainer):
         self.model.to(self.device)
 
     def train_epoch(self, epoch_i):
-        for step, (b_t, b_x, b_p, b_l, b_y, b_s) in enumerate(self.data_loader):
+        for step, (b_t, b_x, b_p, b_l, b_y, b_s) in enumerate(self.data_loader, self.last_step):
             self.model.zero_grad()
             for i, t in enumerate(b_t):
                 b_t[i] += [0] * (max([len(l) for l in b_t]) - len(t))
@@ -469,8 +474,9 @@ class TransformerTrainer(BaseTrainer):
                 self._plot('Dev F1', f1, step)
                 self.model.train()  # return to train mode after evaluation
 
-            clip_grad_norm_(parameters=self.model.parameters(), max_norm=1.0)
+            clip_grad_norm_(parameters=self.model.parameters(), max_norm=5.0)
             self.optimizer.step()  # update the weights
+        self.last_step += step
 
     def train(self):
         self.model.train()

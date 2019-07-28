@@ -119,10 +119,6 @@ class BertTransformerWSD(BaselineWSD):
         self.output_dense = nn.Linear(self.config.encoder_embed_dim, self.tagset_size)
         self.device = device
 
-    def _aggregate_bert(self, x, starts):
-        # how to do efficiently?
-        pass
-
     def forward(self, token_ids, lengths, slices):
         """
 
