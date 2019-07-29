@@ -416,7 +416,7 @@ class ElmoTrainerLM(TrainerLM):
             self._print_metrics(true_eval, pred_eval)
 
 
-class TransformerTrainer(TrainerLM):
+class TransformerTrainer(BaseTrainer):
 
     def __init__(self, config: TransformerConfig, **kwargs):
         self.config = config
