@@ -42,11 +42,11 @@ class SemCorDataset(Dataset):
                 sense2id[w] = i
         self.sense2id = sense2id
         # 0 for monosemic words, no sense associated
-        self.senses_count = {sense2id[k]: v for k, v in c.items()}
-        if sense2id:  # i.e. loading training set
-            self.senses_count[-1] = 0
-        instance2ids: Dict[str, List[int]] = {k: list(map(lambda x: sense2id[x], v)) for k, v in instance2senses.items()}
-
+        # self.senses_count = {sense2id[k]: v for k, v in c.items()}
+        # if sense2id:  # i.e. loading training set
+        #     self.senses_count[-1] = 0
+        instance2ids: Dict[str, List[int]] = {k: list(map(lambda x: sense2id[x] if x in sense2id else -1, v))
+                                              for k, v in instance2senses.items()}
         self.docs: List[List[str]] = []
         self.senses: List[List[List[int]]] = []
         self.first_senses: List[List[int]] = []

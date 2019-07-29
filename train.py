@@ -165,7 +165,7 @@ class BaseTrainer:
             checkpoint = torch.load(self.best_model_path)
             self.model.load_state_dict(checkpoint['model_state_dict'])
         else:
-            raise ValueError("Could not find any best model checkpoint.")
+            raise ValueError(f"Could not find any best model checkpoint: {self.best_model_path}")
 
     def _save_best(self, f1, epoch_i):
         if f1 > self.best_f1_micro:
@@ -426,6 +426,7 @@ class TransformerTrainer(TrainerLM):
         # Load data
         dataset = SemCorDataset(train_data, train_tags)
         self.sense2id = dataset.sense2id
+        num_tags = len(self.sense2id) + 1
         self.data_loader = BertLemmaPosLoader(dataset, batch_size=self.batch_size, win_size=32)
         self.tokenizer = self.data_loader.bert_tokenizer
         eval_dataset = SemCorDataset(data_path=eval_data,
@@ -434,8 +435,7 @@ class TransformerTrainer(TrainerLM):
         self.eval_loader = BertLemmaPosLoader(eval_dataset, batch_size=self.batch_size,
                                               win_size=32, overlap_size=8)
         # Build model
-        self.model = BertTransformerWSD(self.device, len(self.sense2id) + 1,
-                                        32, self.config)
+        self.model = BertTransformerWSD(self.device, num_tags, 32, self.config)
         self.model.to(self.device)
         self.optimizer = optim.Adam(self.model.parameters(), lr=self.config.learning_rate)
         self._maybe_load_checkpoint()
@@ -443,13 +443,13 @@ class TransformerTrainer(TrainerLM):
     def _setup_testing(self, train_data, train_tags, test_data, test_tags):
         dataset = SemCorDataset(train_data, train_tags)
         self.sense2id = dataset.sense2id
+        num_tags = len(self.sense2id) + 1
         dataset = SemCorDataset(data_path=test_data,
                                 tags_path=test_tags,
                                 sense2id=self.sense2id)
         self.test_loader = BertLemmaPosLoader(dataset, batch_size=self.batch_size,
                                               win_size=32, overlap_size=8)
-        self.model = BertTransformerWSD(self.device, len(self.sense2id) + 1,
-                                        32, self.config)
+        self.model = BertTransformerWSD(self.device, num_tags, 32, self.config)
         self._load_best()
         self.model.eval()
         self.model.to(self.device)
