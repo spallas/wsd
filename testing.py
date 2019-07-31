@@ -125,11 +125,11 @@ class ZerosBaseTrainer(BaseTrainer):
             self.last_epoch = 0
             self.min_loss = 1e3
 
-    def evaluate(self,
-                 num_epoch,
-                 eval_report='logs/zeros_report.txt',
-                 best_model_path='saved_weights/zeros/best_checkpoint.pt'):
-        super().evaluate(num_epoch, eval_report, best_model_path)
+    def _evaluate(self,
+                  num_epoch,
+                  eval_report='logs/zeros_report.txt',
+                  best_model_path='saved_weights/zeros/best_checkpoint.pt'):
+        super()._evaluate(num_epoch)
 
 
 class OneBatchBaseTrainer(BaseTrainer):

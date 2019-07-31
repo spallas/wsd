@@ -51,7 +51,9 @@ class BaseTrainer:
         self.optimizer = None
         self.min_loss = np.inf
         self.data_loader = None
+        self.eval_loader = None
         self.sense2id = None
+        self.train_sense_map = {}
         self.last_step = 0
 
         self.best_model_path = self.checkpoint_path + '.best'
@@ -75,11 +77,15 @@ class BaseTrainer:
     def train(self):
         raise NotImplementedError("Do not use base class, use concrete classes instead.")
 
-    def evaluate(self, num_epoch):
+    def test(self, loader):
         raise NotImplementedError("Do not use base class, use concrete classes instead.")
 
-    def test(self):
-        raise NotImplementedError("Do not use base class, use concrete classes instead.")
+    def _evaluate(self, num_epoch):
+        print("\nEvaluating...", flush=True)
+        self.model.eval()
+        f1 = self.test(self.eval_loader)
+        self._save_best(f1, num_epoch)
+        return f1
 
     def _select_senses(self, b_scores, b_vec, b_str, b_pos, b_lengths, b_labels):
         """
@@ -92,7 +98,7 @@ class BaseTrainer:
         :return:
         """
         def to_ids(synsets):
-            return [self.data_loader.dataset.sense2id[x.name()] for x in synsets]
+            return set([self.data_loader.dataset.sense2id[x.name()] for x in synsets])
 
         def set2padded(s: Set[int]):
             arr = np.array(list(s))
@@ -104,7 +110,9 @@ class BaseTrainer:
             impossible_senses = []
             for j, lemma in enumerate(sent):
                 sense_ids = to_ids(wn.synsets(lemma, pos=util.id2wnpos[b_pos[i][j]]))
-                padded = set2padded(set(range(b_scores.shape[-1])) - set(sense_ids))
+                if lemma in self.train_sense_map:
+                    sense_ids &= set(self.train_sense_map[lemma])
+                padded = set2padded(set(range(b_scores.shape[-1])) - sense_ids)
                 impossible_senses.append(padded)
             b_impossible_senses.append(impossible_senses)
         b_scores = b_scores.cpu().numpy()
@@ -228,16 +236,18 @@ class TrainerLM(BaseTrainer):
                 impossible_senses.append(padded)
             b_impossible_senses.append(impossible_senses)
         b_scores = b_scores.cpu().numpy()
-        b_scores = softmax(b_scores, -1)
         b_impossible_senses = np.array(b_impossible_senses)
-        np.put_along_axis(b_scores, b_impossible_senses, 0, axis=-1)
+        np.put_along_axis(b_scores, b_impossible_senses, np.min(b_scores), axis=-1)
+        b_scores = softmax(b_scores, -1)
 
         # Update b_scores with geometric mean with language model score.
         for i, sent in enumerate(b_str):
             for k, w in enumerate(sent):
                 if b_labels[i][k] != 0:  # i.e. sense tagged word
-                    text = ['[CLS]'] + sent + ['[SEP]']
-                    text[k+1] = '[MASK]'
+                    # text = ['[CLS]'] + sent + ['[SEP]']
+                    # text[k+1] = '[MASK]'
+                    text = [] + sent
+                    text[k] = '[MASK]'
                     tokenized_text = []
                     for ww in text:
                         tokenized_text += self.bert_tokenizer.tokenize(ww)
@@ -276,10 +286,7 @@ class TrainerLM(BaseTrainer):
     def train(self):
         pass
 
-    def evaluate(self, num_epoch):
-        pass
-
-    def test(self):
+    def test(self, loader):
         pass
 
 
@@ -351,7 +358,7 @@ class ElmoTrainerLM(TrainerLM):
                 print(f'\rLoss: {loss.item():.4f} ', end='')
                 self._plot('Train loss', loss.item(), step)
                 self._gpu_mem_info()
-                f1 = self.evaluate(epoch_i)
+                f1 = self._evaluate(epoch_i)
                 self._maybe_checkpoint(loss, f1, epoch_i)
                 self._plot('Dev F1', f1, step)
                 self.model.train()  # return to train mode after evaluation
@@ -365,12 +372,14 @@ class ElmoTrainerLM(TrainerLM):
             print(f'\nEpoch: {epoch}')
             self.train_epoch(epoch)
 
-    def evaluate(self, num_epoch):
-        print("\nEvaluating...", flush=True)
-        self.model.eval()
+    def test(self, loader):
+        """
+        Evaluate on all test dataset.
+        """
+        print("\nEvaluating on concatenation of all dataset...", flush=True)
         with torch.no_grad():
             pred, true = [], []
-            for step, (b_x, b_str, b_p, b_l, b_y) in enumerate(self.eval_loader):
+            for step, (b_x, b_str, b_p, b_l, b_y) in enumerate(loader):
                 self.model.zero_grad()
                 self.model.h, self.model.cell = map(lambda x: x.to(self.device),
                                                     self.model.init_hidden(len(b_y)))
@@ -387,36 +396,10 @@ class ElmoTrainerLM(TrainerLM):
                     true_eval.append(true_flat[i])
                     pred_eval.append(pred_flat[i])
             f1 = self._print_metrics(true_eval, pred_eval)
-            self._save_best(f1, num_epoch)
         return f1
 
-    def test(self):
-        """
-        Evaluate on all test dataset.
-        """
-        print("\nEvaluating on concatenation of all dataset...", flush=True)
-        with torch.no_grad():
-            pred, true = [], []
-            for step, (b_x, b_str, b_p, b_l, b_y) in enumerate(self.test_loader):
-                self.model.zero_grad()
-                self.model.h, self.model.cell = map(lambda x: x.to(self.device),
-                                                    self.model.init_hidden(len(b_y)))
-                scores = self.model(b_x.to(self.device), torch.tensor(b_l).to(self.device))
-                pred += self._select_senses(scores, b_x, b_str, b_p, b_l, b_y)
-                true += b_y
-            true_flat, pred_flat = [item for sublist in true for item in sublist], \
-                                   [item for sublist in pred for item in sublist]
-            true_eval, pred_eval = [], []
-            for i in range(len(true_flat)):
-                if true_flat[i] == 0:
-                    continue
-                else:
-                    true_eval.append(true_flat[i])
-                    pred_eval.append(pred_flat[i])
-            self._print_metrics(true_eval, pred_eval)
 
-
-class TransformerTrainer(BaseTrainer):
+class TransformerTrainer(TrainerLM):
 
     def __init__(self, config: TransformerConfig, **kwargs):
         self.config = config
@@ -426,12 +409,14 @@ class TransformerTrainer(BaseTrainer):
         # Load data
         dataset = SemCorDataset(train_data, train_tags)
         self.sense2id = dataset.sense2id
+        self.train_sense_map = dataset.train_sense_map
         num_tags = len(self.sense2id) + 1
         self.data_loader = BertLemmaPosLoader(dataset, batch_size=self.batch_size, win_size=32)
         self.tokenizer = self.data_loader.bert_tokenizer
         eval_dataset = SemCorDataset(data_path=eval_data,
                                      tags_path=eval_tags,
-                                     sense2id=self.sense2id)
+                                     sense2id=self.sense2id,
+                                     is_training=False)
         self.eval_loader = BertLemmaPosLoader(eval_dataset, batch_size=self.batch_size,
                                               win_size=32, overlap_size=8)
         # Build model
@@ -443,11 +428,13 @@ class TransformerTrainer(BaseTrainer):
     def _setup_testing(self, train_data, train_tags, test_data, test_tags):
         dataset = SemCorDataset(train_data, train_tags)
         self.sense2id = dataset.sense2id
+        self.train_sense_map = dataset.train_sense_map
         num_tags = len(self.sense2id) + 1
-        dataset = SemCorDataset(data_path=test_data,
-                                tags_path=test_tags,
-                                sense2id=self.sense2id)
-        self.test_loader = BertLemmaPosLoader(dataset, batch_size=self.batch_size,
+        test_dataset = SemCorDataset(data_path=test_data,
+                                     tags_path=test_tags,
+                                     sense2id=self.sense2id,
+                                     is_training=False)
+        self.test_loader = BertLemmaPosLoader(test_dataset, batch_size=self.batch_size,
                                               win_size=32, overlap_size=8)
         self.model = BertTransformerWSD(self.device, num_tags, 32, self.config)
         self._load_best()
@@ -469,7 +456,7 @@ class TransformerTrainer(BaseTrainer):
                 print(f'\rLoss: {loss.item():.4f} ', end='')
                 self._plot('Train loss', loss.item(), step)
                 self._gpu_mem_info()
-                f1 = self.evaluate(epoch_i)
+                f1 = self._evaluate(epoch_i)
                 self._maybe_checkpoint(loss, f1, epoch_i)
                 self._plot('Dev F1', f1, step)
                 self.model.train()  # return to train mode after evaluation
@@ -484,12 +471,13 @@ class TransformerTrainer(BaseTrainer):
             print(f'\nEpoch: {epoch}')
             self.train_epoch(epoch)
 
-    def evaluate(self, num_epoch):
-        print("\nEvaluating...", flush=True)
-        self.model.eval()
+    def test(self, loader):
+        """
+        Evaluate on all test dataset.
+        """
         with torch.no_grad():
             pred, true = [], []
-            for step, (b_t, b_x, b_p, b_l, b_y, b_s) in enumerate(self.eval_loader):
+            for step, (b_t, b_x, b_p, b_l, b_y, b_s) in enumerate(loader):
                 for i, t in enumerate(b_t):
                     b_t[i] += [0] * (max([len(l) for l in b_t]) - len(t))
                 scores = self.model(torch.tensor(b_t).to(self.device),
@@ -506,33 +494,7 @@ class TransformerTrainer(BaseTrainer):
                     true_eval.append(true_flat[i])
                     pred_eval.append(pred_flat[i])
             f1 = self._print_metrics(true_eval, pred_eval)
-            self._save_best(f1, num_epoch)
         return f1
-
-    def test(self):
-        """
-        Evaluate on all test dataset.
-        """
-        print("\nEvaluating on concatenation of all dataset...", flush=True)
-        with torch.no_grad():
-            pred, true = [], []
-            for step, (b_t, b_x, b_p, b_l, b_y, b_s) in enumerate(self.test_loader):
-                for i, t in enumerate(b_t):
-                    b_t[i] += [0] * (max([len(l) for l in b_t]) - len(t))
-                scores = self.model(torch.tensor(b_t).to(self.device),
-                                    torch.tensor(b_l).to(self.device), b_s)
-                pred += self._select_senses(scores, b_t, b_x, b_p, b_l, b_y)
-                true += b_y.tolist()
-            true_flat, pred_flat = [item for sublist in true for item in sublist], \
-                                   [item for sublist in pred for item in sublist]
-            true_eval, pred_eval = [], []
-            for i in range(len(true_flat)):
-                if true_flat[i] == 0:
-                    continue
-                else:
-                    true_eval.append(true_flat[i])
-                    pred_eval.append(pred_flat[i])
-            self._print_metrics(true_eval, pred_eval)
 
 
 class WSDNetTrainer(BaseTrainer):
@@ -548,10 +510,7 @@ class WSDNetTrainer(BaseTrainer):
     def train(self):
         pass
 
-    def evaluate(self, num_epoch):
-        pass
-
-    def test(self):
+    def test(self, loader):
         pass
 
 

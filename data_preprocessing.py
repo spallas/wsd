@@ -47,6 +47,7 @@ class SemCorDataset(Dataset):
         #     self.senses_count[-1] = 0
         instance2ids: Dict[str, List[int]] = {k: list(map(lambda x: sense2id[x] if x in sense2id else -1, v))
                                               for k, v in instance2senses.items()}
+        self.train_sense_map = {}
         self.docs: List[List[str]] = []
         self.senses: List[List[List[int]]] = []
         self.first_senses: List[List[int]] = []
@@ -63,6 +64,8 @@ class SemCorDataset(Dataset):
                     pos_tags.append(util.pos2id[word.attrib["pos"]])
                     word_senses = instance2ids[word.attrib["id"]] if word.tag == "instance" else [0]
                     senses.append(word_senses)
+                    if is_training and word.tag == "instance":
+                        self.train_sense_map.setdefault(lemma, []).extend(word_senses)
                     if lemma not in self.vocab:
                         self.vocab[lemma] = len(self.vocab)
             if len(lemmas) < 10 and is_training:
