@@ -279,7 +279,7 @@ class BertLemmaPosLoader(SemCorDataLoader):
             - labels: List[List[int]]
         """
         stop_iter = False
-        b_t, b_x, b_l, b_p, b_y, b_s = [], [], [], [], [], []
+        b_t, b_x, b_l, b_p, b_y, b_s, b_z = [], [], [], [], [], [], []
         lengths = [len(d) for d in self.dataset.docs[self.last_doc: self.last_doc + self.batch_size]]
         end_of_docs = self.last_offset + self.win_size >= max(lengths)
         i = 0
@@ -292,6 +292,7 @@ class BertLemmaPosLoader(SemCorDataLoader):
             text_span = ['[CLS]'] + self.dataset.docs[n][m] + ['[SEP]']
             labels = [0] + self.dataset.first_senses[n][m] + [0]
             pos_tags = [0] + self.dataset.pos_tags[n][m] + [0]
+            all_labels = [[0]] + self.dataset.senses[n][m] + [[0]]
 
             bert_tokens = []
             slices = []
@@ -305,6 +306,7 @@ class BertLemmaPosLoader(SemCorDataLoader):
             # Padding
             text_span += ['[PAD]'] * (self.win_size + 2 - text_len)
             pos_tags += [0] * (self.win_size + 2 - text_len)
+            all_labels += [[0]] * (self.win_size + 2 - text_len)
 
             i += 1
             if all([x == 0 for x in labels]):
@@ -314,11 +316,12 @@ class BertLemmaPosLoader(SemCorDataLoader):
             b_x.append(text_span)
             b_l.append(bert_len)
             b_p.append(pos_tags)
+            b_z.append(all_labels)
+            b_y.append(torch.tensor(labels))
 
-            labels = torch.tensor(labels)
-            b_y.append(labels)
-
-        b_y = torch.nn.utils.rnn.pad_sequence(b_y, batch_first=True)
+        b_y = torch.nn.utils.rnn.pad_sequence(b_y, batch_first=True, padding_value=0)
+        b_t = torch.nn.utils.rnn.pad_sequence(b_t, batch_first=True, padding_value=0)
+        b_l = torch.tensor(b_l)
 
         self.last_offset += self.win_size - self.overlap_size
         if end_of_docs:
@@ -327,7 +330,7 @@ class BertLemmaPosLoader(SemCorDataLoader):
             if stop_iter or self.last_doc >= len(self.dataset.docs):
                 raise StopIteration
 
-        return b_t, b_x, b_p, b_l, b_y, b_s
+        return b_t, b_x, b_p, b_l, b_y, b_s, b_z
 
 
 if __name__ == '__main__':

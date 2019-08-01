@@ -20,19 +20,8 @@ class BaselineWSD(nn.Module):
     def forward(self, *inputs):
         pass
 
-    def _loss(self, scores, tags, device):
-        y_true = torch.tensor(tags).view(-1).to(device)
-        scores = scores.view(-1, self.tagset_size)
-        mask = (y_true != self.pad_tag_index).float()
-        num_tokens = int(torch.sum(mask).item())
-
-        y_l = scores[range(scores.shape[0]), y_true] * mask
-        ce_loss = - torch.sum(y_l) / (num_tokens + 1)
-        # Negative LogLikelihood
-        return ce_loss
-
-    def loss(self, scores, tags, device):
-        y_true = torch.tensor(tags).view(-1).to(device)
+    def loss(self, scores, tags):
+        y_true = torch.tensor(tags).view(-1)
         scores = scores.view(-1, self.tagset_size)
         return self.ce_loss(scores, y_true)
 
@@ -146,13 +135,7 @@ class BertTransformerWSD(BaselineWSD):
              ],
             batch_first=True)
         x = self.output_dense(x)
-
         return x
-
-    def loss(self, scores, tags, device=None):
-        y_true = tags.view(-1)
-        scores = scores.view(-1, self.tagset_size)
-        return self.ce_loss(scores, y_true)
 
 
 class WSDNet(nn.Module):

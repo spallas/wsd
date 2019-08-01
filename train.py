@@ -270,7 +270,10 @@ class TrainerLM(BaseTrainer):
                         top_k = torch.topk(probabilities[syn_tok_ids, ], k=5)[0].tolist() \
                             if len(syn_tok_ids) > 5 else probabilities[syn_tok_ids, ].tolist()
                         s_score = sum(top_k)
-                        b_scores[i, k, s_id] = (b_scores[i, k, s_id] * s_score) ** 0.5
+                        if w in self.train_sense_map:
+                            b_scores[i, k, s_id] = (b_scores[i, k, s_id] * s_score) ** 0.5
+                        else:
+                            b_scores[i, k, s_id] = s_score
 
         return np.argmax(b_scores, -1).tolist()
 
@@ -442,12 +445,11 @@ class TransformerTrainer(TrainerLM):
         self.model.to(self.device)
 
     def train_epoch(self, epoch_i):
-        for step, (b_t, b_x, b_p, b_l, b_y, b_s) in enumerate(self.data_loader, self.last_step):
+        for step, (b_t, b_x, b_p, b_l, b_y, b_s, b_z) in enumerate(self.data_loader, self.last_step):
             self.model.zero_grad()
-            for i, t in enumerate(b_t):
-                b_t[i] += [0] * (max([len(l) for l in b_t]) - len(t))
-            scores = self.model(torch.tensor(b_t).to(self.device),
-                                torch.tensor(b_l).to(self.device), b_s)
+            scores = self.model(b_t.to(self.device),
+                                b_l.to(self.device),
+                                b_s)
             loss = self.model.loss(scores, b_y.to(self.device))
             # provide starts to aggregate scores of sub-words
             loss.backward()
@@ -476,22 +478,26 @@ class TransformerTrainer(TrainerLM):
         Evaluate on all test dataset.
         """
         with torch.no_grad():
-            pred, true = [], []
-            for step, (b_t, b_x, b_p, b_l, b_y, b_s) in enumerate(loader):
-                for i, t in enumerate(b_t):
-                    b_t[i] += [0] * (max([len(l) for l in b_t]) - len(t))
-                scores = self.model(torch.tensor(b_t).to(self.device),
-                                    torch.tensor(b_l).to(self.device), b_s)
+            pred, true, z = [], [], []
+            for step, (b_t, b_x, b_p, b_l, b_y, b_s, b_z) in enumerate(loader):
+                scores = self.model(b_t.to(self.device),
+                                    b_l.to(self.device),
+                                    b_s)
                 pred += self._select_senses(scores, b_t, b_x, b_p, b_l, b_y)
                 true += b_y.tolist()
-            true_flat, pred_flat = [item for sublist in true for item in sublist], \
-                                   [item for sublist in pred for item in sublist]
+                z += b_z
+            true_flat, pred_flat, z_flat = [item for sublist in true for item in sublist], \
+                                           [item for sublist in pred for item in sublist], \
+                                           [item for sublist in z for item in sublist]
             true_eval, pred_eval = [], []
             for i in range(len(true_flat)):
                 if true_flat[i] == 0:
                     continue
                 else:
-                    true_eval.append(true_flat[i])
+                    if pred_flat[i] in z_flat[i]:
+                        true_eval.append(z_flat[i])
+                    else:
+                        true_eval.append(true_flat[i])
                     pred_eval.append(pred_flat[i])
             f1 = self._print_metrics(true_eval, pred_eval)
         return f1

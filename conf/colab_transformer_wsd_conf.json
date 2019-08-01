@@ -10,6 +10,6 @@
   "test_data" :"res/wsd-train/test_data.xml",
   "test_tags" :"res/wsd-train/test_tags.txt",
   "report_path": "drive/My Drive/wsd/transformer_wsd_report.txt",
-  "learning_rate": 0.0001,
-  "num_layers": 2
+  "learning_rate": 0.001,
+  "num_layers": 4
 }
