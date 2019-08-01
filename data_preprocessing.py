@@ -311,7 +311,7 @@ class BertLemmaPosLoader(SemCorDataLoader):
             i += 1
             if all([x == 0 for x in labels]):
                 continue  # skip batch elem if no annotation
-            b_t.append(bert_tokens)
+            b_t.append(torch.tensor(bert_tokens))
             b_s.append(slices)
             b_x.append(text_span)
             b_l.append(bert_len)
