@@ -447,9 +447,13 @@ class TransformerTrainer(TrainerLM):
     def train_epoch(self, epoch_i):
         for step, (b_t, b_x, b_p, b_l, b_y, b_s, b_z) in enumerate(self.data_loader, self.last_step):
             self.model.zero_grad()
+            b_lengths = torch.tensor([sum([1 for w in sent if w != '[PAD]']) for sent in b_x]).to(self.device)
+            b_pos = torch.tensor([p_row[:b_lengths.max().item()] for p_row in b_p]).to(self.device)
             scores = self.model(b_t.to(self.device),
                                 b_l.to(self.device),
-                                b_s)
+                                b_s,
+                                b_lengths,
+                                b_pos)
             loss = self.model.loss(scores, b_y.to(self.device))
             # provide starts to aggregate scores of sub-words
             loss.backward()
@@ -480,9 +484,13 @@ class TransformerTrainer(TrainerLM):
         with torch.no_grad():
             pred, true, z = [], [], []
             for step, (b_t, b_x, b_p, b_l, b_y, b_s, b_z) in enumerate(loader):
+                b_lengths = torch.tensor([sum([1 for w in sent if w != '[PAD]']) for sent in b_x]).to(self.device)
+                b_pos = torch.tensor([p_row[:b_lengths.max().item()] for p_row in b_p]).to(self.device)
                 scores = self.model(b_t.to(self.device),
                                     b_l.to(self.device),
-                                    b_s)
+                                    b_s,
+                                    b_lengths,
+                                    b_pos)
                 pred += self._select_senses(scores, b_t, b_x, b_p, b_l, b_y)
                 true += b_y.tolist()
                 z += b_z

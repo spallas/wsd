@@ -51,7 +51,8 @@ class TransformerConfig(Config):
     learning_rate: float = 0.0001
     num_layers: int = 6
 
-    encoder_embed_dim = 768
+    pos_embed_dim = 32
+    encoder_embed_dim = 768 + 32
     encoder_attention_heads = 8
     attention_dropout = 0.5
     dropout = 0.5

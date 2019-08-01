@@ -1,3 +1,5 @@
+import math
+
 import torch
 from allennlp.modules.elmo import Elmo
 from pytorch_transformers import BertModel, BertConfig
@@ -6,6 +8,7 @@ from torch.nn import CrossEntropyLoss
 
 from models import Attention, WSDTransformerEncoder
 from utils.config import TransformerConfig
+from utils.util import pos2id
 
 
 class BaselineWSD(nn.Module):
@@ -104,13 +107,16 @@ class BertTransformerWSD(BaselineWSD):
         self.bert_config = BertConfig.from_pretrained('bert-base-uncased')
         self.bert_embedding = BertModel(self.bert_config)
         self.config = config
+        self.pos_embed = nn.Embedding(len(pos2id), self.config.pos_embed_dim, padding_idx=0)
         self.transformer_layer = WSDTransformerEncoder(self.config)
         self.output_dense = nn.Linear(self.config.encoder_embed_dim, self.tagset_size)
         self.device = device
+        self.scale = math.sqrt(self.config.encoder_embed_dim)
 
-    def forward(self, token_ids, lengths, slices):
+    def forward(self, token_ids, lengths, slices, text_lengths, pos_tags):
         """
-
+        :param pos_tags:
+        :param text_lengths: List[int] shape = `(batch)`
         :param slices: List[Slice]
         :param lengths: List[int] shape = `(batch)`
         :param token_ids: (Tensor) shape `(batch, seq_len)`
@@ -120,20 +126,26 @@ class BertTransformerWSD(BaselineWSD):
         attention_mask = torch.arange(max_len)\
                               .expand(len(lengths), max_len)\
                               .to(self.device) < lengths.unsqueeze(1)
+        max_text_len = text_lengths.max().item()
+        transformer_mask = 1 - (torch.arange(max_text_len)
+                                     .expand(len(text_lengths), max_text_len)
+                                     .to(self.device) < text_lengths.unsqueeze(1))
         x, _ = self.bert_embedding(token_ids, attention_mask=attention_mask)
-        x = x.transpose(1, 0)  # make batch second dim for transformer layer
-        for _ in range(self.config.num_layers):
-            x = self.transformer_layer(x, 1 - attention_mask)
-
-        x = x.transpose(1, 0)  # restore batch first
         # aggregate bert sub-words and pad to max len
         x = torch.nn.utils.rnn.pad_sequence(
             [torch.cat([torch.mean(x[i, sl, :], dim=-2)
-                        for sl in slices[i]])\
-                  .reshape(-1, self.config.encoder_embed_dim)
+                        for sl in slices[i]])
+                  .reshape(-1, self.config.encoder_embed_dim - self.config.pos_embed_dim)
              for i in range(x.shape[0])
              ],
             batch_first=True)
+        x_p = self.pos_embed(pos_tags)
+        x = torch.cat([x, x_p], dim=-1)
+        x = x * self.scale  # embedding scale
+        x = x.transpose(1, 0)  # make batch second dim for transformer layer
+        for _ in range(self.config.num_layers):
+            x = self.transformer_layer(x, transformer_mask)
+        x = x.transpose(1, 0)  # restore batch first
         x = self.output_dense(x)
         return x
 

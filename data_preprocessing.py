@@ -7,6 +7,7 @@ from collections import Counter, defaultdict
 from typing import List, Dict
 
 import torch
+from torch import nn
 from allennlp.modules.elmo import batch_to_ids
 from pytorch_transformers import BertTokenizer
 from torch.utils.data import Dataset
@@ -319,8 +320,8 @@ class BertLemmaPosLoader(SemCorDataLoader):
             b_z.append(all_labels)
             b_y.append(torch.tensor(labels))
 
-        b_y = torch.nn.utils.rnn.pad_sequence(b_y, batch_first=True, padding_value=0)
-        b_t = torch.nn.utils.rnn.pad_sequence(b_t, batch_first=True, padding_value=0)
+        b_y = nn.utils.rnn.pad_sequence(b_y, batch_first=True, padding_value=0)
+        b_t = nn.utils.rnn.pad_sequence(b_t, batch_first=True, padding_value=0)
         b_l = torch.tensor(b_l)
 
         self.last_offset += self.win_size - self.overlap_size

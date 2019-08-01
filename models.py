@@ -1,7 +1,6 @@
 import torch
 from fairseq.models.transformer import TransformerEncoderLayer
 from torch import nn
-import math
 
 from utils.config import TransformerConfig
 
@@ -32,7 +31,6 @@ class WSDTransformerEncoder(nn.Module):
     def __init__(self, config: TransformerConfig):
         super().__init__()
         self.transformer_encoder = TransformerEncoderLayer(config)
-        self.scale = math.sqrt(config.encoder_embed_dim)
 
     def forward(self, x: torch.Tensor, encoder_padding_mask):
         """
@@ -43,5 +41,4 @@ class WSDTransformerEncoder(nn.Module):
         Returns:
             encoded output of shape `(seq_len, batch, embed_dim)`
         """
-        x = x * self.scale
         return self.transformer_encoder(x, encoder_padding_mask)
