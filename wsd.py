@@ -21,7 +21,7 @@ class BaselineWSD(nn.Module):
         pass
 
     def loss(self, scores, tags):
-        y_true = torch.tensor(tags).view(-1)
+        y_true = tags.view(-1)
         scores = scores.view(-1, self.tagset_size)
         return self.ce_loss(scores, y_true)
 

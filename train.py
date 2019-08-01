@@ -495,7 +495,7 @@ class TransformerTrainer(TrainerLM):
                     continue
                 else:
                     if pred_flat[i] in z_flat[i]:
-                        true_eval.append(z_flat[i])
+                        true_eval.append(pred_flat[i])
                     else:
                         true_eval.append(true_flat[i])
                     pred_eval.append(pred_flat[i])
