@@ -477,10 +477,12 @@ class TransformerTrainer(TrainerLM):
             print(f'\nEpoch: {epoch}')
             self.train_epoch(epoch)
 
-    def test(self, loader):
+    def test(self, loader=None):
         """
         Evaluate on all test dataset.
         """
+        if not loader:
+            loader = self.test_loader
         with torch.no_grad():
             pred, true, z = [], [], []
             for step, (b_t, b_x, b_p, b_l, b_y, b_s, b_z) in enumerate(loader):

@@ -310,8 +310,8 @@ class BertLemmaPosLoader(SemCorDataLoader):
             all_labels += [[0]] * (self.win_size + 2 - text_len)
 
             i += 1
-            if all([x == 0 for x in labels]):
-                continue  # skip batch elem if no annotation
+            # if all([x == 0 for x in labels]):
+            #     continue  # skip batch elem if no annotation
             b_t.append(torch.tensor(bert_tokens))
             b_s.append(slices)
             b_x.append(text_span)
@@ -320,7 +320,10 @@ class BertLemmaPosLoader(SemCorDataLoader):
             b_z.append(all_labels)
             b_y.append(torch.tensor(labels))
 
-        b_y = nn.utils.rnn.pad_sequence(b_y, batch_first=True, padding_value=0)
+        try:
+            b_y = nn.utils.rnn.pad_sequence(b_y, batch_first=True, padding_value=0)
+        except IndexError:
+            print('Wait for it')
         b_t = nn.utils.rnn.pad_sequence(b_t, batch_first=True, padding_value=0)
         b_l = torch.tensor(b_l)
 
