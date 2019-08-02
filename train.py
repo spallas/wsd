@@ -29,6 +29,7 @@ class BaseTrainer:
     def __init__(self,
                  num_epochs=40,
                  batch_size=32,
+                 window_size=64,
                  checkpoint_path='saved_weights/baseline_elmo_checkpoint.pt',
                  log_interval=400,
                  train_data='res/wsd-train/semcor+glosses_data.xml',
@@ -43,6 +44,7 @@ class BaseTrainer:
 
         self.num_epochs = num_epochs
         self.batch_size = batch_size
+        self.window_size = window_size
         self.checkpoint_path = checkpoint_path
         self.log_interval = log_interval
         self._plot_server = None
@@ -170,7 +172,7 @@ class BaseTrainer:
 
     def _load_best(self):
         if os.path.exists(self.best_model_path):
-            checkpoint = torch.load(self.best_model_path)
+            checkpoint = torch.load(self.best_model_path, map_location=str(self.device))
             self.model.load_state_dict(checkpoint['model_state_dict'])
         else:
             raise ValueError(f"Could not find any best model checkpoint: {self.best_model_path}")
@@ -212,7 +214,7 @@ class TrainerLM(BaseTrainer):
         :return:
         """
         def to_ids(synsets):
-            return [self.data_loader.dataset.sense2id[x.name()] for x in synsets]
+            return [self.sense2id[x.name()] for x in synsets]
 
         def set2padded(s: Set[int]):
             arr = np.array(list(s))
@@ -414,16 +416,17 @@ class TransformerTrainer(TrainerLM):
         self.sense2id = dataset.sense2id
         self.train_sense_map = dataset.train_sense_map
         num_tags = len(self.sense2id) + 1
-        self.data_loader = BertLemmaPosLoader(dataset, batch_size=self.batch_size, win_size=32)
+        self.data_loader = BertLemmaPosLoader(dataset, batch_size=self.batch_size,
+                                              win_size=self.window_size)
         self.tokenizer = self.data_loader.bert_tokenizer
         eval_dataset = SemCorDataset(data_path=eval_data,
                                      tags_path=eval_tags,
                                      sense2id=self.sense2id,
                                      is_training=False)
         self.eval_loader = BertLemmaPosLoader(eval_dataset, batch_size=self.batch_size,
-                                              win_size=32, overlap_size=8)
+                                              win_size=self.window_size, overlap_size=8)
         # Build model
-        self.model = BertTransformerWSD(self.device, num_tags, 32, self.config)
+        self.model = BertTransformerWSD(self.device, num_tags, self.window_size, self.config)
         self.model.to(self.device)
         self.optimizer = optim.Adam(self.model.parameters(), lr=self.config.learning_rate)
         self._maybe_load_checkpoint()
@@ -438,8 +441,8 @@ class TransformerTrainer(TrainerLM):
                                      sense2id=self.sense2id,
                                      is_training=False)
         self.test_loader = BertLemmaPosLoader(test_dataset, batch_size=self.batch_size,
-                                              win_size=32, overlap_size=8)
-        self.model = BertTransformerWSD(self.device, num_tags, 32, self.config)
+                                              win_size=self.window_size, overlap_size=8)
+        self.model = BertTransformerWSD(self.device, num_tags, self.window_size, self.config)
         self._load_best()
         self.model.eval()
         self.model.to(self.device)
