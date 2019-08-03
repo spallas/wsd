@@ -9,7 +9,7 @@
   "eval_tags" :"res/wsd-test/se07/se07.txt",
   "test_data" :"res/wsd-train/test_data.xml",
   "test_tags" :"res/wsd-train/test_tags.txt",
-  "report_path": "logs/baseline_elmo_report.txt",
+  "report_path": "drive/My Drive/wsd/baseline_elmo_report.txt",
   "hidden_size": 1024,
   "num_layers": 2,
   "learning_rate": 0.0005,
