@@ -100,7 +100,7 @@ class BaseTrainer:
         :return:
         """
         def to_ids(synsets):
-            return set([self.data_loader.dataset.sense2id[x.name()] for x in synsets])
+            return set([self.sense2id[x.name()] for x in synsets])
 
         def set2padded(s: Set[int]):
             arr = np.array(list(s))
@@ -317,15 +317,19 @@ class ElmoTrainerLM(TrainerLM):
         # Load data
         dataset = SemCorDataset(train_data, train_tags)
         self.sense2id = dataset.sense2id
-        self.data_loader = ElmoSemCorLoader(dataset, batch_size=self.batch_size, win_size=32)
+        self.train_sense_map = dataset.train_sense_map
+        num_tags = len(self.sense2id) + 1
+        self.data_loader = ElmoLemmaPosLoader(dataset, batch_size=self.batch_size,
+                                              win_size=self.window_size)
         eval_dataset = SemCorDataset(data_path=eval_data,
                                      tags_path=eval_tags,
-                                     sense2id=self.sense2id)
+                                     sense2id=self.sense2id,
+                                     is_training=False)
         self.eval_loader = ElmoLemmaPosLoader(eval_dataset, batch_size=self.batch_size,
-                                              win_size=32, overlap_size=8)
+                                              win_size=self.window_size, overlap_size=8)
         # Build model
-        self.model = SimpleWSD(len(self.sense2id) + 1,
-                               self.data_loader.win_size,
+        self.model = SimpleWSD(num_tags,
+                               self.window_size,
                                self.elmo_weights, self.elmo_options,
                                self.elmo_size, self.hidden_size, self.num_layers)
         self.model.to(self.device)
@@ -336,13 +340,17 @@ class ElmoTrainerLM(TrainerLM):
         # Load data
         dataset = SemCorDataset(train_data, train_tags)
         self.sense2id = dataset.sense2id
+        self.train_sense_map = dataset.train_sense_map
+        num_tags = len(self.sense2id) + 1
         dataset = SemCorDataset(data_path=test_data,
                                 tags_path=test_tags,
-                                sense2id=self.sense2id)
-        self.test_loader = ElmoLemmaPosLoader(dataset, batch_size=self.batch_size, win_size=32)
+                                sense2id=self.sense2id,
+                                is_training=False)
+        self.test_loader = ElmoLemmaPosLoader(dataset, batch_size=self.batch_size,
+                                              win_size=self.window_size)
         # Build model
-        self.model = SimpleWSD(len(self.sense2id) + 1,
-                               self.data_loader.win_size,
+        self.model = SimpleWSD(num_tags,
+                               self.window_size,
                                self.elmo_weights, self.elmo_options,
                                self.elmo_size, self.hidden_size, self.num_layers)
         self._load_best()
@@ -350,13 +358,12 @@ class ElmoTrainerLM(TrainerLM):
         self.model.to(self.device)
 
     def train_epoch(self, epoch_i):
-        for step, (b_x, b_l, b_y) in enumerate(self.data_loader):
+        for step, (b_t, b_x, b_p, b_l, b_y, b_z) in enumerate(self.data_loader, self.last_step):
             self.model.zero_grad()
             self.model.h, self.model.cell = map(lambda x: x.to(self.device),
                                                 self.model.init_hidden(len(b_y)))
-
-            scores = self.model(b_x.to(self.device), torch.tensor(b_l).to(self.device))
-            loss = self.model.loss(scores, b_y, self.device)
+            scores = self.model(b_t.to(self.device), b_l.to(self.device))
+            loss = self.model.loss(scores, b_y.to(self.device))
             loss.backward()
 
             if step % self.log_interval == 0:
@@ -370,6 +377,7 @@ class ElmoTrainerLM(TrainerLM):
 
             clip_grad_norm_(parameters=self.model.parameters(), max_norm=1.0)
             self.optimizer.step()  # update the weights
+        self.last_step += step
 
     def train(self):
         self.model.train()
@@ -377,28 +385,34 @@ class ElmoTrainerLM(TrainerLM):
             print(f'\nEpoch: {epoch}')
             self.train_epoch(epoch)
 
-    def test(self, loader):
+    def test(self, loader=None):
         """
-        Evaluate on all test dataset.
+        Evaluate on test dataset.
         """
-        print("\nEvaluating on concatenation of all dataset...", flush=True)
+        if not loader:
+            loader = self.test_loader
         with torch.no_grad():
-            pred, true = [], []
-            for step, (b_x, b_str, b_p, b_l, b_y) in enumerate(loader):
+            pred, true, z = [], [], []
+            for step, (b_t, b_x, b_p, b_l, b_y, b_z) in enumerate(loader):
                 self.model.zero_grad()
                 self.model.h, self.model.cell = map(lambda x: x.to(self.device),
                                                     self.model.init_hidden(len(b_y)))
-                scores = self.model(b_x.to(self.device), torch.tensor(b_l).to(self.device))
-                pred += self._select_senses(scores, b_x, b_str, b_p, b_l, b_y)
-                true += b_y
-            true_flat, pred_flat = [item for sublist in true for item in sublist], \
-                                   [item for sublist in pred for item in sublist]
+                scores = self.model(b_t.to(self.device), b_l.to(self.device))
+                pred += self._select_senses(scores, b_t, b_x, b_p, b_l, b_y)
+                true += b_y.tolist()
+                z += b_z
+            true_flat, pred_flat, z_flat = [item for sublist in true for item in sublist], \
+                                           [item for sublist in pred for item in sublist], \
+                                           [item for sublist in z for item in sublist]
             true_eval, pred_eval = [], []
             for i in range(len(true_flat)):
                 if true_flat[i] == 0:
                     continue
                 else:
-                    true_eval.append(true_flat[i])
+                    if pred_flat[i] in z_flat[i]:
+                        true_eval.append(pred_flat[i])
+                    else:
+                        true_eval.append(true_flat[i])
                     pred_eval.append(pred_flat[i])
             f1 = self._print_metrics(true_eval, pred_eval)
         return f1

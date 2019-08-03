@@ -221,7 +221,7 @@ class ElmoLemmaPosLoader(SemCorDataLoader):
             - labels: List[List[int]]
         """
         stop_iter = False
-        b_x, b_l, b_p, b_y = [], [], [], []
+        b_x, b_l, b_p, b_y, b_z = [], [], [], [], []
         lengths = [len(d) for d in self.dataset.docs[self.last_doc: self.last_doc + self.batch_size]]
         end_of_docs = self.last_offset + self.win_size >= max(lengths)
         i = 0
@@ -234,21 +234,25 @@ class ElmoLemmaPosLoader(SemCorDataLoader):
             text_span = self.dataset.docs[n][m]
             labels = self.dataset.first_senses[n][m]
             pos_tags = self.dataset.pos_tags[n][m]
+            all_labels = self.dataset.senses[n][m]
+
             length = len(text_span)
             # Padding
-            text_span += ['.'] * (self.win_size - length)
+            text_span += ['<pad>'] * (self.win_size - length)
             labels += [0] * (self.win_size - length)
             pos_tags += [0] * (self.win_size - length)
+            all_labels += [[0]] * (self.win_size + 2 - length)
 
             i += 1
-
-            if all([x == 0 for x in labels]):
-                continue  # skip batch elem if no annotation
-
             b_x.append(text_span)
-            b_y.append(labels)
+            b_y.append(torch.tensor(labels))
             b_l.append(length)
             b_p.append(pos_tags)
+            b_z.append(all_labels)
+
+        b_y = nn.utils.rnn.pad_sequence(b_y, batch_first=True, padding_value=0)
+        b_t = batch_to_ids(b_x)
+        b_l = torch.tensor(b_l)
 
         self.last_offset += self.win_size - self.overlap_size
         if end_of_docs:
@@ -257,7 +261,7 @@ class ElmoLemmaPosLoader(SemCorDataLoader):
             if stop_iter or self.last_doc >= len(self.dataset.docs):
                 raise StopIteration
 
-        return batch_to_ids(b_x), b_x, b_p, b_l, b_y
+        return b_t, b_x, b_p, b_l, b_y, b_z
 
 
 class BertLemmaPosLoader(SemCorDataLoader):
@@ -320,10 +324,7 @@ class BertLemmaPosLoader(SemCorDataLoader):
             b_z.append(all_labels)
             b_y.append(torch.tensor(labels))
 
-        try:
-            b_y = nn.utils.rnn.pad_sequence(b_y, batch_first=True, padding_value=0)
-        except IndexError:
-            print('Wait for it')
+        b_y = nn.utils.rnn.pad_sequence(b_y, batch_first=True, padding_value=0)
         b_t = nn.utils.rnn.pad_sequence(b_t, batch_first=True, padding_value=0)
         b_l = torch.tensor(b_l)
 
