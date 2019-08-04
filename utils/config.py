@@ -62,6 +62,7 @@ class TransformerConfig(Config):
 
     activation_fn = 'gelu_accurate'
     activation_dropout = 0.1
+    bert_trainable = False
 
     @staticmethod
     def from_json_file(file_name, **kwargs):

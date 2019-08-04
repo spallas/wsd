@@ -106,6 +106,9 @@ class BertTransformerWSD(BaselineWSD):
         super().__init__(num_senses, max_len)
         self.bert_config = BertConfig.from_pretrained('bert-base-uncased')
         self.bert_embedding = BertModel(self.bert_config)
+        if not config.bert_trainable:
+            for p in self.bert_embedding.parameters():
+                p.requires_grad = False
         self.config = config
         self.pos_embed = nn.Embedding(len(pos2id), self.config.pos_embed_dim, padding_idx=0)
         self.transformer_layer = WSDTransformerEncoder(self.config)
