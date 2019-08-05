@@ -1,7 +1,7 @@
 {
   "num_epochs": 40,
   "batch_size": 32,
-  "checkpoint_path": "saved_weights/baseline_elmo_checkpoint.pt",
+  "checkpoint_path": "drive/My Drive/wsd/baseline_elmo_checkpoint.pt",
   "log_interval": 1000,
   "train_data":"res/wsd-train/semcor_data.xml",
   "train_tags":"res/wsd-train/semcor_tags.txt",
@@ -9,7 +9,7 @@
   "eval_tags" :"res/wsd-test/se07/se07.txt",
   "test_data" :"res/wsd-train/test_data.xml",
   "test_tags" :"res/wsd-train/test_tags.txt",
-  "report_path": "logs/baseline_elmo_report.txt",
+  "report_path": "drive/My Drive/wsd/baseline_elmo_report.txt",
   "hidden_size": 1024,
   "num_layers": 2,
   "learning_rate": 0.0005,
