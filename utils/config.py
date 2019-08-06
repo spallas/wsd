@@ -8,7 +8,7 @@ class Config(object):
 
     batch_size: int = 32
     num_epochs: int = 40
-    window_size: int = 64
+    window_size: int = 100
 
     train_data: str = 'res/wsd-train/semcor+glosses_data.xml'
     train_tags: str = 'res/wsd-train/semcor+glosses_tags.txt'
