@@ -1,4 +1,5 @@
 import os
+import pprint
 import warnings
 from typing import Set
 
@@ -260,6 +261,7 @@ class TrainerLM(BaseTrainer):
                     predictions = outputs[0]
                     probabilities = torch.nn.Softmax(dim=0)(predictions[0, masked_index])
 
+                    lm_ids, lm_scores = [], []
                     for S in wn.synsets(w, pos=util.id2wnpos[b_pos[i][k]]):
                         s_id = self.sense2id[S.name()]
                         if S not in self.all_syn_lemmas:
@@ -272,10 +274,14 @@ class TrainerLM(BaseTrainer):
                         top_k = torch.topk(probabilities[syn_tok_ids, ], k=5)[0].tolist() \
                             if len(syn_tok_ids) > 5 else probabilities[syn_tok_ids, ].tolist()
                         s_score = sum(top_k)
+                        lm_ids.append(s_id)
+                        lm_scores.append(s_score)
+                    lm_score = {k: v for k, v in zip(lm_ids, softmax(lm_scores))}
+                    for s_id in lm_score:
                         if w in self.train_sense_map:
-                            b_scores[i, k, s_id] = (b_scores[i, k, s_id] * s_score) ** 0.5
+                            b_scores[i, k, s_id] = (b_scores[i, k, s_id] * lm_score[s_id]) ** 0.5
                         else:
-                            b_scores[i, k, s_id] = s_score
+                            b_scores[i, k, s_id] = lm_score[s_id]
 
         return np.argmax(b_scores, -1).tolist()
 
