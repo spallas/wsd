@@ -556,6 +556,6 @@ class WSDNetTrainer(BaseTrainer):
 
 
 if __name__ == '__main__':
-    c = TransformerConfig.from_json_file('conf/tr_semcor_conf.json')
+    c = TransformerConfig.from_json_file('conf/transformer_wsd_conf.json')
     t = TransformerTrainer(c, **c.__dict__)
     t.train()
