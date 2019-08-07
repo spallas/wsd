@@ -273,7 +273,7 @@ class TrainerLM(BaseTrainer):
                             tok_ids = self.bert_tokenizer.convert_tokens_to_ids(tokenized)
                             syn_tok_ids += tok_ids
                         top_k = torch.topk(probabilities[syn_tok_ids, ], k=10)[0].tolist() \
-                            if len(syn_tok_ids) > 5 else probabilities[syn_tok_ids, ].tolist()
+                            if len(syn_tok_ids) > 10 else probabilities[syn_tok_ids, ].tolist()
                         s_score = sum(top_k)
                         lm_ids.append(s_id)
                         lm_scores.append(s_score)

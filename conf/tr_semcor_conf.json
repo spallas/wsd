@@ -1,6 +1,6 @@
 {
   "num_epochs": 40,
-  "batch_size": 40,
+  "batch_size": 48,
   "checkpoint_path": "saved_weights/transformer_wsd_checkpoint.pt",
   "log_interval": 200,
   "train_data":"res/wsd-train/semcor_data.xml",
