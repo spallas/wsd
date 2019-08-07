@@ -149,8 +149,11 @@ class BertTransformerWSD(BaselineWSD):
         for _ in range(self.config.num_layers):
             x = self.transformer_layer(x, transformer_mask)
         x = x.transpose(1, 0)  # restore batch first
-        x = self.output_dense(x)
-        return x
+        y = x.contiguous().view(-1, x.shape[2])
+        y = self.output_dense(y)
+        y = nn.LogSoftmax(dim=1)(y)
+        tag_scores = y.view(-1, max_text_len, self.tagset_size)
+        return tag_scores
 
 
 class WSDNet(nn.Module):
