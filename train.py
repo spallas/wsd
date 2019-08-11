@@ -1,5 +1,4 @@
 import os
-import pprint
 import warnings
 from typing import Set
 
@@ -14,8 +13,7 @@ from torch import optim
 from torch.nn.utils import clip_grad_norm_
 from torch.utils.tensorboard import SummaryWriter
 
-from data_preprocessing import SemCorDataset, ElmoSemCorLoader, \
-    ElmoLemmaPosLoader, BertLemmaPosLoader
+from data_preprocessing import SemCorDataset, ElmoLemmaPosLoader, BertLemmaPosLoader
 from utils import util
 from utils.config import TransformerConfig
 from wsd import SimpleWSD, BertTransformerWSD
@@ -426,6 +424,25 @@ class ElmoTrainerLM(TrainerLM):
         return f1
 
 
+class BertWsdTrainer(BaseTrainer):
+    # TODO
+
+    def _setup_training(self, train_data, train_tags, eval_data, eval_tags):
+        pass
+
+    def _setup_testing(self, train_data, train_tags, test_data, test_tags):
+        pass
+
+    def train_epoch(self, epoch_i):
+        pass
+
+    def train(self):
+        pass
+
+    def test(self, loader):
+        pass
+
+
 class TransformerTrainer(TrainerLM):
 
     def __init__(self, config: TransformerConfig, **kwargs):
@@ -448,7 +465,10 @@ class TransformerTrainer(TrainerLM):
         self.eval_loader = BertLemmaPosLoader(eval_dataset, batch_size=self.batch_size,
                                               win_size=self.window_size, overlap_size=8)
         # Build model
-        self.model = BertTransformerWSD(self.device, num_tags, self.window_size, self.config)
+        self.model = BertTransformerWSD(self.device, num_tags, self.window_size,
+                                        self.config.d_model, self.config.num_heads,
+                                        self.config.num_layers, self.config.pos_embed_dim,
+                                        self.config.encoder_embed_dim, self.config.bert_trainable)
         self.model.to(self.device)
         self.optimizer = optim.Adam(self.model.parameters(), lr=self.config.learning_rate)
         self._maybe_load_checkpoint()
@@ -464,7 +484,10 @@ class TransformerTrainer(TrainerLM):
                                      is_training=False)
         self.test_loader = BertLemmaPosLoader(test_dataset, batch_size=self.batch_size,
                                               win_size=self.window_size, overlap_size=8)
-        self.model = BertTransformerWSD(self.device, num_tags, self.window_size, self.config)
+        self.model = BertTransformerWSD(self.device, num_tags, self.window_size,
+                                        self.config.d_model, self.config.num_heads,
+                                        self.config.num_layers, self.config.pos_embed_dim,
+                                        self.config.encoder_embed_dim, self.config.bert_trainable)
         self._load_best()
         self.model.eval()
         self.model.to(self.device)

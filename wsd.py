@@ -6,8 +6,7 @@ from pytorch_transformers import BertModel, BertConfig
 from torch import nn
 from torch.nn import CrossEntropyLoss
 
-from models import Attention, WSDTransformerEncoder
-from utils.config import TransformerConfig
+from models import Attention
 from utils.util import pos2id
 
 
@@ -100,54 +99,87 @@ class ElmoTransformerWSD(nn.Module):
         pass
 
 
+class BertWSD(BaselineWSD):
+
+    def __init__(self, device, num_senses, max_len):
+        super().__init__(num_senses, max_len)
+        self.device = device
+        self.num_senses = num_senses
+        self.max_len = max_len
+
+        self.bert_config = BertConfig.from_pretrained('bert-large-cased')
+        self.bert_embedding = BertModel(self.bert_config)
+
+    def forward(self, token_ids, lengths, slices, text_lengths, pos_tags):
+        # TODO implement bert + 2 dense
+        pass
+
+
 class BertTransformerWSD(BaselineWSD):
 
-    def __init__(self, device, num_senses, max_len, config: TransformerConfig):
+    def __init__(self,
+                 device,
+                 num_senses,
+                 max_len,
+                 d_model: int = 512,
+                 num_heads: int = 8,
+                 num_layers: int = 4,
+                 pos_embed_dim: int = 32,
+                 encoder_embed_dim: int = 768+32,
+                 bert_trainable: bool = False):
         super().__init__(num_senses, max_len)
+        self.d_model = d_model
+        self.num_heads = num_heads
+        self.num_layers = num_layers
+        self.pos_embed_dim = pos_embed_dim
+        self.bert_trainable = bert_trainable
+        self.encoder_embed_dim = encoder_embed_dim
+
         self.bert_config = BertConfig.from_pretrained('bert-base-uncased')
         self.bert_embedding = BertModel(self.bert_config)
-        if not config.bert_trainable:
+        if not self.bert_trainable:
             for p in self.bert_embedding.parameters():
                 p.requires_grad = False
-        self.config = config
-        self.pos_embed = nn.Embedding(len(pos2id), self.config.pos_embed_dim, padding_idx=0)
-        self.transformer_layer = WSDTransformerEncoder(self.config)
-        self.output_dense = nn.Linear(self.config.encoder_embed_dim, self.tagset_size)
+        self.pos_embed = nn.Embedding(len(pos2id), self.pos_embed_dim, padding_idx=0)
+        self.project_dense = nn.Linear(self.encoder_embed_dim, self.d_model)
+        self.encoder_layer = nn.TransformerEncoderLayer(self.d_model, self.num_heads)
+        self.transformer_encoder = nn.TransformerEncoder(self.encoder_layer, self.num_layers)
+        self.output_dense = nn.Linear(self.d_model, self.tagset_size)
         self.device = device
-        self.scale = math.sqrt(self.config.encoder_embed_dim)
+        self.scale = math.sqrt(self.encoder_embed_dim)
 
     def forward(self, token_ids, lengths, slices, text_lengths, pos_tags):
         """
         :param pos_tags:
-        :param text_lengths: List[int] shape = `(batch)`
+        :param text_lengths: Tensor, shape = `(batch)`
         :param slices: List[Slice]
-        :param lengths: List[int] shape = `(batch)`
-        :param token_ids: (Tensor) shape `(batch, seq_len)`
+        :param lengths: List[int], shape = `(batch)`
+        :param token_ids: Tensor, shape `(batch, seq_len)`
         :return:
         """
         max_len = token_ids.shape[1]
-        attention_mask = torch.arange(max_len)\
-                              .expand(len(lengths), max_len)\
-                              .to(self.device) < lengths.unsqueeze(1)
+        bert_mask = torch.arange(max_len)\
+                         .expand(len(lengths), max_len)\
+                         .to(self.device) < lengths.unsqueeze(1)
         max_text_len = text_lengths.max().item()
-        transformer_mask = 1 - (torch.arange(max_text_len)
-                                     .expand(len(text_lengths), max_text_len)
-                                     .to(self.device) < text_lengths.unsqueeze(1))
-        x, _ = self.bert_embedding(token_ids, attention_mask=attention_mask)
+        # mask is True for values to be masked
+        mask_range = torch.arange(max_text_len).expand(len(text_lengths), max_text_len)
+        transformer_mask = (mask_range >= text_lengths.unsqueeze(1)).to(self.device)
+        x, _ = self.bert_embedding(token_ids, attention_mask=bert_mask)
         # aggregate bert sub-words and pad to max len
         x = torch.nn.utils.rnn.pad_sequence(
             # [torch.cat([torch.mean(x[i, sl, :], dim=-2) for sl in slices[i]])
             [torch.cat([x[i, sl.start, :] for sl in slices[i]])  # only use first bert token
-                    .reshape(-1, self.config.encoder_embed_dim - self.config.pos_embed_dim)
+                    .reshape(-1, self.encoder_embed_dim - self.pos_embed_dim)
              for i in range(x.shape[0])
              ],
             batch_first=True)
         x_p = self.pos_embed(pos_tags)
         x = torch.cat([x, x_p], dim=-1)
+        x = self.project_dense(x)
         x = x * self.scale  # embedding scale
         x = x.transpose(1, 0)  # make batch second dim for transformer layer
-        for _ in range(self.config.num_layers):
-            x = self.transformer_layer(x, transformer_mask)
+        x = self.transformer_encoder(x, src_key_padding_mask=transformer_mask)
         x = x.transpose(1, 0)  # restore batch first
         y = x.contiguous().view(-1, x.shape[2])
         y = self.output_dense(y)

@@ -53,7 +53,9 @@ class TransformerConfig(Config):
     num_layers: int = 6
 
     pos_embed_dim = 32
+    num_heads = 8
     encoder_embed_dim = 768 + 32
+    d_model = 512
     encoder_attention_heads = 8
     attention_dropout = 0.5
     dropout = 0.5
@@ -68,6 +70,23 @@ class TransformerConfig(Config):
     def from_json_file(file_name, **kwargs):
         with open(file_name) as f:
             return TransformerConfig.from_json(f.read(), **kwargs)
+
+
+@dataclass_json
+@dataclass
+class BertWsdConfig(Config):
+
+    checkpoint_path: str = 'saved_weights/bert_wsd_checkpoint.pt'
+    report_path: str = 'logs/bert_wsd_report.txt'
+
+    learning_rate: float = 0.00005
+    dense_size: int = 512
+    bert_trainable = True
+
+    @staticmethod
+    def from_json_file(file_name, **kwargs):
+        with open(file_name) as f:
+            return BertWsdConfig.from_json(f.read(), **kwargs)
 
 
 @dataclass_json
