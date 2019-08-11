@@ -170,8 +170,8 @@ class BertTransformerWSD(BaselineWSD):
         x, _ = self.bert_embedding(token_ids, attention_mask=bert_mask)
         # aggregate bert sub-words and pad to max len
         x = torch.nn.utils.rnn.pad_sequence(
-            # [torch.cat([torch.mean(x[i, sl, :], dim=-2) for sl in slices[i]])
-            [torch.cat([x[i, sl.start, :] for sl in slices[i]])  # only use first bert token
+            [torch.cat([torch.mean(x[i, sl, :], dim=-2) for sl in slices[i]])
+             # [torch.cat([x[i, sl.start, :] for sl in slices[i]])  # only use first bert token
                     .reshape(-1, self.encoder_embed_dim - self.pos_embed_dim)
              for i in range(x.shape[0])
              ],

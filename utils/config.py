@@ -65,6 +65,7 @@ class TransformerConfig(Config):
     activation_fn = 'gelu_accurate'
     activation_dropout = 0.1
     bert_trainable = False
+    subword_aggregation_mode = 'mean'  # or 'first'
 
     @staticmethod
     def from_json_file(file_name, **kwargs):
@@ -82,6 +83,7 @@ class BertWsdConfig(Config):
     learning_rate: float = 0.00005
     dense_size: int = 512
     bert_trainable = True
+    subword_aggregation_mode = 'mean'  # or 'first'
 
     @staticmethod
     def from_json_file(file_name, **kwargs):
