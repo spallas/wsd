@@ -163,8 +163,10 @@ class BertTransformerWSD(BaselineWSD):
                          .to(self.device) < lengths.unsqueeze(1)
         max_text_len = text_lengths.max().item()
         # mask is True for values to be masked
-        mask_range = torch.arange(max_text_len).expand(len(text_lengths), max_text_len)
-        transformer_mask = (mask_range >= text_lengths.unsqueeze(1)).to(self.device)
+        mask_range = torch.arange(max_text_len)\
+            .expand(len(text_lengths), max_text_len)\
+            .to(self.device)
+        transformer_mask = (mask_range >= text_lengths.unsqueeze(1))
         x, _ = self.bert_embedding(token_ids, attention_mask=bert_mask)
         # aggregate bert sub-words and pad to max len
         x = torch.nn.utils.rnn.pad_sequence(
