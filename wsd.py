@@ -178,7 +178,9 @@ class BertTransformerWSD(BaselineWSD):
             batch_first=True)
         x_p = self.pos_embed(pos_tags)
         x = torch.cat([x, x_p], dim=-1)
-        x = self.project_dense(x)
+        # for test
+        r = torch.rand_like(x)
+        x = self.project_dense(r)
         x = x * self.scale  # embedding scale
         x = x.transpose(1, 0)  # make batch second dim for transformer layer
         x = self.transformer_encoder(x, src_key_padding_mask=transformer_mask)
