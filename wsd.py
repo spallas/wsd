@@ -118,7 +118,7 @@ class BertWSD(BaselineWSD):
         bert_mask = torch.arange(max_len)\
                          .expand(len(lengths), max_len)\
                          .to(self.device) < lengths.unsqueeze(1)
-        x = self.bert_embedding(token_ids, attention_mask=bert_mask)[0]
+        x = self.bert_model(token_ids, attention_mask=bert_mask)[0]
         # aggregate bert sub-words and pad to max len
         x = torch.nn.utils.rnn.pad_sequence(
             [torch.cat([torch.mean(x[i, sl, :], dim=-2) for sl in slices[i]])
