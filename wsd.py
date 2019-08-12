@@ -101,12 +101,14 @@ class ElmoTransformerWSD(nn.Module):
 
 class BertWSD(BaselineWSD):
 
-    def __init__(self, device, num_senses, max_len, encoder_embed_dim, d_model):
+    def __init__(self, device, num_senses, max_len, encoder_embed_dim, d_model, pos_embed_dim):
         super().__init__(num_senses, max_len)
         self.device = device
         self.encoder_embed_dim = encoder_embed_dim
         self.d_model = d_model
+        self.pos_embed_dim = pos_embed_dim
 
+        self.pos_embed = nn.Embedding(len(pos2id), self.pos_embed_dim, padding_idx=0)
         self.bert_config = BertConfig.from_pretrained('bert-large-cased')
         self.bert_model = BertModel(self.bert_config)
         self.dense_1 = nn.Linear(self.encoder_embed_dim, self.d_model)
