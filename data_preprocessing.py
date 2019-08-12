@@ -16,6 +16,15 @@ from tqdm import tqdm
 from utils import util
 
 
+def build_sense2id(data_path='res/wsd-train/semcor+glosses_data.xml',
+                   tags_path='res/wsd-train/semcor+glosses_tags.txt'):
+    pass
+
+
+def load_sense2id(dict_path=''):
+    pass
+
+
 class SemCorDataset(Dataset):
 
     def __init__(self,

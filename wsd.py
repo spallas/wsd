@@ -2,7 +2,7 @@ import math
 
 import torch
 from allennlp.modules.elmo import Elmo
-from pytorch_transformers import BertModel, BertConfig
+from pytorch_transformers import BertModel, BertConfig, BertForTokenClassification
 from torch import nn
 from torch.nn import CrossEntropyLoss
 
@@ -101,18 +101,38 @@ class ElmoTransformerWSD(nn.Module):
 
 class BertWSD(BaselineWSD):
 
-    def __init__(self, device, num_senses, max_len):
+    def __init__(self, device, num_senses, max_len, encoder_embed_dim, d_model):
         super().__init__(num_senses, max_len)
         self.device = device
-        self.num_senses = num_senses
-        self.max_len = max_len
+        self.encoder_embed_dim = encoder_embed_dim
+        self.d_model = d_model
 
         self.bert_config = BertConfig.from_pretrained('bert-large-cased')
-        self.bert_embedding = BertModel(self.bert_config)
+        self.bert_model = BertModel(self.bert_config)
+        self.dense_1 = nn.Linear(self.encoder_embed_dim, self.d_model)
+        self.dense_2 = nn.Linear(self.d_model, self.tagset_size)
 
     def forward(self, token_ids, lengths, slices, text_lengths, pos_tags):
-        # TODO implement bert + 2 dense
-        pass
+        max_len = token_ids.shape[1]
+        max_text_len = text_lengths.max().item()
+        bert_mask = torch.arange(max_len)\
+                         .expand(len(lengths), max_len)\
+                         .to(self.device) < lengths.unsqueeze(1)
+        x = self.bert_embedding(token_ids, attention_mask=bert_mask)[0]
+        # aggregate bert sub-words and pad to max len
+        x = torch.nn.utils.rnn.pad_sequence(
+            [torch.cat([torch.mean(x[i, sl, :], dim=-2) for sl in slices[i]])
+                 .reshape(-1, self.encoder_embed_dim - self.pos_embed_dim)
+             for i in range(x.shape[0])
+             ],
+            batch_first=True)
+        x_p = self.pos_embed(pos_tags)
+        x = torch.cat([x, x_p], dim=-1)
+        x = self.dense_1(x)
+        y = self.dense_2(x)
+        y = nn.LogSoftmax(dim=1)(y)
+        tag_scores = y.view(-1, max_text_len, self.tagset_size)
+        return tag_scores
 
 
 class BertTransformerWSD(BaselineWSD):
