@@ -81,7 +81,10 @@ class BertWsdConfig(Config):
     report_path: str = 'logs/bert_wsd_report.txt'
 
     learning_rate: float = 0.00005
-    dense_size: int = 512
+    d_model: int = 512
+    encoder_embed_dim = 1024 + 32
+    pos_embed_dim = 32
+
     bert_trainable = True
     subword_aggregation_mode = 'mean'  # or 'first'
 
