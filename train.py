@@ -13,7 +13,7 @@ from torch import optim
 from torch.nn.utils import clip_grad_norm_
 from torch.utils.tensorboard import SummaryWriter
 
-from data_preprocessing import SemCorDataset, ElmoLemmaPosLoader, BertLemmaPosLoader
+from data_preprocessing import SemCorDataset, ElmoLemmaPosLoader, BertLemmaPosLoader, BERT_MODEL
 from utils import util
 from utils.config import TransformerConfig, BertWsdConfig
 from wsd import SimpleWSD, BertTransformerWSD, BertWSD
@@ -197,8 +197,8 @@ class TrainerLM(BaseTrainer):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         # Load BERT
-        self.bert_tokenizer = BertTokenizer.from_pretrained('bert-base-uncased')
-        self.language_model = BertForMaskedLM.from_pretrained('bert-base-uncased')
+        self.bert_tokenizer = BertTokenizer.from_pretrained(BERT_MODEL)
+        self.language_model = BertForMaskedLM.from_pretrained(BERT_MODEL)
         self.language_model.eval()
         self.all_syn_lemmas = {}
 
@@ -675,6 +675,6 @@ class WSDNetTrainer(BaseTrainer):
 
 
 if __name__ == '__main__':
-    c = TransformerConfig.from_json_file('conf/transformer_wsd_conf.json')
-    t = TransformerTrainer(c, **c.__dict__)
+    c = BertWsdConfig.from_json_file('conf/bert_wsd_conf.json')
+    t = BertWsdTrainer(c, **c.__dict__)
     t.train()

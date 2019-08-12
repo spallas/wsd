@@ -6,6 +6,7 @@ from pytorch_transformers import BertModel, BertConfig, BertForTokenClassificati
 from torch import nn
 from torch.nn import CrossEntropyLoss
 
+from data_preprocessing import BERT_MODEL
 from models import Attention
 from utils.util import pos2id
 
@@ -109,7 +110,7 @@ class BertWSD(BaselineWSD):
         self.pos_embed_dim = pos_embed_dim
 
         self.pos_embed = nn.Embedding(len(pos2id), self.pos_embed_dim, padding_idx=0)
-        self.bert_config = BertConfig.from_pretrained('bert-large-cased')
+        self.bert_config = BertConfig.from_pretrained(BERT_MODEL)
         self.bert_model = BertModel(self.bert_config)
         self.dense_1 = nn.Linear(self.encoder_embed_dim, self.d_model)
         self.dense_2 = nn.Linear(self.d_model, self.tagset_size)
@@ -157,7 +158,7 @@ class BertTransformerWSD(BaselineWSD):
         self.bert_trainable = bert_trainable
         self.encoder_embed_dim = encoder_embed_dim
 
-        self.bert_config = BertConfig.from_pretrained('bert-base-uncased')
+        self.bert_config = BertConfig.from_pretrained(BERT_MODEL)
         self.bert_embedding = BertModel(self.bert_config)
         if not self.bert_trainable:
             for p in self.bert_embedding.parameters():

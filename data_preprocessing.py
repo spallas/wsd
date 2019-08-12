@@ -16,6 +16,9 @@ from tqdm import tqdm
 from utils import util
 
 
+BERT_MODEL = 'bert-large-cased'
+
+
 def build_sense2id(data_path='res/wsd-train/semcor+glosses_data.xml',
                    tags_path='res/wsd-train/semcor+glosses_tags.txt'):
     pass
@@ -277,7 +280,7 @@ class BertLemmaPosLoader(SemCorDataLoader):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.bert_tokenizer = BertTokenizer.from_pretrained('bert-base-uncased')
+        self.bert_tokenizer = BertTokenizer.from_pretrained(BERT_MODEL)
 
     def __next__(self):
         """
