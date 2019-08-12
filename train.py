@@ -15,7 +15,7 @@ from torch.utils.tensorboard import SummaryWriter
 
 from data_preprocessing import SemCorDataset, ElmoLemmaPosLoader, BertLemmaPosLoader
 from utils import util
-from utils.config import TransformerConfig
+from utils.config import TransformerConfig, BertWsdConfig
 from wsd import SimpleWSD, BertTransformerWSD, BertWSD
 
 warnings.filterwarnings("ignore", category=UndefinedMetricWarning)
@@ -426,7 +426,7 @@ class ElmoTrainerLM(TrainerLM):
 
 class BertWsdTrainer(BaseTrainer):
 
-    def __init__(self, config: TransformerConfig, **kwargs):
+    def __init__(self, config: BertWsdConfig, **kwargs):
         self.config = config
         super().__init__(**kwargs)
 
@@ -447,7 +447,8 @@ class BertWsdTrainer(BaseTrainer):
                                               win_size=self.window_size, overlap_size=8)
         # Build model
         self.model = BertWSD(self.device, num_tags, self.window_size,
-                             self.config.encoder_embed_dim, self.config.d_model)
+                             self.config.encoder_embed_dim, self.config.d_model,
+                             self.config.pos_embed_dim)
         self.model.to(self.device)
         self.optimizer = optim.Adam(self.model.parameters(), lr=self.config.learning_rate)
         self._maybe_load_checkpoint()
