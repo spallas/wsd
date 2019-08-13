@@ -19,15 +19,6 @@ from utils import util
 BERT_MODEL = 'bert-large-cased'
 
 
-def build_sense2id(data_path='res/wsd-train/semcor+glosses_data.xml',
-                   tags_path='res/wsd-train/semcor+glosses_tags.txt'):
-    pass
-
-
-def load_sense2id(dict_path=''):
-    pass
-
-
 class SemCorDataset(Dataset):
 
     def __init__(self,
@@ -123,52 +114,7 @@ class SemCorDataLoader:
         return self
 
     def __next__(self):
-        """
-        Produce one batch
-        :return:
-            x: Tensor - shape = (batch_size x win_size)
-                      - x[i][j] = token index in vocab
-            lengths: Tensor
-                      - shape = batch_size
-                      - lengths[i] = length of text span i
-            y: Tensor - shape = (batch_size x win_size)
-                      - y[i][j] = sense index in vocab
-        """
-        stop_iter = False
-        b_x, b_l, b_y = [], [], []
-        lengths = [len(d) for d in self.dataset.docs[self.last_doc: self.last_doc + self.batch_size]]
-        end_of_docs = max(lengths) <= self.last_offset + self.win_size
-        i = 0
-        while len(b_x) < self.batch_size:
-            if self.last_doc + i >= len(self.dataset.docs):
-                stop_iter = True
-                break
-            n = self.last_doc + i
-            m = slice(self.last_offset, self.last_offset + self.win_size)
-            text_span = self.dataset.docs[n][m]
-            labels = self.dataset.first_senses[n][m]
-            text_span_ids = list(map(lambda x: self.dataset.vocab[x], text_span))
-            length = len(text_span)
-            # Padding
-            text_span += ['PAD'] * (self.win_size - len(text_span))
-            text_span_ids += [self.dataset.vocab['PAD']] * (self.win_size - len(text_span_ids))
-            labels += [self.dataset.vocab['PAD']] * (self.win_size - len(labels))
-
-            i += 1
-            if all([x == 0 for x in labels]):
-                continue  # skip batch elem if no annotation
-            b_x.append(text_span)
-            b_y.append(labels)
-            b_l.append(length)
-
-        self.last_offset += self.win_size - self.overlap_size
-        if end_of_docs:
-            self.last_doc += self.batch_size
-            self.last_offset = 0
-            if stop_iter or self.last_doc >= len(self.dataset.docs):
-                raise StopIteration
-
-        return b_x, b_l, b_y
+        raise NotImplementedError("Do not use base class, use concrete classes instead.")
 
 
 class ElmoSemCorLoader(SemCorDataLoader):

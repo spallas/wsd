@@ -62,10 +62,10 @@ class TransformerConfig(Config):
     encoder_normalize_before = True
     encoder_ffn_embed_dim = 512
 
-    activation_fn = 'gelu_accurate'
-    activation_dropout = 0.1
-    bert_trainable = False
-    subword_aggregation_mode = 'mean'  # or 'first'
+    activation_fn: str = 'gelu_accurate'
+    activation_dropout: float = 0.1
+    bert_trainable: bool = False
+    subword_aggregation_mode: str = 'mean'  # or 'first'
 
     @staticmethod
     def from_json_file(file_name, **kwargs):
@@ -82,11 +82,11 @@ class BertWsdConfig(Config):
 
     learning_rate: float = 0.00005
     d_model: int = 512
-    encoder_embed_dim = 1024 + 32
-    pos_embed_dim = 32
+    encoder_embed_dim: int = 1024
+    pos_embed_dim: int = 32
 
-    bert_trainable = True
-    subword_aggregation_mode = 'mean'  # or 'first'
+    bert_trainable: int = True
+    subword_aggregation_mode: str = 'mean'  # or 'first'
 
     @staticmethod
     def from_json_file(file_name, **kwargs):

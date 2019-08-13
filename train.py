@@ -16,7 +16,7 @@ from torch.utils.tensorboard import SummaryWriter
 from data_preprocessing import SemCorDataset, ElmoLemmaPosLoader, BertLemmaPosLoader, BERT_MODEL
 from utils import util
 from utils.config import TransformerConfig, BertWsdConfig
-from wsd import SimpleWSD, BertTransformerWSD, BertWSD
+from wsd import SimpleWSD, BertTransformerWSD
 
 warnings.filterwarnings("ignore", category=UndefinedMetricWarning)
 torch.manual_seed(42)
@@ -99,7 +99,7 @@ class BaseTrainer:
         :return:
         """
         def to_ids(synsets):
-            return set([self.sense2id[x.name()] for x in synsets])
+            return set([self.sense2id.get(x.name(), 0) for x in synsets]) - {0}
 
         def set2padded(s: Set[int]):
             arr = np.array(list(s))
@@ -424,121 +424,6 @@ class ElmoTrainerLM(TrainerLM):
         return f1
 
 
-class BertWsdTrainer(BaseTrainer):
-
-    def __init__(self, config: BertWsdConfig, **kwargs):
-        self.config = config
-        super().__init__(**kwargs)
-
-    def _setup_training(self, train_data, train_tags, eval_data, eval_tags):
-        # Load data
-        dataset = SemCorDataset(train_data, train_tags)
-        self.sense2id = dataset.sense2id
-        self.train_sense_map = dataset.train_sense_map
-        num_tags = len(self.sense2id) + 1
-        self.data_loader = BertLemmaPosLoader(dataset, batch_size=self.batch_size,
-                                              win_size=self.window_size)
-        self.tokenizer = self.data_loader.bert_tokenizer
-        eval_dataset = SemCorDataset(data_path=eval_data,
-                                     tags_path=eval_tags,
-                                     sense2id=self.sense2id,
-                                     is_training=False)
-        self.eval_loader = BertLemmaPosLoader(eval_dataset, batch_size=self.batch_size,
-                                              win_size=self.window_size, overlap_size=8)
-        # Build model
-        self.model = BertWSD(self.device, num_tags, self.window_size,
-                             self.config.encoder_embed_dim, self.config.d_model,
-                             self.config.pos_embed_dim)
-        self.model.to(self.device)
-        self.optimizer = optim.Adam(self.model.parameters(), lr=self.config.learning_rate)
-        self._maybe_load_checkpoint()
-
-    def _setup_testing(self, train_data, train_tags, test_data, test_tags):
-        dataset = SemCorDataset(train_data, train_tags)
-        self.sense2id = dataset.sense2id
-        self.train_sense_map = dataset.train_sense_map
-        num_tags = len(self.sense2id) + 1
-        test_dataset = SemCorDataset(data_path=test_data,
-                                     tags_path=test_tags,
-                                     sense2id=self.sense2id,
-                                     is_training=False)
-        self.test_loader = BertLemmaPosLoader(test_dataset, batch_size=self.batch_size,
-                                              win_size=self.window_size, overlap_size=8)
-        self.model = BertWSD(self.device, num_tags, self.window_size,
-                             self.config.encoder_embed_dim, self.config.d_model)
-        self._load_best()
-        self.model.eval()
-        self.model.to(self.device)
-
-    def train_epoch(self, epoch_i):
-        for step, (b_t, b_x, b_p, b_l, b_y, b_s, b_z) in enumerate(self.data_loader, self.last_step):
-            self.model.zero_grad()
-            b_lengths = torch.tensor([sum([1 for w in sent if w != '[PAD]']) for sent in b_x]).to(self.device)
-            b_pos = torch.tensor([p_row[:b_lengths.max().item()] for p_row in b_p]).to(self.device)
-            scores = self.model(b_t.to(self.device),
-                                b_l.to(self.device),
-                                b_s,
-                                b_lengths,
-                                b_pos)
-            loss = self.model.loss(scores, b_y.to(self.device))
-            # provide starts to aggregate scores of sub-words
-            loss.backward()
-
-            if step % self.log_interval == 0:
-                print(f'\rLoss: {loss.item():.4f} ', end='')
-                self._plot('Train loss', loss.item(), step)
-                self._gpu_mem_info()
-                f1 = self._evaluate(epoch_i)
-                self._maybe_checkpoint(loss, f1, epoch_i)
-                self._plot('Dev F1', f1, step)
-                self.model.train()  # return to train mode after evaluation
-
-            clip_grad_norm_(parameters=self.model.parameters(), max_norm=5.0)
-            self.optimizer.step()  # update the weights
-        self.last_step += step
-
-    def train(self):
-        self.model.train()
-        for epoch in range(self.last_epoch + 1, self.num_epochs + 1):
-            print(f'\nEpoch: {epoch}')
-            self.train_epoch(epoch)
-
-    def test(self, loader):
-        """
-        Evaluate on all test dataset.
-        """
-        if not loader:
-            loader = self.test_loader
-        with torch.no_grad():
-            pred, true, z = [], [], []
-            for step, (b_t, b_x, b_p, b_l, b_y, b_s, b_z) in enumerate(loader):
-                b_lengths = torch.tensor([sum([1 for w in sent if w != '[PAD]']) for sent in b_x]).to(self.device)
-                b_pos = torch.tensor([p_row[:b_lengths.max().item()] for p_row in b_p]).to(self.device)
-                scores = self.model(b_t.to(self.device),
-                                    b_l.to(self.device),
-                                    b_s,
-                                    b_lengths,
-                                    b_pos)
-                pred += self._select_senses(scores, b_t, b_x, b_p, b_l, b_y)
-                true += b_y.tolist()
-                z += b_z
-            true_flat, pred_flat, z_flat = [item for sublist in true for item in sublist], \
-                                           [item for sublist in pred for item in sublist], \
-                                           [item for sublist in z for item in sublist]
-            true_eval, pred_eval = [], []
-            for i in range(len(true_flat)):
-                if true_flat[i] == 0:
-                    continue
-                else:
-                    if pred_flat[i] in z_flat[i]:
-                        true_eval.append(pred_flat[i])
-                    else:
-                        true_eval.append(true_flat[i])
-                    pred_eval.append(pred_flat[i])
-            f1 = self._print_metrics(true_eval, pred_eval)
-        return f1
-
-
 class TransformerTrainer(TrainerLM):
 
     def __init__(self, config: TransformerConfig, **kwargs):
@@ -675,6 +560,6 @@ class WSDNetTrainer(BaseTrainer):
 
 
 if __name__ == '__main__':
-    c = BertWsdConfig.from_json_file('conf/bert_wsd_conf.json')
-    t = BertWsdTrainer(c, **c.__dict__)
+    c = TransformerConfig.from_json_file('conf/transformer_wsd_conf.json')
+    t = TransformerTrainer(c, **c.__dict__)
     t.train()
