@@ -129,6 +129,7 @@ class BertSimpleLoader:
             b_z.append(all_senses)
             if self.stop_flag:
                 break
+        self.last_offset = m
         b_y = nn.utils.rnn.pad_sequence(b_y, batch_first=True, padding_value=-1)
         b_t = nn.utils.rnn.pad_sequence(b_t, batch_first=True, padding_value=0)
         b_l = torch.tensor(b_l)
