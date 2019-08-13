@@ -111,8 +111,8 @@ class BaseTrainer:
             impossible_senses = []
             for j, lemma in enumerate(sent):
                 sense_ids = to_ids(wn.synsets(lemma, pos=util.id2wnpos[b_pos[i][j]]))
-                if lemma in self.train_sense_map:
-                    sense_ids &= set(self.train_sense_map[lemma])
+                # if lemma in self.train_sense_map:
+                #     sense_ids &= set(self.train_sense_map[lemma])
                 padded = set2padded(set(range(b_scores.shape[-1])) - sense_ids)
                 impossible_senses.append(padded)
             b_impossible_senses.append(impossible_senses)
