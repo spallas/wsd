@@ -15,12 +15,13 @@ from data_preprocessing import BERT_MODEL
 from train import BaseTrainer
 from utils import util
 from utils.config import BertWsdConfig
+from utils.util import NOT_AMB_SYMBOL, UNK_SENSE
 from wsd import BaselineWSD
 
 
 def build_sense2id(tags_path='res/wsd-train/semcor+glosses_tags.txt',
                    dict_path='res/dictionaries/senses.txt'):
-    sense2id: Dict[str, int] = defaultdict(lambda: -1)
+    sense2id: Dict[str, int] = defaultdict(lambda: NOT_AMB_SYMBOL)
     with open(tags_path) as f:
         senses_set = set()
         for line in f:
@@ -47,7 +48,7 @@ class FlatSemCorDataset(Dataset):
         with open(tags_path) as f:
             instance2senses: Dict[str, str] = {line.strip().split(' ')[0]: line.strip().split(' ')[1:] for line in f}
         sense2id = load_sense2id(sense_dict) if os.path.exists(sense_dict) else build_sense2id(tags_path, sense_dict)
-        instance2ids: Dict[str, List[int]] = {k: list(map(lambda x: sense2id[x] if x in sense2id else -1, v))
+        instance2ids: Dict[str, List[int]] = {k: list(map(lambda x: sense2id[x] if x in sense2id else UNK_SENSE, v))
                                               for k, v in instance2senses.items()}
         self.num_tags = len(sense2id)
         self.train_sense_map = {}
@@ -60,7 +61,7 @@ class FlatSemCorDataset(Dataset):
                 for word in sentence:
                     self.dataset_lemmas.append(word.attrib['lemma'])
                     self.pos_tags.append(util.pos2id[word.attrib['pos']])
-                    word_senses = instance2ids[word.attrib['id']] if word.tag == 'instance' else [-1]
+                    word_senses = instance2ids[word.attrib['id']] if word.tag == 'instance' else [NOT_AMB_SYMBOL]
                     self.all_senses.append(word_senses)
                     self.first_senses.append(word_senses[0])
                     self.train_sense_map.setdefault(word.attrib['lemma'], []).extend(word_senses)
@@ -108,9 +109,13 @@ class BertSimpleLoader:
                 self.stop_flag = True
                 m = len(self.dataset)
             text_window = ['[CLS]'] + self.dataset.dataset_lemmas[n:m] + ['[SEP]']
+            text_window += ['[PAD]'] * (self.win_size + 2 - len(text_window))
             pos_tags = [0] + self.dataset.pos_tags[n:m] + [0]
-            sense_labels = [-1] + self.dataset.first_senses[n:m] + [-1]
-            all_senses = [[-1]] + self.dataset.all_senses[n:m] + [[-1]]
+            pos_tags += [0] * (self.win_size + 2 - len(pos_tags))
+            sense_labels = [NOT_AMB_SYMBOL] + self.dataset.first_senses[n:m] + [NOT_AMB_SYMBOL]
+            sense_labels += [NOT_AMB_SYMBOL] * (self.win_size + 2 - len(sense_labels))
+            all_senses = [[NOT_AMB_SYMBOL]] + self.dataset.all_senses[n:m] + [[NOT_AMB_SYMBOL]]
+            all_senses += [[NOT_AMB_SYMBOL]] * (self.win_size + 2 - len(all_senses))
 
             bert_ids, slices = [], []
             j = 0
@@ -130,7 +135,7 @@ class BertSimpleLoader:
             if self.stop_flag:
                 break
         self.last_offset = m
-        b_y = nn.utils.rnn.pad_sequence(b_y, batch_first=True, padding_value=-1)
+        b_y = nn.utils.rnn.pad_sequence(b_y, batch_first=True, padding_value=NOT_AMB_SYMBOL)
         b_t = nn.utils.rnn.pad_sequence(b_t, batch_first=True, padding_value=0)
         b_l = torch.tensor(b_l)
         return b_t, b_x, b_p, b_l, b_y, b_s, b_z
@@ -157,17 +162,24 @@ class BertWSD(BaselineWSD):
                          .to(self.device) < lengths.unsqueeze(1)
         x = self.bert_model(token_ids, attention_mask=bert_mask)[0]
         # aggregate bert sub-words and pad to max len
-        x = torch.nn.utils.rnn.pad_sequence(
-            [torch.cat([torch.mean(x[i, sl, :], dim=-2) for sl in slices[i]])
-                 .reshape(-1, self.encoder_embed_dim)
-             for i in range(x.shape[0])
-             ],
-            batch_first=True)
+        # x = torch.nn.utils.rnn.pad_sequence(
+        #     [torch.cat([torch.mean(x[i, sl, :], dim=-2) for sl in slices[i]])
+        #          .reshape(-1, self.encoder_embed_dim)
+        #      for i in range(x.shape[0])
+        #      ],
+        #     batch_first=True)
+        batch_x = []
+        for i in range(x.shape[0]):
+            s = x[i]
+            m = [torch.mean(s[sl, :], dim=-2) for sl in slices[i]]
+            mt = torch.cat(m).reshape(-1, self.encoder_embed_dim)
+            batch_x.append(mt)
+        x = torch.cat(batch_x).reshape(len(batch_x), -1, self.encoder_embed_dim)
         x = self.dense_1(x)
         logits = self.dense_2(x)
         outputs = logits
         if labels is not None:
-            active_loss = labels.view(-1) != -1
+            active_loss = labels.view(-1) != NOT_AMB_SYMBOL
             active_logits = logits.view(-1, self.tagset_size)[active_loss]
             active_labels = labels.view(-1)[active_loss]
             loss = self.ce_loss(active_logits, active_labels)
@@ -231,8 +243,6 @@ class BertWsdTrainer(BaseTrainer):
                 self._maybe_checkpoint(loss, f1, epoch_i)
                 self._plot('Dev F1', f1, step)
                 self.model.train()  # return to train mode after evaluation
-
-            clip_grad_norm_(parameters=self.model.parameters(), max_norm=5.0)
             self.optimizer.step()
         self.last_step += step
 
@@ -254,22 +264,20 @@ class BertWsdTrainer(BaseTrainer):
                 scores = self.model(b_t.to(self.device),
                                     b_l.to(self.device),
                                     b_s)
-                pred += self._select_senses(scores, b_t, b_x, b_p, None, b_y)
-                true += b_y.tolist()
-                z += b_z
-            true_flat, pred_flat, z_flat = [item for sublist in true for item in sublist], \
-                                           [item for sublist in pred for item in sublist], \
-                                           [item for sublist in z for item in sublist]
+                pred += [item for seq in self._select_senses(scores, b_t, b_x, b_p, None, b_y) for item in seq]
+                true += [item for seq in b_y.tolist() for item in seq]
+                z += [item for seq in b_z for item in seq]
+
             true_eval, pred_eval = [], []
-            for i in range(len(true_flat)):
-                if true_flat[i] == 0:
+            for i in range(len(true)):
+                if true[i] == NOT_AMB_SYMBOL:
                     continue
                 else:
-                    if pred_flat[i] in z_flat[i]:
-                        true_eval.append(pred_flat[i])
+                    if pred[i] in z[i]:
+                        true_eval.append(pred[i])
                     else:
-                        true_eval.append(true_flat[i])
-                    pred_eval.append(pred_flat[i])
+                        true_eval.append(true[i])
+                    pred_eval.append(pred[i])
             f1 = self._print_metrics(true_eval, pred_eval)
         return f1
 

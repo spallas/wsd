@@ -118,7 +118,7 @@ class BaseTrainer:
             b_impossible_senses.append(impossible_senses)
         b_scores = b_scores.cpu().numpy()
         b_impossible_senses = np.array(b_impossible_senses)
-        np.put_along_axis(b_scores, b_impossible_senses, -np.inf, axis=-1)
+        np.put_along_axis(b_scores, b_impossible_senses, np.min(b_scores), axis=-1)
         return np.argmax(b_scores, -1).tolist()
 
     def _plot(self, name, value, step):

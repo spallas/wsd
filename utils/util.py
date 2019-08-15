@@ -30,6 +30,9 @@ id2wnpos[2] = 'n'
 id2wnpos[3] = 'a'
 id2wnpos[4] = 'r'
 
+NOT_AMB_SYMBOL = -1
+UNK_SENSE = -2
+
 #######################################
 
 
