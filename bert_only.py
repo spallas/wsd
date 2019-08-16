@@ -149,7 +149,8 @@ class BertWSD(BaselineWSD):
         self.d_model = d_model
         self.bert_config = BertConfig.from_pretrained(BERT_MODEL)
         self.bert_model = BertModel(self.bert_config)
-
+        for p in self.bert_model.parameters():
+            p.requires_grad = False
         self.dense_1 = nn.Linear(self.encoder_embed_dim, self.d_model)
         self.dense_2 = nn.Linear(self.d_model, self.tagset_size)
         self.ce_loss = CrossEntropyLoss()
@@ -164,16 +165,16 @@ class BertWSD(BaselineWSD):
         for i in range(x.shape[0]):
             s = x[i]
             m = [torch.mean(s[sl, :], dim=-2) for sl in slices[i]]
-            mt = torch.cat(m).reshape(-1, self.encoder_embed_dim)
+            mt = torch.stack(m, dim=0)
             batch_x.append(mt)
-        x = torch.cat(batch_x).reshape(len(batch_x), -1, self.encoder_embed_dim)
+        x = torch.stack(batch_x, dim=0)
         x = self.dense_1(x)
         logits = self.dense_2(x)
         outputs = logits
         if labels is not None:
             active_loss = labels.view(-1) != NOT_AMB_SYMBOL
             if not active_loss.any():
-                loss = torch.tensor(0)
+                loss = self.ce_loss(torch.tensor([[-100., 1.]]), torch.tensor([1]))
             else:
                 active_logits = logits.view(-1, self.tagset_size)[active_loss]
                 active_labels = labels.view(-1)[active_loss]
