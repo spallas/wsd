@@ -213,7 +213,7 @@ class TrainerLM(BaseTrainer):
         :return:
         """
         def to_ids(synsets):
-            return [self.sense2id[x.name()] for x in synsets]
+            return set([self.sense2id.get(x.name(), 0) for x in synsets]) - {0}
 
         def set2padded(s: Set[int]):
             arr = np.array(list(s))
