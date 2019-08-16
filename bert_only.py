@@ -11,7 +11,7 @@ from torch.utils.data import Dataset
 from tqdm import tqdm
 
 from data_preprocessing import BERT_MODEL
-from train import BaseTrainer
+from train import BaseTrainer, TrainerLM
 from utils import util
 from utils.config import BertWsdConfig
 from utils.util import NOT_AMB_SYMBOL, UNK_SENSE
@@ -102,7 +102,7 @@ class BertSimpleLoader:
             raise StopIteration
         b_t, b_x, b_l, b_p, b_y, b_s, b_z = [], [], [], [], [], [], []
         for i in range(self.batch_size):
-            n = self.last_offset + i
+            n = self.last_offset + (i * self.win_size)
             m = n + self.win_size
             if m > len(self.dataset):
                 self.stop_flag = True
@@ -183,7 +183,7 @@ class BertWSD(BaselineWSD):
         return outputs
 
 
-class BertWsdTrainer(BaseTrainer):
+class BertWsdTrainer(TrainerLM):
 
     def __init__(self, **kwargs):
         self.encoder_embed_dim = kwargs['encoder_embed_dim']

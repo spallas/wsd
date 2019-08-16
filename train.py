@@ -197,7 +197,7 @@ class TrainerLM(BaseTrainer):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         # Load BERT
-        self.bert_tokenizer = BertTokenizer.from_pretrained(BERT_MODEL)
+        self.bert_tokenizer = BertTokenizer.from_pretrained(BERT_MODEL, do_lower_case=False)
         self.language_model = BertForMaskedLM.from_pretrained(BERT_MODEL)
         self.language_model.eval()
         self.all_syn_lemmas = {}
