@@ -81,7 +81,7 @@ class BertWsdConfig(Config):
     report_path: str = 'logs/bert_wsd_report.txt'
 
     learning_rate: float = 0.00005
-    d_model: int = 512
+    d_model: int = 2048
     encoder_embed_dim: int = 1024
     pos_embed_dim: int = 32
 

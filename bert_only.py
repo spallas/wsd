@@ -7,7 +7,6 @@ import torch
 from pytorch_transformers import BertTokenizer, BertConfig, BertModel
 from torch import optim, nn
 from torch.nn import CrossEntropyLoss
-from torch.nn.utils import clip_grad_norm_
 from torch.utils.data import Dataset
 from tqdm import tqdm
 
@@ -161,13 +160,6 @@ class BertWSD(BaselineWSD):
                          .expand(len(lengths), max_len)\
                          .to(self.device) < lengths.unsqueeze(1)
         x = self.bert_model(token_ids, attention_mask=bert_mask)[0]
-        # aggregate bert sub-words and pad to max len
-        # x = torch.nn.utils.rnn.pad_sequence(
-        #     [torch.cat([torch.mean(x[i, sl, :], dim=-2) for sl in slices[i]])
-        #          .reshape(-1, self.encoder_embed_dim)
-        #      for i in range(x.shape[0])
-        #      ],
-        #     batch_first=True)
         batch_x = []
         for i in range(x.shape[0]):
             s = x[i]
@@ -180,9 +172,12 @@ class BertWSD(BaselineWSD):
         outputs = logits
         if labels is not None:
             active_loss = labels.view(-1) != NOT_AMB_SYMBOL
-            active_logits = logits.view(-1, self.tagset_size)[active_loss]
-            active_labels = labels.view(-1)[active_loss]
-            loss = self.ce_loss(active_logits, active_labels)
+            if not active_loss.any():
+                loss = torch.tensor(0)
+            else:
+                active_logits = logits.view(-1, self.tagset_size)[active_loss]
+                active_labels = labels.view(-1)[active_loss]
+                loss = self.ce_loss(active_logits, active_labels)
             outputs = (logits, loss)
         return outputs
 
