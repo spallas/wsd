@@ -248,6 +248,7 @@ class TrainerLM(BaseTrainer):
                 if b_labels[i][k] != NOT_AMB_SYMBOL:  # i.e. sense tagged word
                     if sent[0] != '[CLS]':
                         text = ['[CLS]'] + sent + ['[SEP]']
+                        kk = k
                         k = k + 1
                     else:
                         text = [] + sent
@@ -264,10 +265,10 @@ class TrainerLM(BaseTrainer):
 
                     lm_ids, lm_scores = [], []
                     net_score = {}
-                    for S in wn.synsets(w, pos=util.id2wnpos[b_pos[i][k]]):
+                    for S in wn.synsets(w, pos=util.id2wnpos[b_pos[i][kk]]):
                         if S.name() not in self.sense2id:
                             continue
-                        if len(wn.synsets(w, pos=util.id2wnpos[b_pos[i][k]])) == 1:
+                        if len(wn.synsets(w, pos=util.id2wnpos[b_pos[i][kk]])) == 1:
                             continue
                         s_id = self.sense2id[S.name()]
                         if S not in self.all_syn_lemmas:
@@ -282,15 +283,15 @@ class TrainerLM(BaseTrainer):
                         s_score = sum(top_k)
                         lm_ids.append(s_id)
                         lm_scores.append(s_score)
-                        net_score[s_id] = b_scores[i, k, s_id]
+                        net_score[s_id] = b_scores[i, kk, s_id]
                     if not lm_scores:
                         continue
                     lm_score = {k: v for k, v in zip(lm_ids, softmax(lm_scores))}
                     for s_id in lm_score:
                         if w in self.train_sense_map:
-                            b_scores[i, k, s_id] = (net_score[s_id] * lm_score[s_id]) ** 0.5
+                            b_scores[i, kk, s_id] = (net_score[s_id] * lm_score[s_id]) ** 0.5
                         else:
-                            b_scores[i, k, s_id] = lm_score[s_id]
+                            b_scores[i, kk, s_id] = lm_score[s_id]
 
         return np.argmax(b_scores, -1).tolist()
 
