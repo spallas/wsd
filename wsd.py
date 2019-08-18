@@ -121,7 +121,9 @@ class ElmoTransformerWSD(BaselineWSD):
 
     def forward(self, char_ids, lengths):
         x = self.elmo_embedding(char_ids)
-        mask = WSDTransformerEncoder.get_transformer_mask(lengths, self.device)
+        mask = WSDTransformerEncoder.get_transformer_mask(lengths,
+                                                          self.win_size,
+                                                          self.device)
         x = self.transformer(x, mask)
         return x
 

@@ -552,7 +552,7 @@ class TransformerTrainer(TrainerLM):
         return f1
 
 
-class ElmoTransformerTrainerLM(TrainerLM):
+class ElmoTransformerTrainerLM(BaseTrainer):
 
     def __init__(self,
                  num_layers=2,
@@ -689,6 +689,6 @@ class WSDNetTrainer(BaseTrainer):
 
 
 if __name__ == '__main__':
-    c = ElmoTransformerConfig.from_json_file('conf/elmo_tr_conf.json')
+    c = ElmoTransformerConfig.from_json_file('conf/elmo_tr_large_conf.json')
     t = ElmoTransformerTrainerLM(**c.__dict__)
     t.train()

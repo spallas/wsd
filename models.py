@@ -63,8 +63,7 @@ class WSDTransformerEncoder(nn.Module):
         return scores
 
     @staticmethod
-    def get_transformer_mask(lengths: torch.Tensor, device):
-        max_len = lengths.max().item()
+    def get_transformer_mask(lengths: torch.Tensor, max_len, device):
         # mask is True for values to be masked
         mask_range = torch.arange(max_len) \
             .expand(len(lengths), max_len) \
