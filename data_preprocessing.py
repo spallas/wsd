@@ -18,6 +18,30 @@ from utils import util
 
 BERT_MODEL = 'bert-large-cased'
 
+bert_tokenizer = BertTokenizer.from_pretrained(BERT_MODEL, do_lower_case=BERT_MODEL.endswith('-uncased'))
+
+
+def str_to_token_ids(batch: List[List[str]]):
+    slices_b = []
+    tokens_b = []
+    for seq in batch:
+        bert_tok_ids = []
+        slices = []
+        j = 0
+        seq = ['[CLS]'] + seq + ['[SEP]']
+        for w in seq:
+            bert_tok_ids += bert_tokenizer.encode(w)
+            slices.append(slice(j, len(bert_tok_ids)))
+            j = len(bert_tok_ids)
+        tokens_b.append(torch.tensor(bert_tok_ids))
+        slices_b.append(slices)
+    tokens_b = nn.utils.rnn.pad_sequence(b_y, batch_first=True, padding_value=0)
+    return tokens_b, slices_b
+
+
+def str_to_char_ids(batch: List[List[str]]):
+    return batch_to_ids(batch)
+
 
 class SemCorDataset(Dataset):
 

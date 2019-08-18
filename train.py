@@ -15,8 +15,9 @@ from torch.utils.tensorboard import SummaryWriter
 
 from data_preprocessing import SemCorDataset, ElmoLemmaPosLoader, BertLemmaPosLoader, BERT_MODEL
 from utils import util
-from utils.config import TransformerConfig, BertWsdConfig
-from wsd import SimpleWSD, BertTransformerWSD
+from utils.config import TransformerConfig, BertWsdConfig, ElmoTransformerConfig
+from utils.util import NOT_AMB_SYMBOL
+from wsd import SimpleWSD, BertTransformerWSD, ElmoTransformerWSD
 
 warnings.filterwarnings("ignore", category=UndefinedMetricWarning)
 torch.manual_seed(42)
@@ -244,10 +245,12 @@ class TrainerLM(BaseTrainer):
         # Update b_scores with geometric mean with language model score.
         for i, sent in enumerate(b_str):
             for k, w in enumerate(sent):
-                if b_labels[i][k] != 0:  # i.e. sense tagged word
-                    # text = ['[CLS]'] + sent + ['[SEP]']
-                    # text[k+1] = '[MASK]'
-                    text = [] + sent
+                if b_labels[i][k] != NOT_AMB_SYMBOL:  # i.e. sense tagged word
+                    if sent[0] != '[CLS]':
+                        text = ['[CLS]'] + sent + ['[SEP]']
+                        k = k + 1
+                    else:
+                        text = [] + sent
                     text[k] = '[MASK]'
                     tokenized_text = []
                     for ww in text:
@@ -262,6 +265,10 @@ class TrainerLM(BaseTrainer):
                     lm_ids, lm_scores = [], []
                     net_score = {}
                     for S in wn.synsets(w, pos=util.id2wnpos[b_pos[i][k]]):
+                        if S.name() not in self.sense2id:
+                            continue
+                        if len(wn.synsets(w, pos=util.id2wnpos[b_pos[i][k]])) == 1:
+                            continue
                         s_id = self.sense2id[S.name()]
                         if S not in self.all_syn_lemmas:
                             self.all_syn_lemmas[S] = get_lemmas(S)
@@ -276,6 +283,8 @@ class TrainerLM(BaseTrainer):
                         lm_ids.append(s_id)
                         lm_scores.append(s_score)
                         net_score[s_id] = b_scores[i, k, s_id]
+                    if not lm_scores:
+                        continue
                     lm_score = {k: v for k, v in zip(lm_ids, softmax(lm_scores))}
                     for s_id in lm_score:
                         if w in self.train_sense_map:
@@ -542,6 +551,125 @@ class TransformerTrainer(TrainerLM):
         return f1
 
 
+class ElmoTransformerTrainerLM(TrainerLM):
+
+    def __init__(self,
+                 num_layers=2,
+                 learning_rate=0.001,
+                 elmo_weights='res/elmo/elmo_2x1024_128_2048cnn_1xhighway_weights.hdf5',
+                 elmo_options='res/elmo/elmo_2x1024_128_2048cnn_1xhighway_options.json',
+                 elmo_size=128,
+                 d_model=512,
+                 num_heads=4,
+                 **kwargs):
+        self.learning_rate = learning_rate
+        self.elmo_weights = elmo_weights
+        self.elmo_options = elmo_options
+        self.elmo_size = elmo_size
+        self.num_layers = num_layers
+        self.d_model = d_model
+        self.num_heads = num_heads
+        super().__init__(**kwargs)
+
+    def _setup_training(self, train_data, train_tags, eval_data, eval_tags):
+        # Load data
+        dataset = SemCorDataset(train_data, train_tags)
+        self.sense2id = dataset.sense2id
+        self.train_sense_map = dataset.train_sense_map
+        num_tags = len(self.sense2id) + 1
+        self.data_loader = ElmoLemmaPosLoader(dataset, batch_size=self.batch_size,
+                                              win_size=self.window_size)
+        eval_dataset = SemCorDataset(data_path=eval_data,
+                                     tags_path=eval_tags,
+                                     sense2id=self.sense2id,
+                                     is_training=False)
+        self.eval_loader = ElmoLemmaPosLoader(eval_dataset, batch_size=self.batch_size,
+                                              win_size=self.window_size)
+        # Build model
+        self.model = ElmoTransformerWSD(self.device, num_tags, self.window_size, self.elmo_weights,
+                                        self.elmo_options, self.elmo_size, self.d_model,
+                                        self.num_heads, self.num_layers)
+        self.model.to(self.device)
+        self.optimizer = optim.Adam(self.model.parameters(), lr=self.learning_rate)
+        self._maybe_load_checkpoint()
+
+    def _setup_testing(self, train_data, train_tags, test_data, test_tags):
+        # Load data
+        dataset = SemCorDataset(train_data, train_tags)
+        self.sense2id = dataset.sense2id
+        self.train_sense_map = dataset.train_sense_map
+        num_tags = len(self.sense2id) + 1
+        dataset = SemCorDataset(data_path=test_data,
+                                tags_path=test_tags,
+                                sense2id=self.sense2id,
+                                is_training=False)
+        self.test_loader = ElmoLemmaPosLoader(dataset, batch_size=self.batch_size,
+                                              win_size=self.window_size)
+        # Build model
+        self.model = ElmoTransformerWSD(self.device, num_tags, self.window_size, self.elmo_weights,
+                                        self.elmo_options, self.elmo_size, self.d_model,
+                                        self.num_heads, self.num_layers)
+        self._load_best()
+        self.model.eval()
+        self.model.to(self.device)
+
+    def train_epoch(self, epoch_i):
+        for step, (b_t, b_x, b_p, b_l, b_y, b_z) in enumerate(self.data_loader, self.last_step):
+            self.model.zero_grad()
+            scores = self.model(b_t.to(self.device), b_l.to(self.device))
+            loss = self.model.loss(scores, b_y.to(self.device))
+            loss.backward()
+
+            if step % self.log_interval == 0:
+                print(f'\rLoss: {loss.item():.4f} ', end='')
+                self._plot('Train loss', loss.item(), step)
+                self._gpu_mem_info()
+                f1 = self._evaluate(epoch_i)
+                self._maybe_checkpoint(loss, f1, epoch_i)
+                self._plot('Dev F1', f1, step)
+                self.model.train()  # return to train mode after evaluation
+
+            clip_grad_norm_(parameters=self.model.parameters(), max_norm=1.0)
+            self.optimizer.step()  # update the weights
+        self.last_step += step
+
+    def train(self):
+        self.model.train()
+        for epoch in range(self.last_epoch + 1, self.num_epochs + 1):
+            print(f'\nEpoch: {epoch}')
+            self.train_epoch(epoch)
+
+    def test(self, loader=None):
+        """
+        Evaluate on test dataset.
+        """
+        if not loader:
+            loader = self.test_loader
+        with torch.no_grad():
+            pred, true, z = [], [], []
+            for step, (b_t, b_x, b_p, b_l, b_y, b_z) in enumerate(loader):
+                self.model.zero_grad()
+                scores = self.model(b_t.to(self.device), b_l.to(self.device))
+                pred += self._select_senses(scores, b_t, b_x, b_p, b_l, b_y)
+                true += b_y.tolist()
+                z += b_z
+            true_flat, pred_flat, z_flat = [item for sublist in true for item in sublist], \
+                                           [item for sublist in pred for item in sublist], \
+                                           [item for sublist in z for item in sublist]
+            true_eval, pred_eval = [], []
+            for i in range(len(true_flat)):
+                if true_flat[i] == 0:
+                    continue
+                else:
+                    if pred_flat[i] in z_flat[i]:
+                        true_eval.append(pred_flat[i])
+                    else:
+                        true_eval.append(true_flat[i])
+                    pred_eval.append(pred_flat[i])
+            f1 = self._print_metrics(true_eval, pred_eval)
+        return f1
+
+
 class WSDNetTrainer(BaseTrainer):
     def _setup_training(self, train_data, train_tags, eval_data, eval_tags):
         pass
@@ -560,6 +688,6 @@ class WSDNetTrainer(BaseTrainer):
 
 
 if __name__ == '__main__':
-    c = TransformerConfig.from_json_file('conf/transformer_wsd_conf.json')
-    t = TransformerTrainer(c, **c.__dict__)
+    c = ElmoTransformerConfig.from_json_file('conf/elmo_tr_conf.json')
+    t = ElmoTransformerTrainerLM(**c.__dict__)
     t.train()

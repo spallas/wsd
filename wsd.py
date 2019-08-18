@@ -7,7 +7,7 @@ from torch import nn
 from torch.nn import CrossEntropyLoss
 
 from data_preprocessing import BERT_MODEL
-from models import Attention
+from models import Attention, ElmoEmbeddings, WSDTransformerEncoder
 from utils.util import pos2id
 
 
@@ -87,17 +87,43 @@ class SimpleWSD(BaselineWSD):
         return tag_scores
 
 
-class ElmoTransformerWSD(nn.Module):
+class ElmoTransformerWSD(BaselineWSD):
 
     _ELMO_OPTIONS = ''
     _ELMO_WEIGHTS = ''
 
-    def __init__(self):
-        super().__init__()
-        pass
+    def __init__(self,
+                 device,
+                 num_senses,
+                 max_len,
+                 elmo_weights,
+                 elmo_options,
+                 elmo_size,
+                 d_model: int = 512,
+                 num_heads: int = 8,
+                 num_layers: int = 4):
+        super().__init__(num_senses, max_len)
+        self.device = device
+        self.elmo_weights = elmo_weights
+        self.elmo_options = elmo_options
+        self.elmo_size = elmo_size
+        self.d_model = d_model
+        self.num_heads = num_heads
+        self.num_layers = num_layers
+        self.elmo_embedding = ElmoEmbeddings(self.elmo_options,
+                                             self.elmo_weights,
+                                             self.elmo_size)
+        self.transformer = WSDTransformerEncoder(self.elmo_size * 2,
+                                                 self.d_model,
+                                                 self.tagset_size,
+                                                 self.num_layers,
+                                                 self.num_heads)
 
-    def forward(self, *inputs):
-        pass
+    def forward(self, char_ids, lengths):
+        x = self.elmo_embedding(char_ids)
+        mask = WSDTransformerEncoder.get_transformer_mask(lengths, self.device)
+        x = self.transformer(x, mask)
+        return x
 
 
 class BertTransformerWSD(BaselineWSD):

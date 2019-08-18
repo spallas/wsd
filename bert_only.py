@@ -127,7 +127,7 @@ class BertSimpleLoader:
             b_t.append(torch.tensor(bert_ids))
             b_x.append(text_window)
             b_l.append(bert_len)
-            b_p.append(torch.tensor(pos_tags))
+            b_p.append(pos_tags)
             b_y.append(torch.tensor(sense_labels))
             b_s.append(slices)
             b_z.append(all_senses)

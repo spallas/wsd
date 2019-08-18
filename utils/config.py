@@ -96,6 +96,29 @@ class BertWsdConfig(Config):
 
 @dataclass_json
 @dataclass
+class ElmoTransformerConfig(Config):
+
+    checkpoint_path: str = 'saved_weights/elmo_tr_checkpoint.pt'
+    report_path: str = 'logs/elmo_tr_report.txt'
+
+    elmo_weights: str = ''
+    elmo_options: str = ''
+    elmo_size: int = 0
+
+    learning_rate: float = 0.0005
+    d_model: int = 2048
+    encoder_embed_dim: int = 1024
+    pos_embed_dim: int = 32
+
+
+    @staticmethod
+    def from_json_file(file_name, **kwargs):
+        with open(file_name) as f:
+            return ElmoTransformerConfig.from_json(f.read(), **kwargs)
+
+
+@dataclass_json
+@dataclass
 class WSDNetConfig(Config):
 
     learning_rate: float = 0.0001
