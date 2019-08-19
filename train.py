@@ -14,7 +14,7 @@ from torch.nn.utils import clip_grad_norm_
 from torch.utils.tensorboard import SummaryWriter
 
 from data_preprocessing import SemCorDataset, ElmoLemmaPosLoader, BertLemmaPosLoader, BERT_MODEL, FlatSemCorDataset, \
-    load_sense2id, FlatLoader, str_to_token_ids
+    load_sense2id, FlatLoader, str_to_token_ids, str_to_char_ids
 from utils import util
 from utils.config import TransformerConfig, BertWsdConfig, ElmoTransformerConfig
 from utils.util import NOT_AMB_SYMBOL
@@ -607,7 +607,7 @@ class ElmoTransformerTrainerLM(BaseTrainer):
     def train_epoch(self, epoch_i):
         for step, (b_x, b_p, b_y, b_z) in enumerate(self.data_loader, self.last_step):
             self.model.zero_grad()
-            b_t = str_to_token_ids(b_x)
+            b_t = str_to_char_ids(b_x)
             scores = self.model(b_t.to(self.device))
             loss = self.model.loss(scores, b_y.to(self.device))
             loss.backward()
@@ -641,6 +641,7 @@ class ElmoTransformerTrainerLM(BaseTrainer):
             pred, true, z = [], [], []
             for step, (b_x, b_p, b_y, b_z) in enumerate(loader):
                 self.model.zero_grad()
+                b_t = str_to_char_ids(b_x)
                 scores = self.model(b_t.to(self.device))
                 pred += [item for seq in self._select_senses(scores, None, b_x, b_p, None, b_y) for item in seq]
                 true += [item for seq in b_y.tolist() for item in seq]
