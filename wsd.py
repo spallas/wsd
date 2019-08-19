@@ -8,7 +8,7 @@ from torch.nn import CrossEntropyLoss
 
 from data_preprocessing import BERT_MODEL
 from models import Attention, ElmoEmbeddings, WSDTransformerEncoder
-from utils.util import pos2id
+from utils.util import pos2id, NOT_AMB_SYMBOL
 
 
 class BaselineWSD(nn.Module):
@@ -17,8 +17,7 @@ class BaselineWSD(nn.Module):
         super().__init__()
         self.tagset_size = num_senses
         self.win_size = max_len
-        self.pad_tag_index = 0
-        self.ce_loss = CrossEntropyLoss(ignore_index=0)
+        self.ce_loss = CrossEntropyLoss(ignore_index=NOT_AMB_SYMBOL)
 
     def forward(self, *inputs):
         pass
@@ -119,7 +118,7 @@ class ElmoTransformerWSD(BaselineWSD):
                                                  self.num_layers,
                                                  self.num_heads)
 
-    def forward(self, char_ids, lengths):
+    def forward(self, char_ids, lengths=None):
         x = self.elmo_embedding(char_ids)
         mask = WSDTransformerEncoder.get_transformer_mask(lengths,
                                                           self.win_size,

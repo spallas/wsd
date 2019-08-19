@@ -13,7 +13,8 @@ from torch import optim
 from torch.nn.utils import clip_grad_norm_
 from torch.utils.tensorboard import SummaryWriter
 
-from data_preprocessing import SemCorDataset, ElmoLemmaPosLoader, BertLemmaPosLoader, BERT_MODEL
+from data_preprocessing import SemCorDataset, ElmoLemmaPosLoader, BertLemmaPosLoader, BERT_MODEL, FlatSemCorDataset, \
+    load_sense2id, FlatLoader, str_to_token_ids
 from utils import util
 from utils.config import TransformerConfig, BertWsdConfig, ElmoTransformerConfig
 from utils.util import NOT_AMB_SYMBOL
@@ -93,10 +94,8 @@ class BaseTrainer:
         """
         Get the max of scores only of possible senses for a given lemma+pos
         :param b_scores: shape = (batch_s x win_s x sense_vocab_s)
-        :param b_vec: unused
         :param b_str:
         :param b_pos:
-        :param b_lengths:
         :return:
         """
         def to_ids(synsets):
@@ -556,11 +555,11 @@ class ElmoTransformerTrainerLM(BaseTrainer):
 
     def __init__(self,
                  num_layers=2,
-                 learning_rate=0.001,
+                 learning_rate=0.0001,
                  elmo_weights='res/elmo/elmo_2x1024_128_2048cnn_1xhighway_weights.hdf5',
                  elmo_options='res/elmo/elmo_2x1024_128_2048cnn_1xhighway_options.json',
                  elmo_size=128,
-                 d_model=512,
+                 d_model=2048,
                  num_heads=4,
                  **kwargs):
         self.learning_rate = learning_rate
@@ -574,18 +573,13 @@ class ElmoTransformerTrainerLM(BaseTrainer):
 
     def _setup_training(self, train_data, train_tags, eval_data, eval_tags):
         # Load data
-        dataset = SemCorDataset(train_data, train_tags)
-        self.sense2id = dataset.sense2id
+        dataset = FlatSemCorDataset(train_data, train_tags)
+        self.sense2id = load_sense2id()
         self.train_sense_map = dataset.train_sense_map
         num_tags = len(self.sense2id) + 1
-        self.data_loader = ElmoLemmaPosLoader(dataset, batch_size=self.batch_size,
-                                              win_size=self.window_size)
-        eval_dataset = SemCorDataset(data_path=eval_data,
-                                     tags_path=eval_tags,
-                                     sense2id=self.sense2id,
-                                     is_training=False)
-        self.eval_loader = ElmoLemmaPosLoader(eval_dataset, batch_size=self.batch_size,
-                                              win_size=self.window_size)
+        self.data_loader = FlatLoader(dataset, batch_size=self.batch_size, win_size=self.window_size)
+        eval_dataset = FlatSemCorDataset(data_path=eval_data, tags_path=eval_tags)
+        self.eval_loader = FlatLoader(eval_dataset, batch_size=self.batch_size, win_size=self.window_size)
         # Build model
         self.model = ElmoTransformerWSD(self.device, num_tags, self.window_size, self.elmo_weights,
                                         self.elmo_options, self.elmo_size, self.d_model,
@@ -596,16 +590,12 @@ class ElmoTransformerTrainerLM(BaseTrainer):
 
     def _setup_testing(self, train_data, train_tags, test_data, test_tags):
         # Load data
-        dataset = SemCorDataset(train_data, train_tags)
-        self.sense2id = dataset.sense2id
+        dataset = FlatSemCorDataset(train_data, train_tags)
+        self.sense2id = load_sense2id()
         self.train_sense_map = dataset.train_sense_map
         num_tags = len(self.sense2id) + 1
-        dataset = SemCorDataset(data_path=test_data,
-                                tags_path=test_tags,
-                                sense2id=self.sense2id,
-                                is_training=False)
-        self.test_loader = ElmoLemmaPosLoader(dataset, batch_size=self.batch_size,
-                                              win_size=self.window_size)
+        dataset = FlatSemCorDataset(data_path=test_data, tags_path=test_tags)
+        self.test_loader = FlatLoader(dataset, batch_size=self.batch_size, win_size=self.window_size)
         # Build model
         self.model = ElmoTransformerWSD(self.device, num_tags, self.window_size, self.elmo_weights,
                                         self.elmo_options, self.elmo_size, self.d_model,
@@ -615,9 +605,10 @@ class ElmoTransformerTrainerLM(BaseTrainer):
         self.model.to(self.device)
 
     def train_epoch(self, epoch_i):
-        for step, (b_t, b_x, b_p, b_l, b_y, b_z) in enumerate(self.data_loader, self.last_step):
+        for step, (b_x, b_p, b_y, b_z) in enumerate(self.data_loader, self.last_step):
             self.model.zero_grad()
-            scores = self.model(b_t.to(self.device), b_l.to(self.device))
+            b_t = str_to_token_ids(b_x)
+            scores = self.model(b_t.to(self.device))
             loss = self.model.loss(scores, b_y.to(self.device))
             loss.backward()
 
@@ -648,25 +639,23 @@ class ElmoTransformerTrainerLM(BaseTrainer):
             loader = self.test_loader
         with torch.no_grad():
             pred, true, z = [], [], []
-            for step, (b_t, b_x, b_p, b_l, b_y, b_z) in enumerate(loader):
+            for step, (b_x, b_p, b_y, b_z) in enumerate(loader):
                 self.model.zero_grad()
-                scores = self.model(b_t.to(self.device), b_l.to(self.device))
-                pred += self._select_senses(scores, b_t, b_x, b_p, b_l, b_y)
-                true += b_y.tolist()
-                z += b_z
-            true_flat, pred_flat, z_flat = [item for sublist in true for item in sublist], \
-                                           [item for sublist in pred for item in sublist], \
-                                           [item for sublist in z for item in sublist]
+                scores = self.model(b_t.to(self.device))
+                pred += [item for seq in self._select_senses(scores, None, b_x, b_p, None, b_y) for item in seq]
+                true += [item for seq in b_y.tolist() for item in seq]
+                z += [item for seq in b_z for item in seq]
+
             true_eval, pred_eval = [], []
-            for i in range(len(true_flat)):
-                if true_flat[i] == 0:
+            for i in range(len(true)):
+                if true[i] == NOT_AMB_SYMBOL:
                     continue
                 else:
-                    if pred_flat[i] in z_flat[i]:
-                        true_eval.append(pred_flat[i])
+                    if pred[i] in z[i]:
+                        true_eval.append(pred[i])
                     else:
-                        true_eval.append(true_flat[i])
-                    pred_eval.append(pred_flat[i])
+                        true_eval.append(true[i])
+                    pred_eval.append(pred[i])
             f1 = self._print_metrics(true_eval, pred_eval)
         return f1
 

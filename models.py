@@ -47,7 +47,7 @@ class WSDTransformerEncoder(nn.Module):
         self.output_dense = nn.Linear(self.d_model, self.d_output)
         self.scale = math.sqrt(self.d_input)
 
-    def forward(self, x: torch.Tensor, mask):
+    def forward(self, x: torch.Tensor, mask=None):
         """
         """
         seq_len = x.shape[1]
@@ -64,6 +64,8 @@ class WSDTransformerEncoder(nn.Module):
 
     @staticmethod
     def get_transformer_mask(lengths: torch.Tensor, max_len, device):
+        if not lengths:
+            return None
         # mask is True for values to be masked
         mask_range = torch.arange(max_len) \
             .expand(len(lengths), max_len) \

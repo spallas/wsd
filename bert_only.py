@@ -10,69 +10,12 @@ from torch.nn import CrossEntropyLoss
 from torch.utils.data import Dataset
 from tqdm import tqdm
 
-from data_preprocessing import BERT_MODEL
+from data_preprocessing import BERT_MODEL, FlatSemCorDataset, load_sense2id
 from train import BaseTrainer, TrainerLM
 from utils import util
 from utils.config import BertWsdConfig
 from utils.util import NOT_AMB_SYMBOL, UNK_SENSE
 from wsd import BaselineWSD
-
-
-def build_sense2id(tags_path='res/wsd-train/semcor+glosses_tags.txt',
-                   dict_path='res/dictionaries/senses.txt'):
-    sense2id: Dict[str, int] = defaultdict(lambda: NOT_AMB_SYMBOL)
-    with open(tags_path) as f:
-        senses_set = set()
-        for line in f:
-            senses_set.update(line.strip().split(' ')[1:])
-    with open(dict_path, 'w') as f:
-        for i, w in enumerate(senses_set, start=1):
-            sense2id[w] = i
-            print(f"{w} {i}", file=f)
-    return sense2id
-
-
-def load_sense2id(dict_path='res/dictionaries/senses.txt'):
-    with open(dict_path) as f:
-        sense2id = {line.strip().split(' ')[0]: int(line.strip().split(' ')[1]) for line in f}
-    return sense2id
-
-
-class FlatSemCorDataset(Dataset):
-
-    def __init__(self,
-                 data_path='res/wsd-train/semcor+glosses_data.xml',
-                 tags_path='res/wsd-train/semcor+glosses_tags.txt',
-                 sense_dict='res/dictionaries/senses.txt'):
-        with open(tags_path) as f:
-            instance2senses: Dict[str, str] = {line.strip().split(' ')[0]: line.strip().split(' ')[1:] for line in f}
-        sense2id = load_sense2id(sense_dict) if os.path.exists(sense_dict) else build_sense2id(tags_path, sense_dict)
-        instance2ids: Dict[str, List[int]] = {k: list(map(lambda x: sense2id[x] if x in sense2id else UNK_SENSE, v))
-                                              for k, v in instance2senses.items()}
-        self.num_tags = len(sense2id)
-        self.train_sense_map = {}
-        self.dataset_lemmas = []
-        self.first_senses = []
-        self.all_senses = []
-        self.pos_tags = []
-        for text in tqdm(Et.parse(data_path).getroot()):
-            for sentence in text:
-                for word in sentence:
-                    self.dataset_lemmas.append(word.attrib['lemma'])
-                    self.pos_tags.append(util.pos2id[word.attrib['pos']])
-                    word_senses = instance2ids[word.attrib['id']] if word.tag == 'instance' else [NOT_AMB_SYMBOL]
-                    self.all_senses.append(word_senses)
-                    self.first_senses.append(word_senses[0])
-                    self.train_sense_map.setdefault(word.attrib['lemma'], []).extend(word_senses)
-
-    def __len__(self):
-        return len(self.dataset_lemmas)
-
-    def __getitem__(self, idx):
-        return {'lemma': self.dataset_lemmas[idx],
-                'pos': self.pos_tags[idx],
-                'sense': self.first_senses[idx],
-                'all_senses': self.all_senses[idx]}
 
 
 class BertSimpleLoader:

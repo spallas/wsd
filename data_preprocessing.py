@@ -7,6 +7,7 @@ from collections import Counter, defaultdict
 from typing import List, Dict
 
 import torch
+import os
 from torch import nn
 from allennlp.modules.elmo import batch_to_ids
 from pytorch_transformers import BertTokenizer
@@ -14,7 +15,7 @@ from torch.utils.data import Dataset
 from tqdm import tqdm
 
 from utils import util
-
+from utils.util import UNK_SENSE, NOT_AMB_SYMBOL, PAD_SYMBOL
 
 BERT_MODEL = 'bert-large-cased'
 
@@ -35,12 +36,73 @@ def str_to_token_ids(batch: List[List[str]]):
             j = len(bert_tok_ids)
         tokens_b.append(torch.tensor(bert_tok_ids))
         slices_b.append(slices)
-    tokens_b = nn.utils.rnn.pad_sequence(b_y, batch_first=True, padding_value=0)
+    tokens_b = nn.utils.rnn.pad_sequence(tokens_b, batch_first=True, padding_value=0)
     return tokens_b, slices_b
 
 
 def str_to_char_ids(batch: List[List[str]]):
     return batch_to_ids(batch)
+
+
+def build_sense2id(tags_path='res/wsd-train/semcor_tags.txt',
+                   test_tags_path='res/wsd-train/test_tags.txt',
+                   dict_path='res/dictionaries/senses.txt'):
+    sense2id: Dict[str, int] = defaultdict(lambda: NOT_AMB_SYMBOL)
+    with open(tags_path) as f, open(test_tags_path) as ff:
+        senses_set = set()
+        for line in f:
+            senses_set.update(line.strip().split(' ')[1:])
+        for line in ff:
+            senses_set.update(line.strip().split(' ')[1:])
+
+    with open(dict_path, 'w') as f:
+        for i, w in enumerate(senses_set, start=1):
+            sense2id[w] = i
+            print(f"{w} {i}", file=f)
+    return sense2id
+
+
+def load_sense2id(dict_path='res/dictionaries/senses.txt'):
+    with open(dict_path) as f:
+        sense2id = {line.strip().split(' ')[0]: int(line.strip().split(' ')[1]) for line in f}
+    return sense2id
+
+
+class FlatSemCorDataset(Dataset):
+
+    def __init__(self,
+                 data_path='res/wsd-train/semcor_data.xml',
+                 tags_path='res/wsd-train/semcor_tags.txt',
+                 sense_dict='res/dictionaries/senses.txt'):
+        with open(tags_path) as f:
+            instance2senses: Dict[str, str] = {line.strip().split(' ')[0]: line.strip().split(' ')[1:] for line in f}
+        sense2id = load_sense2id(sense_dict) if os.path.exists(sense_dict) else build_sense2id(tags_path, dict_path=sense_dict)
+        instance2ids: Dict[str, List[int]] = {k: list(map(lambda x: sense2id[x] if x in sense2id else UNK_SENSE, v))
+                                              for k, v in instance2senses.items()}
+        self.num_tags = len(sense2id)
+        self.train_sense_map = {}
+        self.dataset_lemmas = []
+        self.first_senses = []
+        self.all_senses = []
+        self.pos_tags = []
+        for text in tqdm(Et.parse(data_path).getroot()):
+            for sentence in text:
+                for word in sentence:
+                    self.dataset_lemmas.append(word.attrib['lemma'])
+                    self.pos_tags.append(util.pos2id[word.attrib['pos']])
+                    word_senses = instance2ids[word.attrib['id']] if word.tag == 'instance' else [NOT_AMB_SYMBOL]
+                    self.all_senses.append(word_senses)
+                    self.first_senses.append(word_senses[0])
+                    self.train_sense_map.setdefault(word.attrib['lemma'], []).extend(word_senses)
+
+    def __len__(self):
+        return len(self.dataset_lemmas)
+
+    def __getitem__(self, idx):
+        return {'lemma': self.dataset_lemmas[idx],
+                'pos': self.pos_tags[idx],
+                'sense': self.first_senses[idx],
+                'all_senses': self.all_senses[idx]}
 
 
 class SemCorDataset(Dataset):
@@ -318,6 +380,51 @@ class BertLemmaPosLoader(SemCorDataLoader):
                 raise StopIteration
 
         return b_t, b_x, b_p, b_l, b_y, b_s, b_z
+
+
+class FlatLoader:
+
+    def __init__(self,
+                 dataset: FlatSemCorDataset,
+                 batch_size: int,
+                 win_size: int):
+        self.dataset = dataset
+        self.batch_size = batch_size
+        self.win_size = win_size
+
+    def __iter__(self):
+        self.last_offset = 0
+        self.stop_flag = False
+        return self
+
+    def __next__(self):
+        if self.stop_flag:
+            raise StopIteration
+        b_t, b_x, b_l, b_p, b_y, b_s, b_z = [], [], [], [], [], [], []
+        for i in range(self.batch_size):
+            n = self.last_offset + (i * self.win_size)
+            m = n + self.win_size
+            if m > len(self.dataset):
+                self.stop_flag = True
+                m = len(self.dataset)
+            text_window = self.dataset.dataset_lemmas[n:m]
+            text_window += [PAD_SYMBOL] * (self.win_size + 2 - len(text_window))
+            pos_tags = self.dataset.pos_tags[n:m]
+            pos_tags += [0] * (self.win_size + 2 - len(pos_tags))
+            sense_labels = self.dataset.first_senses[n:m]
+            sense_labels += [NOT_AMB_SYMBOL] * (self.win_size + 2 - len(sense_labels))
+            all_senses = self.dataset.all_senses[n:m]
+            all_senses += [[NOT_AMB_SYMBOL]] * (self.win_size + 2 - len(all_senses))
+
+            b_x.append(text_window)
+            b_p.append(pos_tags)
+            b_y.append(torch.tensor(sense_labels))
+            b_z.append(all_senses)
+            if self.stop_flag:
+                break
+        self.last_offset = m
+        b_y = nn.utils.rnn.pad_sequence(b_y, batch_first=True, padding_value=NOT_AMB_SYMBOL)
+        return b_x, b_p, b_y, b_z
 
 
 if __name__ == '__main__':
