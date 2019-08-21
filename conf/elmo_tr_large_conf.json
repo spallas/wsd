@@ -10,7 +10,7 @@
   "test_data" :"res/wsd-train/test_data.xml",
   "test_tags" :"res/wsd-train/test_tags.txt",
   "report_path": "logs/elmo_tr_large_report.txt",
-  "num_layers": 2,
+  "num_layers": 3,
   "learning_rate": 0.0001,
   "elmo_options": "https://s3-us-west-2.amazonaws.com/allennlp/models/elmo/2x4096_512_2048cnn_2xhighway/elmo_2x4096_512_2048cnn_2xhighway_options.json",
   "elmo_weights": "https://s3-us-west-2.amazonaws.com/allennlp/models/elmo/2x4096_512_2048cnn_2xhighway/elmo_2x4096_512_2048cnn_2xhighway_weights.hdf5",
