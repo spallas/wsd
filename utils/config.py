@@ -105,10 +105,10 @@ class ElmoTransformerConfig(Config):
     elmo_options: str = ''
     elmo_size: int = 0
 
-    learning_rate: float = 0.0005
+    learning_rate: float = 0.00005
     d_model: int = 512
-    encoder_embed_dim: int = 1024
     pos_embed_dim: int = 32
+    num_heads: int = 4
 
 
     @staticmethod
