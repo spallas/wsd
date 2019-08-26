@@ -121,7 +121,7 @@ def lm_select_senses(b_scores, b_str, b_pos, sense2id, train_sense_map, b_labels
     return np.argmax(b_scores, -1).tolist()
 
 
-def main():
+def test1():
     train_dataset = FlatSemCorDataset('res/wsd-train/semcor_data.xml', 'res/wsd-train/semcor_tags.txt')
     dataset = FlatSemCorDataset('res/wsd-test/se07/se07.xml', 'res/wsd-test/se07/se07.txt')
     loader = BertSimpleLoader(dataset, 33, 100)
@@ -145,6 +145,10 @@ def main():
             pred_eval.append(pred[i])
     f1 = f1_score(true_eval, pred_eval, average='micro')
     print(f"F1 = {f1}")
+
+
+def test2():
+    pass
 
 
 if __name__ == '__main__':

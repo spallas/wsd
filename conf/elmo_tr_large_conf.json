@@ -1,8 +1,8 @@
 {
   "num_epochs": 100,
-  "batch_size": 64,
+  "batch_size": 32,
   "checkpoint_path": "saved_weights/elmo_tr_large_checkpoint.pt",
-  "log_interval": 100,
+  "log_interval": 200,
   "train_data":"res/wsd-train/semcor_data.xml",
   "train_tags":"res/wsd-train/semcor_tags.txt",
   "eval_data" :"res/wsd-test/se07/se07.xml",
@@ -10,8 +10,8 @@
   "test_data" :"res/wsd-train/test_data.xml",
   "test_tags" :"res/wsd-train/test_tags.txt",
   "report_path": "logs/elmo_tr_large_report.txt",
-  "num_layers": 4,
-  "learning_rate": 0.00007,
+  "num_layers": 2,
+  "learning_rate": 0.0001,
   "elmo_options": "https://s3-us-west-2.amazonaws.com/allennlp/models/elmo/2x4096_512_2048cnn_2xhighway_5.5B/elmo_2x4096_512_2048cnn_2xhighway_5.5B_options.json",
   "elmo_weights": "https://s3-us-west-2.amazonaws.com/allennlp/models/elmo/2x4096_512_2048cnn_2xhighway_5.5B/elmo_2x4096_512_2048cnn_2xhighway_5.5B_weights.hdf5",
   "elmo_size": 512
