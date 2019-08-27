@@ -150,17 +150,19 @@ class RobertaEmbeddings(nn.Module):
                  model_path='res/roberta.large'):
         super().__init__()
         self.device = device
-        self.roberta = RobertaModel.from_pretrained(model_path, checkpoint_file='model.pt')
-        self.roberta.eval()
+        with torch.no_grad():
+            self.roberta = RobertaModel.from_pretrained(model_path, checkpoint_file='model.pt')
+            self.roberta.eval()
 
     def forward(self, seq_list):
-        seq_embeddings = []
-        for seq in seq_list:
-            sent = ' '.join(seq)
-            encoded = self.roberta.encode(sent)
-            alignment = alignment_utils.align_bpe_to_words(self.roberta, encoded, seq)
-            features = self.roberta.extract_features(encoded, return_all_hiddens=False)
-            features = features.squeeze(0)
-            aligned = align_features_to_words(self.roberta, features, alignment)
-            seq_embeddings.append(aligned[1:-1])  # skip <s>,</s> embeddings
-        return torch.stack(seq_embeddings, dim=0).to(self.device)
+        with torch.no_grad():
+            seq_embeddings = []
+            for seq in seq_list:
+                sent = ' '.join(seq)
+                encoded = self.roberta.encode(sent)
+                alignment = alignment_utils.align_bpe_to_words(self.roberta, encoded, seq)
+                features = self.roberta.extract_features(encoded, return_all_hiddens=False)
+                features = features.squeeze(0)
+                aligned = align_features_to_words(self.roberta, features, alignment)
+                seq_embeddings.append(aligned[1:-1])  # skip <s>,</s> embeddings
+            return torch.stack(seq_embeddings, dim=0).to(self.device)
