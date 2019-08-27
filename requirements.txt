@@ -3,7 +3,7 @@ numpy
 tqdm
 scikit-learn
 nltk
-torch
+torch>=1.2.0
 allennlp
 fairseq
 pytorch-transformers
