@@ -7,7 +7,7 @@ from torch import nn
 from torch.nn import CrossEntropyLoss
 
 from data_preprocessing import BERT_MODEL
-from models import Attention, ElmoEmbeddings, WSDTransformerEncoder
+from models import Attention, ElmoEmbeddings, WSDTransformerEncoder, RobertaEmbeddings, get_transformer_mask
 from utils.util import pos2id, NOT_AMB_SYMBOL
 
 
@@ -120,9 +120,36 @@ class ElmoTransformerWSD(BaselineWSD):
 
     def forward(self, char_ids, lengths=None):
         x = self.elmo_embedding(char_ids)
-        mask = WSDTransformerEncoder.get_transformer_mask(lengths,
-                                                          self.win_size,
-                                                          self.device)
+        mask = get_transformer_mask(lengths, self.win_size, self.device)
+        x = self.transformer(x, mask)
+        return x
+
+
+class RobertaTransformerWSD(BaselineWSD):
+
+    def __init__(self,
+                 device,
+                 num_senses,
+                 max_len,
+                 model_path,
+                 d_embedding: int = 1024,
+                 d_model: int = 512,
+                 num_heads: int = 8,
+                 num_layers: int = 4):
+        super().__init__(num_senses, max_len)
+        self.device = device
+        self.d_embedding = d_embedding
+        self.d_model = d_model
+        self.num_heads = num_heads
+        self.num_layers = num_layers
+        self.embedding = RobertaEmbeddings(device, model_path)
+        self.transformer = WSDTransformerEncoder(self.d_embedding, self.d_model,
+                                                 self.tagset_size, self.num_layers,
+                                                 self.num_heads)
+
+    def forward(self, seq_list, lengths=None):
+        x = self.embedding(seq_list)
+        mask = get_transformer_mask(lengths, self.win_size, self.device)
         x = self.transformer(x, mask)
         return x
 

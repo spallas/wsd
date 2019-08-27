@@ -2,7 +2,19 @@ import math
 
 import torch
 from allennlp.modules import Elmo
+from fairseq.models.roberta import RobertaModel, alignment_utils
 from torch import nn
+
+
+def get_transformer_mask(lengths: torch.Tensor, max_len, device):
+    if not lengths:
+        return None
+    # mask is True for values to be masked
+    mask_range = torch.arange(max_len) \
+        .expand(len(lengths), max_len) \
+        .to(device)
+    transformer_mask = (mask_range >= lengths.unsqueeze(1))
+    return transformer_mask
 
 
 class Attention(nn.Module):
@@ -62,17 +74,6 @@ class WSDTransformerEncoder(nn.Module):
         scores = y.view(-1, seq_len, self.d_output)
         return scores
 
-    @staticmethod
-    def get_transformer_mask(lengths: torch.Tensor, max_len, device):
-        if not lengths:
-            return None
-        # mask is True for values to be masked
-        mask_range = torch.arange(max_len) \
-            .expand(len(lengths), max_len) \
-            .to(device)
-        transformer_mask = (mask_range >= lengths.unsqueeze(1))
-        return transformer_mask
-
 
 class LSTMEncoder(nn.Module):
 
@@ -111,3 +112,25 @@ class ElmoEmbeddings(nn.Module):
         x = embeddings['elmo_representations'][1]
         return x
 
+
+class RobertaEmbeddings(nn.Module):
+
+    def __init__(self,
+                 device,
+                 model_path='res/roberta.large'):
+        super().__init__()
+        self.device = device
+        self.roberta = RobertaModel.from_pretrained(model_path, checkpoint_file='model.pt')
+        self.roberta.eval()
+
+    def forward(self, seq_list):
+        seq_embeddings = []
+        for seq in seq_list:
+            sent = ' '.join(seq)
+            encoded = self.roberta.encode(sent)
+            alignment = alignment_utils.align_bpe_to_words(self.roberta, encoded, seq)
+            features = self.roberta.extract_features(encoded, return_all_hiddens=False)
+            features = features.squeeze(0)
+            aligned = alignment_utils.align_features_to_words(self.roberta, features, alignment)
+            seq_embeddings.append(aligned[1:-1])  # skip <s>,</s> embeddings
+        return torch.stack(seq_embeddings, dim=0).to(self.device)

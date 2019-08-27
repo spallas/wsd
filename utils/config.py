@@ -110,11 +110,30 @@ class ElmoTransformerConfig(Config):
     pos_embed_dim: int = 32
     num_heads: int = 4
 
-
     @staticmethod
     def from_json_file(file_name, **kwargs):
         with open(file_name) as f:
             return ElmoTransformerConfig.from_json(f.read(), **kwargs)
+
+
+@dataclass_json
+@dataclass
+class RobertaTransformerConfig(Config):
+
+    checkpoint_path: str = 'saved_weights/roberta_tr_checkpoint.pt'
+    report_path: str = 'logs/roberta_tr_report.txt'
+
+    model_path: str = 'res/roberta.large'
+    learning_rate: float = 0.00005
+    d_embeddings: int = 1024
+    d_model: int = 512
+    pos_embed_dim: int = 32
+    num_heads: int = 4
+
+    @staticmethod
+    def from_json_file(file_name, **kwargs):
+        with open(file_name) as f:
+            return RobertaTransformerConfig.from_json(f.read(), **kwargs)
 
 
 @dataclass_json

@@ -16,9 +16,9 @@ from torch.utils.tensorboard import SummaryWriter
 from data_preprocessing import SemCorDataset, ElmoLemmaPosLoader, BertLemmaPosLoader, BERT_MODEL, FlatSemCorDataset, \
     load_sense2id, FlatLoader, str_to_token_ids, str_to_char_ids
 from utils import util
-from utils.config import TransformerConfig, BertWsdConfig, ElmoTransformerConfig
-from utils.util import NOT_AMB_SYMBOL
-from wsd import SimpleWSD, BertTransformerWSD, ElmoTransformerWSD
+from utils.config import TransformerConfig, BertWsdConfig, ElmoTransformerConfig, RobertaTransformerConfig
+from utils.util import NOT_AMB_SYMBOL, PAD_SYMBOL
+from wsd import SimpleWSD, BertTransformerWSD, ElmoTransformerWSD, RobertaTransformerWSD
 
 warnings.filterwarnings("ignore", category=UndefinedMetricWarning)
 torch.manual_seed(42)
@@ -577,9 +577,11 @@ class ElmoTransformerTrainerLM(BaseTrainer):
         self.sense2id = load_sense2id()
         self.train_sense_map = dataset.train_sense_map
         num_tags = len(self.sense2id) + 1
-        self.data_loader = FlatLoader(dataset, batch_size=self.batch_size, win_size=self.window_size)
+        self.data_loader = FlatLoader(dataset, batch_size=self.batch_size, win_size=self.window_size,
+                                      pad_symbol='<pad>')
         eval_dataset = FlatSemCorDataset(data_path=eval_data, tags_path=eval_tags)
-        self.eval_loader = FlatLoader(eval_dataset, batch_size=self.batch_size, win_size=self.window_size)
+        self.eval_loader = FlatLoader(eval_dataset, batch_size=self.batch_size, win_size=self.window_size,
+                                      pad_symbol='<pad>')
         # Build model
         self.model = ElmoTransformerWSD(self.device, num_tags, self.window_size, self.elmo_weights,
                                         self.elmo_options, self.elmo_size, self.d_model,
@@ -595,7 +597,8 @@ class ElmoTransformerTrainerLM(BaseTrainer):
         self.train_sense_map = dataset.train_sense_map
         num_tags = len(self.sense2id) + 1
         dataset = FlatSemCorDataset(data_path=test_data, tags_path=test_tags)
-        self.test_loader = FlatLoader(dataset, batch_size=self.batch_size, win_size=self.window_size)
+        self.test_loader = FlatLoader(dataset, batch_size=self.batch_size, win_size=self.window_size,
+                                      pad_symbol='<pad>')
         # Build model
         self.model = ElmoTransformerWSD(self.device, num_tags, self.window_size, self.elmo_weights,
                                         self.elmo_options, self.elmo_size, self.d_model,
@@ -661,6 +664,113 @@ class ElmoTransformerTrainerLM(BaseTrainer):
         return f1
 
 
+class RobertaTrainer(BaseTrainer):
+
+    def __init__(self,
+                 num_layers=2,
+                 learning_rate=0.0001,
+                 d_embeddings=1024,
+                 d_model=2048,
+                 num_heads=4,
+                 model_path='res/roberta.large',
+                 **kwargs):
+        self.learning_rate = learning_rate
+        self.num_layers = num_layers
+        self.d_model = d_model
+        self.d_embeddings = d_embeddings
+        self.num_heads = num_heads
+        self.model_path = model_path
+        super().__init__(**kwargs)
+
+    def _setup_training(self, train_data, train_tags, eval_data, eval_tags):
+        # Load data
+        dataset = FlatSemCorDataset(train_data, train_tags)
+        self.sense2id = load_sense2id()
+        self.train_sense_map = dataset.train_sense_map
+        num_tags = len(self.sense2id) + 1
+        self.data_loader = FlatLoader(dataset, batch_size=self.batch_size, win_size=self.window_size,
+                                      pad_symbol='PAD')
+        eval_dataset = FlatSemCorDataset(data_path=eval_data, tags_path=eval_tags)
+        self.eval_loader = FlatLoader(eval_dataset, batch_size=self.batch_size, win_size=self.window_size,
+                                      pad_symbol='PAD')
+        # Build model
+        self.model = RobertaTransformerWSD(self.device, num_tags, self.window_size, self.model_path,
+                                           self.d_embeddings, self.d_model, self.num_heads, self.num_layers)
+        self.model.to(self.device)
+        self.optimizer = optim.Adam(self.model.parameters(), lr=self.learning_rate)
+        self._maybe_load_checkpoint()
+
+    def _setup_testing(self, train_data, train_tags, test_data, test_tags):
+        # Load data
+        dataset = FlatSemCorDataset(train_data, train_tags)
+        self.sense2id = load_sense2id()
+        self.train_sense_map = dataset.train_sense_map
+        num_tags = len(self.sense2id) + 1
+        dataset = FlatSemCorDataset(data_path=test_data, tags_path=test_tags)
+        self.test_loader = FlatLoader(dataset, batch_size=self.batch_size, win_size=self.window_size,
+                                      pad_symbol='PAD')
+        # Build model
+        self.model = RobertaTransformerWSD(self.device, num_tags, self.window_size, self.d_embeddings,
+                                           self.d_model, self.num_heads, self.num_layers)
+        self._load_best()
+        self.model.eval()
+        self.model.to(self.device)
+
+    def train_epoch(self, epoch_i):
+        for step, (b_x, b_p, b_y, b_z) in enumerate(self.data_loader, self.last_step):
+            self.model.zero_grad()
+            scores = self.model(b_x)
+            loss = self.model.loss(scores, b_y.to(self.device))
+            loss.backward()
+
+            if step % self.log_interval == 0:
+                print(f'\rLoss: {loss.item():.4f} ', end='')
+                self._plot('Train loss', loss.item(), step)
+                self._gpu_mem_info()
+                f1 = self._evaluate(epoch_i)
+                self._maybe_checkpoint(loss, f1, epoch_i)
+                self._plot('Dev F1', f1, step)
+                self.model.train()  # return to train mode after evaluation
+
+            clip_grad_norm_(parameters=self.model.parameters(), max_norm=1.0)
+            self.optimizer.step()  # update the weights
+        self.last_step += step
+
+    def train(self):
+        self.model.train()
+        for epoch in range(self.last_epoch + 1, self.num_epochs + 1):
+            print(f'\nEpoch: {epoch}')
+            self.train_epoch(epoch)
+
+    def test(self, loader=None):
+        """
+        Evaluate on test dataset.
+        """
+        if not loader:
+            loader = self.test_loader
+        with torch.no_grad():
+            pred, true, z = [], [], []
+            for step, (b_x, b_p, b_y, b_z) in enumerate(loader):
+                self.model.zero_grad()
+                scores = self.model(b_x)
+                pred += [item for seq in self._select_senses(scores, None, b_x, b_p, None, b_y) for item in seq]
+                true += [item for seq in b_y.tolist() for item in seq]
+                z += [item for seq in b_z for item in seq]
+
+            true_eval, pred_eval = [], []
+            for i in range(len(true)):
+                if true[i] == NOT_AMB_SYMBOL:
+                    continue
+                else:
+                    if pred[i] in z[i]:
+                        true_eval.append(pred[i])
+                    else:
+                        true_eval.append(true[i])
+                    pred_eval.append(pred[i])
+            f1 = self._print_metrics(true_eval, pred_eval)
+        return f1
+
+
 class WSDNetTrainer(BaseTrainer):
     def _setup_training(self, train_data, train_tags, eval_data, eval_tags):
         pass
@@ -679,6 +789,6 @@ class WSDNetTrainer(BaseTrainer):
 
 
 if __name__ == '__main__':
-    c = ElmoTransformerConfig.from_json_file('conf/elmo_tr_large_conf.json')
-    t = ElmoTransformerTrainerLM(**c.__dict__)
+    c = RobertaTransformerConfig.from_json_file('conf/roberta_tr_conf.json')
+    t = RobertaTrainer(**c.__dict__)
     t.train()

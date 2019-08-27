@@ -1,4 +1,6 @@
+import sys
 
+from fairseq.models.roberta import alignment_utils
 from nltk.corpus import wordnet as wn
 from typing import Set
 import numpy as np
@@ -7,6 +9,7 @@ from sklearn.metrics import f1_score
 from scipy.special import softmax
 
 from bert_only import *
+from data_preprocessing import FlatLoader
 
 all_syn_lemmas = {}
 bert_tokenizer = BertTokenizer.from_pretrained(BERT_MODEL, do_lower_case=False)
@@ -148,8 +151,27 @@ def test1():
 
 
 def test2():
-    pass
+    from fairseq.models.roberta import RobertaModel
+    roberta = RobertaModel.from_pretrained('res/roberta.large', checkpoint_file='model.pt')
+    roberta.eval()
+
+    dataset = FlatSemCorDataset('res/wsd-test/se07/se07.xml', 'res/wsd-test/se07/se07.txt')
+    loader = FlatLoader(dataset, 32, 100, 'PAD')
+    sense2id = load_sense2id()
+    pred, true, z = [], [], []
+    for step, (b_x, b_p, b_y, b_z) in enumerate(loader):
+        for seq in b_x:
+            sent = ' '.join(seq)
+            encoded = roberta.encode(sent)
+            alignment = alignment_utils.align_bpe_to_words(roberta, encoded, seq)
+            features = roberta.extract_features(encoded, return_all_hiddens=False)
+            features = features.squeeze(0)
+            aligned = alignment_utils.align_features_to_words(roberta, features, alignment)[1:-1]
+
+            print(aligned.shape)
+            print(len(seq))
+    print('\nDone.')
 
 
 if __name__ == '__main__':
-    main()
+    test2()

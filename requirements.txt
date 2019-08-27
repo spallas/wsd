@@ -10,3 +10,4 @@ pytorch-transformers
 future
 pillow
 dataclasses-json
+cython

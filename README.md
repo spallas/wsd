@@ -36,3 +36,20 @@ As a training dataset we use both SemCor and the annotated glosses.
 
 Please refer to the [wiki page](https://github.com/spallas/wsd/wiki) in this 
 repository for further details about the implementation.
+
+
+## Notes: RoBERTa installation
+
+```
+# Download roberta.large model
+cd res/
+wget https://dl.fbaipublicfiles.com/fairseq/models/roberta.large.tar.gz
+tar -xzvf roberta.large.tar.gz
+```
+
+```
+# Load the model in fairseq
+from fairseq.models.roberta import RobertaModel
+roberta = RobertaModel.from_pretrained('res/roberta.large', checkpoint_file='model.pt')
+roberta.eval()  # disable dropout (or leave in train mode to finetune)
+```

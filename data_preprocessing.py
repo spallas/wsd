@@ -387,10 +387,12 @@ class FlatLoader:
     def __init__(self,
                  dataset: FlatSemCorDataset,
                  batch_size: int,
-                 win_size: int):
+                 win_size: int,
+                 pad_symbol: str):
         self.dataset = dataset
         self.batch_size = batch_size
         self.win_size = win_size
+        self.pad_symbol = pad_symbol
 
     def __iter__(self):
         self.last_offset = 0
@@ -408,13 +410,13 @@ class FlatLoader:
                 self.stop_flag = True
                 m = len(self.dataset)
             text_window = self.dataset.dataset_lemmas[n:m]
-            text_window += [PAD_SYMBOL] * (self.win_size + 2 - len(text_window))
+            text_window += [self.pad_symbol] * (self.win_size - len(text_window))
             pos_tags = self.dataset.pos_tags[n:m]
-            pos_tags += [0] * (self.win_size + 2 - len(pos_tags))
+            pos_tags += [0] * (self.win_size - len(pos_tags))
             sense_labels = self.dataset.first_senses[n:m]
-            sense_labels += [NOT_AMB_SYMBOL] * (self.win_size + 2 - len(sense_labels))
+            sense_labels += [NOT_AMB_SYMBOL] * (self.win_size - len(sense_labels))
             all_senses = self.dataset.all_senses[n:m]
-            all_senses += [[NOT_AMB_SYMBOL]] * (self.win_size + 2 - len(all_senses))
+            all_senses += [[NOT_AMB_SYMBOL]] * (self.win_size - len(all_senses))
 
             b_x.append(text_window)
             b_p.append(pos_tags)
