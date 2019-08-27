@@ -1,4 +1,5 @@
 import math
+from collections import Counter
 
 import torch
 from allennlp.modules import Elmo
@@ -15,6 +16,35 @@ def get_transformer_mask(lengths: torch.Tensor, max_len, device):
         .to(device)
     transformer_mask = (mask_range >= lengths.unsqueeze(1))
     return transformer_mask
+
+
+def align_features_to_words(roberta, features, alignment):
+    """
+    Align given features to words. Without assert.
+
+    Args:
+        roberta (RobertaHubInterface): RoBERTa instance
+        features (torch.Tensor): features to align of shape `(T_bpe x C)`
+        alignment: alignment between BPE tokens and words returned by
+            func:`align_bpe_to_words`.
+    """
+    assert features.dim() == 2
+
+    bpe_counts = Counter(j for bpe_indices in alignment for j in bpe_indices)
+    assert bpe_counts[0] == 0  # <s> shouldn't be aligned
+    denom = features.new([bpe_counts.get(j, 1) for j in range(len(features))])
+    weighted_features = features / denom.unsqueeze(-1)
+
+    output = [weighted_features[0]]
+    largest_j = -1
+    for bpe_indices in alignment:
+        output.append(weighted_features[bpe_indices].sum(dim=0))
+        largest_j = max(largest_j, *bpe_indices)
+    for j in range(largest_j + 1, len(features)):
+        output.append(weighted_features[j])
+    output = torch.stack(output)
+    # assert torch.all(torch.abs(output.sum(dim=0) - features.sum(dim=0)) < 1e-4)
+    return output
 
 
 class Attention(nn.Module):
@@ -131,6 +161,6 @@ class RobertaEmbeddings(nn.Module):
             alignment = alignment_utils.align_bpe_to_words(self.roberta, encoded, seq)
             features = self.roberta.extract_features(encoded, return_all_hiddens=False)
             features = features.squeeze(0)
-            aligned = alignment_utils.align_features_to_words(self.roberta, features, alignment)
+            aligned = align_features_to_words(self.roberta, features, alignment)
             seq_embeddings.append(aligned[1:-1])  # skip <s>,</s> embeddings
         return torch.stack(seq_embeddings, dim=0).to(self.device)
