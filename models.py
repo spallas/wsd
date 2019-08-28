@@ -160,7 +160,10 @@ class RobertaEmbeddings(nn.Module):
             for seq in seq_list:
                 sent = ' '.join(seq)
                 encoded = self.roberta.encode(sent)
-                alignment = alignment_utils.align_bpe_to_words(self.roberta, encoded, seq)
+                try:
+                    alignment = alignment_utils.align_bpe_to_words(self.roberta, encoded, seq)
+                except AssertionError:
+                    print('')
                 features = self.roberta.extract_features(encoded, return_all_hiddens=False)
                 features = features.squeeze(0)
                 aligned = align_features_to_words(self.roberta, features, alignment)

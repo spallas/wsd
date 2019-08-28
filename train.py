@@ -710,8 +710,8 @@ class RobertaTrainer(BaseTrainer):
         self.test_loader = FlatLoader(dataset, batch_size=self.batch_size, win_size=self.window_size,
                                       pad_symbol='PAD')
         # Build model
-        self.model = RobertaTransformerWSD(self.device, num_tags, self.window_size, self.d_embeddings,
-                                           self.d_model, self.num_heads, self.num_layers)
+        self.model = RobertaTransformerWSD(self.device, num_tags, self.window_size, self.model_path,
+                                           self.d_embeddings, self.d_model, self.num_heads, self.num_layers)
         self._load_best()
         self.model.eval()
         self.model.to(self.device)

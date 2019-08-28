@@ -15,7 +15,7 @@ from torch.utils.data import Dataset
 from tqdm import tqdm
 
 from utils import util
-from utils.util import UNK_SENSE, NOT_AMB_SYMBOL, PAD_SYMBOL
+from utils.util import UNK_SENSE, NOT_AMB_SYMBOL, PAD_SYMBOL, is_ascii
 
 BERT_MODEL = 'bert-large-cased'
 
@@ -88,12 +88,13 @@ class FlatSemCorDataset(Dataset):
         for text in tqdm(Et.parse(data_path).getroot()):
             for sentence in text:
                 for word in sentence:
-                    self.dataset_lemmas.append(word.attrib['lemma'])
+                    lemma = word.attrib['lemma'] if is_ascii(word.attrib['lemma']) else '#'
+                    self.dataset_lemmas.append(lemma)
                     self.pos_tags.append(util.pos2id[word.attrib['pos']])
                     word_senses = instance2ids[word.attrib['id']] if word.tag == 'instance' else [NOT_AMB_SYMBOL]
                     self.all_senses.append(word_senses)
                     self.first_senses.append(word_senses[0])
-                    self.train_sense_map.setdefault(word.attrib['lemma'], []).extend(word_senses)
+                    self.train_sense_map.setdefault(lemma, []).extend(word_senses)
 
     def __len__(self):
         return len(self.dataset_lemmas)

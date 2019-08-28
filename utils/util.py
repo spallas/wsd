@@ -32,7 +32,7 @@ id2wnpos[4] = 'r'
 
 NOT_AMB_SYMBOL = -1
 UNK_SENSE = -2
-PAD_SYMBOL = 'PAD'  # '<pad>'
+PAD_SYMBOL = 'PAD'  # '<pad>'
 
 #######################################
 
@@ -55,3 +55,7 @@ def example_to_input(lemma_list: List[str],
         # mapped_lemmas[j] = example['lemmas'][i]
         # mapped_altern[j] = example['alternatives'][i]
     return subword_list, mapped_tags
+
+
+def is_ascii(s):
+    return all(ord(c) < 128 for c in s)

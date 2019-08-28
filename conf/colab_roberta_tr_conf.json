@@ -1,8 +1,8 @@
 {
   "num_epochs": 50,
-  "batch_size": 16,
+  "batch_size": 32,
   "checkpoint_path": "drive/My Drive/wsd/roberta_tr_checkpoint.pt",
-  "log_interval": 400,
+  "log_interval": 300,
   "train_data":"res/wsd-train/semcor_data.xml",
   "train_tags":"res/wsd-train/semcor_tags.txt",
   "eval_data" :"res/wsd-test/se07/se07.xml",
