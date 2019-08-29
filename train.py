@@ -664,7 +664,7 @@ class ElmoTransformerTrainerLM(BaseTrainer):
         return f1
 
 
-class RobertaTrainer(BaseTrainer):
+class RobertaTrainer(TrainerLM):
 
     def __init__(self,
                  num_layers=2,
