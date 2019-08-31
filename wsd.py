@@ -1,26 +1,29 @@
-import math
-
 import torch
 from allennlp.modules.elmo import Elmo
-from pytorch_transformers import BertModel, BertConfig, BertForTokenClassification
 from torch import nn
 from torch.nn import CrossEntropyLoss
 
-from data_preprocessing import BERT_MODEL
-from models import Attention, ElmoEmbeddings, WSDTransformerEncoder, RobertaEmbeddings, get_transformer_mask
-from utils.util import pos2id, NOT_AMB_SYMBOL
+from models import Attention, ElmoEmbeddings, WSDTransformerEncoder, \
+    RobertaEmbeddings, get_transformer_mask, BertEmbeddings
+from utils.util import NOT_AMB_SYMBOL
 
 
-class BaselineWSD(nn.Module):
+class BaseWSD(nn.Module):
 
-    def __init__(self, num_senses: int, max_len: int):
+    def __init__(self, device, num_senses: int, max_len: int,
+                 batch_size: int = None):
         super().__init__()
+        self.device = device
         self.tagset_size = num_senses
         self.win_size = max_len
+        self.batch_size = batch_size
         self.ce_loss = CrossEntropyLoss(ignore_index=NOT_AMB_SYMBOL)
 
     def forward(self, *inputs):
-        pass
+        raise NotImplementedError("Do not use base class, use concrete classes instead.")
+
+    def init_hidden(self, batch_size):
+        return None, None
 
     def loss(self, scores, tags):
         y_true = tags.view(-1)
@@ -28,25 +31,18 @@ class BaselineWSD(nn.Module):
         return self.ce_loss(scores, y_true)
 
 
-class SimpleWSD(BaselineWSD):
-
-    _ELMO_OPTIONS = 'res/elmo/elmo_2x1024_128_2048cnn_1xhighway_options.json'
-    _ELMO_WEIGHTS = 'res/elmo/elmo_2x1024_128_2048cnn_1xhighway_weights.hdf5'
-    _ELMO_SIZE = 128
-    _HIDDEN_SIZE = 1024
-    _NUM_LAYERS = 2
-    _BATCH_SIZE = 32
+class BaselineWSD(BaseWSD):
 
     def __init__(self,
                  num_senses,
                  max_len,
-                 elmo_weights=_ELMO_WEIGHTS,
-                 elmo_options=_ELMO_OPTIONS,
-                 elmo_size=_ELMO_SIZE,
-                 hidden_size=_HIDDEN_SIZE,
-                 num_layers=_NUM_LAYERS,
-                 batch_size=_BATCH_SIZE):
-        super().__init__(num_senses, max_len)
+                 elmo_weights,
+                 elmo_options,
+                 elmo_size,
+                 hidden_size,
+                 num_layers,
+                 batch_size):
+        super().__init__(num_senses, max_len, batch_size)
         self.elmo_weights = elmo_weights
         self.elmo_options = elmo_options
         self.elmo_size = elmo_size
@@ -82,14 +78,11 @@ class SimpleWSD(BaselineWSD):
         y = y.contiguous().view(-1, y.shape[2])
         y = self.output_dense(y)
         y = nn.LogSoftmax(dim=1)(y)
-        tag_scores = y.view(self.batch_size, self.win_size, self.tagset_size)
+        tag_scores = y.view(-1, self.win_size, self.tagset_size)
         return tag_scores
 
 
-class ElmoTransformerWSD(BaselineWSD):
-
-    _ELMO_OPTIONS = ''
-    _ELMO_WEIGHTS = ''
+class ElmoTransformerWSD(BaseWSD):
 
     def __init__(self,
                  device,
@@ -125,7 +118,7 @@ class ElmoTransformerWSD(BaselineWSD):
         return x
 
 
-class RobertaTransformerWSD(BaselineWSD):
+class RobertaTransformerWSD(BaseWSD):
 
     def __init__(self,
                  device,
@@ -136,8 +129,7 @@ class RobertaTransformerWSD(BaselineWSD):
                  d_model: int = 512,
                  num_heads: int = 8,
                  num_layers: int = 4):
-        super().__init__(num_senses, max_len)
-        self.device = device
+        super().__init__(device, num_senses, max_len)
         self.d_embedding = d_embedding
         self.d_model = d_model
         self.num_heads = num_heads
@@ -154,91 +146,51 @@ class RobertaTransformerWSD(BaselineWSD):
         return x
 
 
-class BertTransformerWSD(BaselineWSD):
+class RobertaDenseWSD(BaseWSD):
+
+    def __init__(self,
+                 device,
+                 num_senses,
+                 max_len,
+                 model_path,
+                 d_embedding: int = 1024,
+                 d_model: int = 512,
+                 num_layers: int = 4):
+        super().__init__(device, num_senses, max_len)
+        pass
+
+    def forward(self, *inputs):
+        pass
+
+
+class BertTransformerWSD(BaseWSD):
 
     def __init__(self,
                  device,
                  num_senses,
                  max_len,
                  d_model: int = 512,
-                 num_heads: int = 8,
-                 num_layers: int = 4,
-                 pos_embed_dim: int = 32,
-                 encoder_embed_dim: int = 768+32,
-                 bert_trainable: bool = False):
-        super().__init__(num_senses, max_len)
+                 num_heads: int = 4,
+                 num_layers: int = 2,
+                 # pos_embed_dim: int = 32,
+                 bert_model='bert-large-cased'):
+        super().__init__(device, num_senses, max_len)
         self.d_model = d_model
         self.num_heads = num_heads
         self.num_layers = num_layers
-        self.pos_embed_dim = pos_embed_dim
-        self.bert_trainable = bert_trainable
-        self.encoder_embed_dim = encoder_embed_dim
+        self.bert_model = bert_model
+        # self.pos_embed_dim = pos_embed_dim
+        # self.pos_embed = nn.Embedding(len(pos2id), self.pos_embed_dim, padding_idx=0)
+        self.d_embedding = 768 if 'base' in bert_model else 1024
+        self.bert_embedding = BertEmbeddings(device, bert_model)
+        self.transformer = WSDTransformerEncoder(self.d_embedding, self.d_model,
+                                                 self.tagset_size, self.num_layers,
+                                                 self.num_heads)
 
-        self.bert_config = BertConfig.from_pretrained(BERT_MODEL)
-        self.bert_embedding = BertModel(self.bert_config)
-        if not self.bert_trainable:
-            for p in self.bert_embedding.parameters():
-                p.requires_grad = False
-        self.pos_embed = nn.Embedding(len(pos2id), self.pos_embed_dim, padding_idx=0)
-        self.project_dense = nn.Linear(self.encoder_embed_dim, self.d_model)
-        self.encoder_layer = nn.TransformerEncoderLayer(self.d_model, self.num_heads)
-        self.transformer_encoder = nn.TransformerEncoder(self.encoder_layer, self.num_layers)
-        self.output_dense = nn.Linear(self.d_model, self.tagset_size)
-        self.device = device
-        self.scale = math.sqrt(self.encoder_embed_dim)
-
-    def forward(self, token_ids, lengths, slices, text_lengths, pos_tags):
-        """
-        :param pos_tags:
-        :param text_lengths: Tensor, shape = `(batch)`
-        :param slices: List[Slice]
-        :param lengths: List[int], shape = `(batch)`
-        :param token_ids: Tensor, shape `(batch, seq_len)`
-        :return:
-        """
-        max_len = token_ids.shape[1]
-        bert_mask = torch.arange(max_len)\
-                         .expand(len(lengths), max_len)\
-                         .to(self.device) < lengths.unsqueeze(1)
-        max_text_len = text_lengths.max().item()
-        # mask is True for values to be masked
-        mask_range = torch.arange(max_text_len)\
-            .expand(len(text_lengths), max_text_len)\
-            .to(self.device)
-        transformer_mask = (mask_range >= text_lengths.unsqueeze(1))
-        x, _ = self.bert_embedding(token_ids, attention_mask=bert_mask)
-        # aggregate bert sub-words and pad to max len
-        x = torch.nn.utils.rnn.pad_sequence(
-            [torch.cat([torch.mean(x[i, sl, :], dim=-2) for sl in slices[i]])
-             # [torch.cat([x[i, sl.start, :] for sl in slices[i]])  # only use first bert token
-                    .reshape(-1, self.encoder_embed_dim - self.pos_embed_dim)
-             for i in range(x.shape[0])
-             ],
-            batch_first=True)
-        x_p = self.pos_embed(pos_tags)
-        x = torch.cat([x, x_p], dim=-1)
-        # for test
-        r = torch.rand_like(x)
-        x = self.project_dense(r)
-        x = x * self.scale  # embedding scale
-        x = x.transpose(1, 0)  # make batch second dim for transformer layer
-        x = self.transformer_encoder(x, src_key_padding_mask=transformer_mask)
-        x = x.transpose(1, 0)  # restore batch first
-        y = x.contiguous().view(-1, x.shape[2])
-        y = self.output_dense(y)
-        y = nn.LogSoftmax(dim=1)(y)
-        tag_scores = y.view(-1, max_text_len, self.tagset_size)
-        return tag_scores
-
-
-class WSDNet(nn.Module):
-    """
-    Multi-Task network for WSD
-    """
-
-    def __init__(self):
-        super().__init__()
-        pass
-
-    def forward(self, *inputs):
-        pass
+    def forward(self, seq_list, lengths=None):
+        # x_p = self.pos_embed(pos_tags)
+        # x = torch.cat([x, x_p], dim=-1)
+        x = self.bert_embedding(seq_list, lengths)
+        mask = get_transformer_mask(lengths, self.win_size, self.device)
+        x = self.transformer(x, mask)
+        return x

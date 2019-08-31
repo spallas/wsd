@@ -16,6 +16,8 @@ class Config(object):
     eval_tags:  str = 'res/wsd-test/se07/se07.txt'
     test_data:  str = 'res/wsd-train/test_data.xml'
     test_tags:  str = 'res/wsd-train/test_tags.txt'
+    sense_dict: str = 'res/dictionaries/senses.txt'
+    pad_symbol: str = 'PAD'  # or '<pad>'
 
     log_interval: int = 400
 
@@ -75,23 +77,23 @@ class TransformerConfig(Config):
 
 @dataclass_json
 @dataclass
-class BertWsdConfig(Config):
+class BertTransformerConfig(Config):
 
     checkpoint_path: str = 'saved_weights/bert_wsd_checkpoint.pt'
     report_path: str = 'logs/bert_wsd_report.txt'
 
     learning_rate: float = 0.00005
-    d_model: int = 2048
-    encoder_embed_dim: int = 1024
+    d_model: int = 512
+    num_layers: int = 2
+    num_heads: int = 4
     pos_embed_dim: int = 32
 
-    bert_trainable: int = True
-    subword_aggregation_mode: str = 'mean'  # or 'first'
+    bert_model = 'bert-large-cased'
 
     @staticmethod
     def from_json_file(file_name, **kwargs):
         with open(file_name) as f:
-            return BertWsdConfig.from_json(f.read(), **kwargs)
+            return BertTransformerConfig.from_json(f.read(), **kwargs)
 
 
 @dataclass_json
@@ -134,21 +136,6 @@ class RobertaTransformerConfig(Config):
     def from_json_file(file_name, **kwargs):
         with open(file_name) as f:
             return RobertaTransformerConfig.from_json(f.read(), **kwargs)
-
-
-@dataclass_json
-@dataclass
-class WSDNetConfig(Config):
-
-    learning_rate: float = 0.0001
-
-    checkpoint_path: str = 'saved_weights/wsdnet_checkpoint.pt'
-    report_path: str = 'logs/wsdnet_report.txt'
-
-    @staticmethod
-    def from_json_file(file_name, **kwargs):
-        with open(file_name) as f:
-            return WSDNetConfig.from_json(f.read(), **kwargs)
 
 
 # Test

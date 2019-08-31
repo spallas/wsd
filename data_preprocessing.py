@@ -2,51 +2,24 @@
 Load data from SemCor files and SemEval/SensEval files.
 """
 
+import os
 import xml.etree.ElementTree as Et
 from collections import Counter, defaultdict
 from typing import List, Dict
 
 import torch
-import os
-from torch import nn
-from allennlp.modules.elmo import batch_to_ids
 from pytorch_transformers import BertTokenizer
+from torch import nn
 from torch.utils.data import Dataset
 from tqdm import tqdm
 
 from utils import util
-from utils.util import UNK_SENSE, NOT_AMB_SYMBOL, PAD_SYMBOL, is_ascii
-
-BERT_MODEL = 'bert-large-cased'
-
-bert_tokenizer = BertTokenizer.from_pretrained(BERT_MODEL, do_lower_case=BERT_MODEL.endswith('-uncased'))
+from utils.util import UNK_SENSE, NOT_AMB_SYMBOL, is_ascii
 
 
-def str_to_token_ids(batch: List[List[str]]):
-    slices_b = []
-    tokens_b = []
-    for seq in batch:
-        bert_tok_ids = []
-        slices = []
-        j = 0
-        seq = ['[CLS]'] + seq + ['[SEP]']
-        for w in seq:
-            bert_tok_ids += bert_tokenizer.encode(w)
-            slices.append(slice(j, len(bert_tok_ids)))
-            j = len(bert_tok_ids)
-        tokens_b.append(torch.tensor(bert_tok_ids))
-        slices_b.append(slices)
-    tokens_b = nn.utils.rnn.pad_sequence(tokens_b, batch_first=True, padding_value=0)
-    return tokens_b, slices_b
-
-
-def str_to_char_ids(batch: List[List[str]]):
-    return batch_to_ids(batch)
-
-
-def build_sense2id(tags_path='res/wsd-train/semcor_tags.txt',
-                   test_tags_path='res/wsd-train/test_tags.txt',
-                   dict_path='res/dictionaries/senses.txt'):
+def build_sense2id(dict_path='res/dictionaries/senses.txt',
+                   tags_path='res/wsd-train/semcor_tags.txt',
+                   test_tags_path='res/wsd-train/test_tags.txt'):
     sense2id: Dict[str, int] = defaultdict(lambda: NOT_AMB_SYMBOL)
     with open(tags_path) as f, open(test_tags_path) as ff:
         senses_set = set()
@@ -62,9 +35,14 @@ def build_sense2id(tags_path='res/wsd-train/semcor_tags.txt',
     return sense2id
 
 
-def load_sense2id(dict_path='res/dictionaries/senses.txt'):
-    with open(dict_path) as f:
-        sense2id = {line.strip().split(' ')[0]: int(line.strip().split(' ')[1]) for line in f}
+def load_sense2id(dict_path='res/dictionaries/senses.txt',
+                  tags_path='res/wsd-train/semcor_tags.txt',
+                  test_tags_path='res/wsd-train/test_tags.txt'):
+    if os.path.exists(dict_path):
+        with open(dict_path) as f:
+            sense2id = {line.strip().split(' ')[0]: int(line.strip().split(' ')[1]) for line in f}
+    else:
+        sense2id = build_sense2id(dict_path, tags_path, test_tags_path)
     return sense2id
 
 
@@ -76,7 +54,7 @@ class FlatSemCorDataset(Dataset):
                  sense_dict='res/dictionaries/senses.txt'):
         with open(tags_path) as f:
             instance2senses: Dict[str, str] = {line.strip().split(' ')[0]: line.strip().split(' ')[1:] for line in f}
-        sense2id = load_sense2id(sense_dict) if os.path.exists(sense_dict) else build_sense2id(tags_path, dict_path=sense_dict)
+        sense2id = load_sense2id(sense_dict, tags_path=tags_path)
         instance2ids: Dict[str, List[int]] = {k: list(map(lambda x: sense2id[x] if x in sense2id else UNK_SENSE, v))
                                               for k, v in instance2senses.items()}
         self.num_tags = len(sense2id)
@@ -204,116 +182,11 @@ class SemCorDataLoader:
         raise NotImplementedError("Do not use base class, use concrete classes instead.")
 
 
-class ElmoSemCorLoader(SemCorDataLoader):
-    """
-    Return ELMo character ids instead of the vocab ids of the base class as input signal.
-    """
-
-    def __init__(self, dataset: SemCorDataset, batch_size: int, win_size: int, shuffle: bool = False,
-                 overlap_size: int = 0, return_all_senses: bool = False):
-        super().__init__(dataset, batch_size, win_size, shuffle, overlap_size, return_all_senses)
-
-    def __next__(self):
-        stop_iter = False
-        b_x, b_l, b_y = [], [], []
-        lengths = [len(d) for d in self.dataset.docs[self.last_doc: self.last_doc + self.batch_size]]
-        end_of_docs = self.last_offset + self.win_size >= max(lengths)
-        i = 0
-        while len(b_x) < self.batch_size:
-            if self.last_doc + i >= len(self.dataset.docs):
-                stop_iter = True
-                break
-            n = self.last_doc + i
-            m = slice(self.last_offset, self.last_offset + self.win_size)
-            text_span = self.dataset.docs[n][m]
-            labels = self.dataset.first_senses[n][m]
-            length = len(text_span)
-            # Padding
-            text_span += ['.'] * (self.win_size - len(text_span))
-            labels += [0] * (self.win_size - len(labels))
-
-            i += 1
-            if all([x == 0 for x in labels]):
-                continue  # skip batch elem if no annotation
-            b_x.append(text_span)
-            b_y.append(labels)
-            b_l.append(length)
-
-        self.last_offset += self.win_size - self.overlap_size
-        if end_of_docs:
-            self.last_doc += self.batch_size
-            self.last_offset = 0
-            if stop_iter or self.last_doc >= len(self.dataset.docs):
-                raise StopIteration
-
-        return batch_to_ids(b_x), b_l, b_y
-
-
-class ElmoLemmaPosLoader(SemCorDataLoader):
-
-    def __init__(self, dataset: SemCorDataset, batch_size: int, win_size: int, shuffle: bool = False,
-                 overlap_size: int = 0, return_all_senses: bool = False):
-        super().__init__(dataset, batch_size, win_size, shuffle, overlap_size, return_all_senses)
-
-    def __next__(self):
-        """
-        Produce one batch.
-        :return: Tuple with:
-            - elmo char ids: Tensor
-            - lemmas: List[List[str]]
-            - pos_tags: List[List[int]]
-            - lengths: List[int]
-            - labels: List[List[int]]
-        """
-        stop_iter = False
-        b_x, b_l, b_p, b_y, b_z = [], [], [], [], []
-        lengths = [len(d) for d in self.dataset.docs[self.last_doc: self.last_doc + self.batch_size]]
-        end_of_docs = self.last_offset + self.win_size >= max(lengths)
-        i = 0
-        while len(b_x) < self.batch_size:
-            if self.last_doc + i >= len(self.dataset.docs):
-                stop_iter = True
-                break
-            n = self.last_doc + i
-            m = slice(self.last_offset, self.last_offset + self.win_size)
-            text_span = self.dataset.docs[n][m]
-            labels = self.dataset.first_senses[n][m]
-            pos_tags = self.dataset.pos_tags[n][m]
-            all_labels = self.dataset.senses[n][m]
-
-            length = len(text_span)
-            # Padding
-            text_span += ['<pad>'] * (self.win_size - length)
-            labels += [0] * (self.win_size - length)
-            pos_tags += [0] * (self.win_size - length)
-            all_labels += [[0]] * (self.win_size + 2 - length)
-
-            i += 1
-            b_x.append(text_span)
-            b_y.append(torch.tensor(labels))
-            b_l.append(length)
-            b_p.append(pos_tags)
-            b_z.append(all_labels)
-
-        b_y = nn.utils.rnn.pad_sequence(b_y, batch_first=True, padding_value=0)
-        b_t = batch_to_ids(b_x)
-        b_l = torch.tensor(b_l)
-
-        self.last_offset += self.win_size - self.overlap_size
-        if end_of_docs:
-            self.last_doc += self.batch_size
-            self.last_offset = 0
-            if stop_iter or self.last_doc >= len(self.dataset.docs):
-                raise StopIteration
-
-        return b_t, b_x, b_p, b_l, b_y, b_z
-
-
 class BertLemmaPosLoader(SemCorDataLoader):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.bert_tokenizer = BertTokenizer.from_pretrained(BERT_MODEL)
+        self.bert_tokenizer = BertTokenizer.from_pretrained('bert-large-cased')
 
     def __next__(self):
         """
@@ -432,9 +305,9 @@ class FlatLoader:
 
 if __name__ == '__main__':
 
-    data_loader = SemCorDataLoader(SemCorDataset(), batch_size=4,
-                                   win_size=5, shuffle=False)
+    dataset = FlatSemCorDataset()
+    data_loader = FlatLoader(dataset, 100, 100, 'PAD')
 
-    for idx, (bx, l, by) in enumerate(data_loader):
+    for bx in enumerate(data_loader):
         print(bx)
         break
