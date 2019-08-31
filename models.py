@@ -195,7 +195,7 @@ class BertEmbeddings(nn.Module):
             bert_mask = torch.arange(max_len) \
                              .expand(token_ids.shape[0], max_len) \
                              .to(self.device) < bert_lengths.unsqueeze(1)
-            x = self.bert_embed(token_ids, attention_mask=bert_mask)[0]
+            x = self.bert_embed(token_ids.to(self.device), attention_mask=bert_mask)[0]
             batch_x = []
             for i in range(x.shape[0]):
                 s = x[i]
