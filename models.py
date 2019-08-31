@@ -127,11 +127,37 @@ class WSDTransformerEncoder(nn.Module):
 
 class LSTMEncoder(nn.Module):
 
-    def __init__(self):
+    def __init__(self,
+                 d_input,
+                 d_output,
+                 num_layers,
+                 hidden_size,
+                 batch_size):
         super().__init__()
+        self.d_input = d_input
+        self.d_output = d_output
+        self.num_layers = num_layers
+        self.hidden_size = hidden_size
+        self.batch_size = batch_size
+
+        self.lstm = nn.LSTM(self.d_input,
+                            hidden_size=self.hidden_size,
+                            num_layers=self.num_layers,
+                            bidirectional=True,
+                            batch_first=True)
+        self.attention = Attention(self.hidden_size)
+        self.output_dense = nn.Linear(self.hidden_size * 4, self.tagset_size)  # 2 directions * (state + attn)
+        self.h = torch.zeros(self.num_layers * 2, 1, self.hidden_size)
+        self.cell = torch.zeros(self.num_layers * 2, 1, self.hidden_size)
 
     def forward(self, x, mask):
-        pass
+        self.h = torch.zeros(self.num_layers * 2, len(x), self.hidden_size)
+        self.cell = torch.zeros(self.num_layers * 2, len(x), self.hidden_size)
+        hidden_states, (self.h, self.cell) = self.lstm(x, (self.h, self.cell))
+        x = self.attention(hidden_states)
+        x = x.contiguous().view(-1, x.shape[2])
+        x = self.output_dense(x)
+        return x
 
 
 class DenseEncoder(nn.Module):
@@ -144,7 +170,7 @@ class DenseEncoder(nn.Module):
         super().__init__()
         self.layers = []
 
-    def forward(self, x, mask):
+    def forward(self, x, mask=None):
         pass
 
 

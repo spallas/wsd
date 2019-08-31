@@ -4,7 +4,7 @@ from torch import nn
 from torch.nn import CrossEntropyLoss
 
 from models import Attention, ElmoEmbeddings, WSDTransformerEncoder, \
-    RobertaEmbeddings, get_transformer_mask, BertEmbeddings
+    RobertaEmbeddings, get_transformer_mask, BertEmbeddings, LSTMEncoder
 from utils.util import NOT_AMB_SYMBOL
 
 
@@ -22,9 +22,6 @@ class BaseWSD(nn.Module):
     def forward(self, *inputs):
         raise NotImplementedError("Do not use base class, use concrete classes instead.")
 
-    def init_hidden(self, batch_size):
-        return None, None
-
     def loss(self, scores, tags):
         y_true = tags.view(-1)
         scores = scores.view(-1, self.tagset_size)
@@ -34,52 +31,30 @@ class BaseWSD(nn.Module):
 class BaselineWSD(BaseWSD):
 
     def __init__(self,
+                 device,
                  num_senses,
                  max_len,
                  elmo_weights,
                  elmo_options,
                  elmo_size,
                  hidden_size,
-                 num_layers,
-                 batch_size):
-        super().__init__(num_senses, max_len, batch_size)
+                 num_layers):
+        super().__init__(device, num_senses, max_len)
         self.elmo_weights = elmo_weights
         self.elmo_options = elmo_options
         self.elmo_size = elmo_size
         self.hidden_size = hidden_size
         self.num_layers = num_layers
-        self.elmo = Elmo(self.elmo_options,
-                         self.elmo_weights,
-                         2, dropout=0)
+        self.elmo_embedding = ElmoEmbeddings(device, elmo_options,
+                                             elmo_weights, elmo_size)
         self.embedding_size = 2 * self.elmo_size
-        self.lstm = nn.LSTM(self.embedding_size,
-                            hidden_size=self.hidden_size,
-                            num_layers=self.num_layers,
-                            bidirectional=True,
-                            batch_first=True)
-        self.attention = Attention(self.hidden_size)
-        self.output_dense = nn.Linear(self.hidden_size * 4, self.tagset_size)  # 2 directions * (state + attn)
-        self.batch_size = batch_size
-        self.h, self.cell = self.init_hidden(self.batch_size)
+        self.lstm_encoder = LSTMEncoder(self.embedding_size, self.tagset_size,
+                                        self.num_layers, self.hidden_size, self.batch_size)
 
-    def init_hidden(self, batch_size):
-        self.batch_size = batch_size
-        return (torch.zeros(self.num_layers * 2, self.batch_size, self.hidden_size),  # hidden state
-                torch.zeros(self.num_layers * 2, self.batch_size, self.hidden_size))  # cell state
-
-    def forward(self, char_ids, lengths):
-
-        embeddings = self.elmo(char_ids)
-        x = embeddings['elmo_representations'][1]
-        hidden_states, (self.h, self.cell) = self.lstm(x, (self.h, self.cell))
-        out = hidden_states
-
-        y = self.attention(out)
-        y = y.contiguous().view(-1, y.shape[2])
-        y = self.output_dense(y)
-        y = nn.LogSoftmax(dim=1)(y)
-        tag_scores = y.view(-1, self.win_size, self.tagset_size)
-        return tag_scores
+    def forward(self, seq_list, lengths=None):
+        x = self.elmo_embedding(seq_list)
+        x = self.lstm_encoder(x)
+        return x
 
 
 class ElmoTransformerWSD(BaseWSD):
@@ -94,8 +69,7 @@ class ElmoTransformerWSD(BaseWSD):
                  d_model: int = 512,
                  num_heads: int = 8,
                  num_layers: int = 4):
-        super().__init__(num_senses, max_len)
-        self.device = device
+        super().__init__(device, num_senses, max_len)
         self.elmo_weights = elmo_weights
         self.elmo_options = elmo_options
         self.elmo_size = elmo_size
@@ -111,8 +85,8 @@ class ElmoTransformerWSD(BaseWSD):
                                                  self.num_layers,
                                                  self.num_heads)
 
-    def forward(self, char_ids, lengths=None):
-        x = self.elmo_embedding(char_ids)
+    def forward(self, seq_list, lengths=None):
+        x = self.elmo_embedding(seq_list)
         mask = get_transformer_mask(lengths, self.win_size, self.device)
         x = self.transformer(x, mask)
         return x

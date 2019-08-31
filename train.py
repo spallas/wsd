@@ -19,7 +19,7 @@ from data_preprocessing import FlatSemCorDataset, \
 from utils import util
 from utils.config import RobertaTransformerConfig
 from utils.util import NOT_AMB_SYMBOL
-from wsd import ElmoTransformerWSD, RobertaTransformerWSD, BertTransformerWSD
+from wsd import ElmoTransformerWSD, RobertaTransformerWSD, BertTransformerWSD, BaselineWSD
 
 warnings.filterwarnings("ignore", category=UndefinedMetricWarning)
 torch.manual_seed(42)
@@ -100,7 +100,16 @@ class BaseTrainer:
         self.model.to(self.device)
 
     def train_epoch(self, epoch_i):
-        raise NotImplementedError("Do not use base class, use concrete classes instead.")
+        step = 0
+        for step, (b_x, b_p, b_y, b_z) in enumerate(self.data_loader, self.last_step):
+            self.model.zero_grad()
+            scores = self.model(b_x)
+            loss = self.model.loss(scores, b_y.to(self.device))
+            loss.backward()
+            self._log(step, loss, epoch_i)
+            clip_grad_norm_(parameters=self.model.parameters(), max_norm=1.0)
+            self.optimizer.step()  # update the weights
+        self.last_step += step
 
     def train(self):
         self.model.train()
@@ -109,7 +118,18 @@ class BaseTrainer:
             self.train_epoch(epoch)
 
     def test(self, loader):
-        raise NotImplementedError("Do not use base class, use concrete classes instead.")
+        """
+        """
+        if not loader:
+            loader = self.test_loader
+        with torch.no_grad():
+            pred, true, z = [], [], []
+            for step, (b_x, b_p, b_y, b_z) in enumerate(loader):
+                scores = self.model(b_x)
+                true += [item for seq in b_y.tolist() for item in seq]
+                pred += [item for seq in self._select_senses(scores, None, b_x, b_p, None, b_y) for item in seq]
+                z += [item for seq in b_z for item in seq]
+            return self._get_metrics(true, pred, z)
 
     def _evaluate(self, num_epoch):
         print("\nEvaluating...", flush=True)
@@ -358,7 +378,9 @@ class TrainerLM(BaseTrainer):
 class ElmoLSTMTrainer(BaseTrainer):
 
     def _build_model(self):
-        pass
+        self.model = BaselineWSD(self.device, len(self.sense2id) + 1, self.window_size,
+                                 self.elmo_weights, self.elmo_options, self.elmo_size,
+                                 self.hidden_size, self.num_layers)
 
     def __init__(self,
                  hidden_size=1024,
@@ -376,73 +398,15 @@ class ElmoLSTMTrainer(BaseTrainer):
         self.hidden_size = hidden_size
         super().__init__(**kwargs)
 
-    def train_epoch(self, epoch_i):
-        for step, (b_t, b_x, b_p, b_l, b_y, b_z) in enumerate(self.data_loader, self.last_step):
-            self.model.zero_grad()
-            self.model.h, self.model.cell = map(lambda x: x.to(self.device),
-                                                self.model.init_hidden(len(b_y)))
-            scores = self.model(b_t.to(self.device), b_l.to(self.device))
-            loss = self.model.loss(scores, b_y.to(self.device))
-            loss.backward()
-
-            if step % self.log_interval == 0:
-                print(f'\rLoss: {loss.item():.4f} ', end='')
-                self._plot('Train loss', loss.item(), step)
-                self._gpu_mem_info()
-                f1 = self._evaluate(epoch_i)
-                self._maybe_checkpoint(loss, f1, epoch_i)
-                self._plot('Dev F1', f1, step)
-                self.model.train()  # return to train mode after evaluation
-
-            clip_grad_norm_(parameters=self.model.parameters(), max_norm=1.0)
-            self.optimizer.step()  # update the weights
-        self.last_step += step
-
-    def test(self, loader=None):
-        """
-        Evaluate on test dataset.
-        """
-        if not loader:
-            loader = self.test_loader
-        with torch.no_grad():
-            pred, true, z = [], [], []
-            for step, (b_t, b_x, b_p, b_l, b_y, b_z) in enumerate(loader):
-                self.model.h, self.model.cell = map(lambda x: x.to(self.device),
-                                                    self.model.init_hidden(len(b_y)))
-                scores = self.model(b_t.to(self.device), b_l.to(self.device))
-                pred += self._select_senses(scores, b_t, b_x, b_p, b_l, b_y)
-                true += b_y.tolist()
-                z += b_z
-            true_flat, pred_flat, z_flat = [item for sublist in true for item in sublist], \
-                                           [item for sublist in pred for item in sublist], \
-                                           [item for sublist in z for item in sublist]
-            true_eval, pred_eval = [], []
-            for i in range(len(true_flat)):
-                if true_flat[i] == 0:
-                    continue
-                else:
-                    if pred_flat[i] in z_flat[i]:
-                        true_eval.append(pred_flat[i])
-                    else:
-                        true_eval.append(true_flat[i])
-                    pred_eval.append(pred_flat[i])
-            f1 = self._print_metrics(true_eval, pred_eval)
-        return f1
-
 
 class ElmoTransformerTrainer(BaseTrainer):
-
-    def _build_model(self):
-        self.model = ElmoTransformerWSD(self.device, len(self.sense2id) + 1, self.window_size, self.elmo_weights,
-                                        self.elmo_options, self.elmo_size, self.d_model,
-                                        self.num_heads, self.num_layers)
 
     def __init__(self,
                  num_layers=2,
                  elmo_weights='res/elmo/elmo_2x1024_128_2048cnn_1xhighway_weights.hdf5',
                  elmo_options='res/elmo/elmo_2x1024_128_2048cnn_1xhighway_options.json',
                  elmo_size=128,
-                 d_model=2048,
+                 d_model=512,
                  num_heads=4,
                  **kwargs):
         self.elmo_weights = elmo_weights
@@ -453,43 +417,10 @@ class ElmoTransformerTrainer(BaseTrainer):
         self.num_heads = num_heads
         super().__init__(**kwargs)
 
-    def train_epoch(self, epoch_i):
-        for step, (b_x, b_p, b_y, b_z) in enumerate(self.data_loader, self.last_step):
-            self.model.zero_grad()
-            scores = self.model(b_x)
-            loss = self.model.loss(scores, b_y.to(self.device))
-            loss.backward()
-            self._log(step, loss, epoch_i)
-            clip_grad_norm_(parameters=self.model.parameters(), max_norm=1.0)
-            self.optimizer.step()  # update the weights
-        self.last_step += step
-
-    def test(self, loader=None):
-        """
-        Evaluate on test dataset.
-        """
-        if not loader:
-            loader = self.test_loader
-        with torch.no_grad():
-            pred, true, z = [], [], []
-            for step, (b_x, b_p, b_y, b_z) in enumerate(loader):
-                scores = self.model(b_x)
-                pred += [item for seq in self._select_senses(scores, None, b_x, b_p, None, b_y) for item in seq]
-                true += [item for seq in b_y.tolist() for item in seq]
-                z += [item for seq in b_z for item in seq]
-
-            true_eval, pred_eval = [], []
-            for i in range(len(true)):
-                if true[i] == NOT_AMB_SYMBOL:
-                    continue
-                else:
-                    if pred[i] in z[i]:
-                        true_eval.append(pred[i])
-                    else:
-                        true_eval.append(true[i])
-                    pred_eval.append(pred[i])
-            f1 = self._print_metrics(true_eval, pred_eval)
-        return f1
+    def _build_model(self):
+        self.model = ElmoTransformerWSD(self.device, len(self.sense2id) + 1, self.window_size, self.elmo_weights,
+                                        self.elmo_options, self.elmo_size, self.d_model,
+                                        self.num_heads, self.num_layers)
 
 
 class RobertaDenseTrainer(BaseTrainer):
@@ -525,34 +456,6 @@ class RobertaTrainer(BaseTrainer):
                                            self.model_path, self.d_embeddings, self.d_model,
                                            self.num_heads, self.num_layers)
 
-    def train_epoch(self, epoch_i):
-        """
-        """
-        for step, (b_x, b_p, b_y, b_z) in enumerate(self.data_loader, self.last_step):
-            self.model.zero_grad()
-            scores = self.model(b_x)
-            loss = self.model.loss(scores, b_y.to(self.device))
-            loss.backward()
-            self._log(step, loss, epoch_i)
-            clip_grad_norm_(parameters=self.model.parameters(), max_norm=1.0)
-            self.optimizer.step()  # update the weights
-        self.last_step += step
-
-    def test(self, loader=None):
-        """
-        Evaluate on test dataset.
-        """
-        if not loader:
-            loader = self.test_loader
-        with torch.no_grad():
-            pred, true, z = [], [], []
-            for step, (b_x, b_p, b_y, b_z) in enumerate(loader):
-                scores = self.model(b_x)
-                true += [item for seq in b_y.tolist() for item in seq]
-                pred += [item for seq in self._select_senses(scores, None, b_x, b_p, None, b_y) for item in seq]
-                z += [item for seq in b_z for item in seq]
-            return self._get_metrics(true, pred, z)
-
 
 class BertTransformerTrainer(BaseTrainer):
 
@@ -572,34 +475,6 @@ class BertTransformerTrainer(BaseTrainer):
         self.model = BertTransformerWSD(self.device, len(self.sense2id) + 1, self.window_size,
                                         self.d_model, self.num_heads, self.num_layers,
                                         self.bert_model)
-
-    def train_epoch(self, epoch_i):
-        """
-        """
-        for step, (b_x, b_p, b_y, b_z) in enumerate(self.data_loader, self.last_step):
-            self.model.zero_grad()
-            scores = self.model(b_x)
-            loss = self.model.loss(scores, b_y.to(self.device))
-            loss.backward()
-            self._log(step, loss, epoch_i)
-            clip_grad_norm_(parameters=self.model.parameters(), max_norm=1.0)
-            self.optimizer.step()  # update the weights
-        self.last_step += step
-
-    def test(self, loader):
-        """
-        Evaluate on test dataset.
-        """
-        if not loader:
-            loader = self.test_loader
-        with torch.no_grad():
-            pred, true, z = [], [], []
-            for step, (b_x, b_p, b_y, b_z) in enumerate(loader):
-                scores = self.model(b_x)
-                true += [item for seq in b_y.tolist() for item in seq]
-                pred += [item for seq in self._select_senses(scores, None, b_x, b_p, None, b_y) for item in seq]
-                z += [item for seq in b_z for item in seq]
-            return self._get_metrics(true, pred, z)
 
 
 if __name__ == '__main__':
