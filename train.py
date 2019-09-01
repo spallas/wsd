@@ -117,7 +117,7 @@ class BaseTrainer:
             print(f'\nEpoch: {epoch}')
             self.train_epoch(epoch)
 
-    def test(self, loader):
+    def test(self, loader=None):
         """
         """
         if not loader:
