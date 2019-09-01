@@ -371,7 +371,7 @@ class TrainerLM(BaseTrainer):
     def train_epoch(self, epoch_i):
         pass
 
-    def test(self, loader):
+    def test(self, loader=None):
         pass
 
 
@@ -431,7 +431,7 @@ class RobertaDenseTrainer(BaseTrainer):
     def train_epoch(self, epoch_i):
         pass
 
-    def test(self, loader):
+    def test(self, loader=None):
         pass
 
 
@@ -483,6 +483,6 @@ if __name__ == '__main__':
     parser.add_argument("-m", "--model", type=str, help="model name", required=True)
     parser.add_argument("-c", "--config", type=str, help="config JSON file", required=True)
 
-    c = RobertaTransformerConfig.from_json_file('conf/roberta_tr_conf.json')
+    c = RobertaTransformerConfig.from_json_file('conf/roberta_tr_conf_2.json')
     t = RobertaTrainer(**c.__dict__)
     t.train()

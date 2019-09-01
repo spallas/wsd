@@ -1,0 +1,19 @@
+{
+  "num_epochs": 30,
+  "batch_size": 128,
+  "checkpoint_path": "saved_weights/roberta_tr_checkpoint.pt",
+  "log_interval": 90,
+  "train_data":"res/wsd-train/semcor_data.xml",
+  "train_tags":"res/wsd-train/semcor_tags.txt",
+  "eval_data" :"res/wsd-test/se07/se07.xml",
+  "eval_tags" :"res/wsd-test/se07/se07.txt",
+  "test_data" :"res/wsd-train/test_data.xml",
+  "test_tags" :"res/wsd-train/test_tags.txt",
+  "report_path": "logs/roberta_tr_report.txt",
+  "num_layers": 4,
+  "num_heads": 8,
+  "d_model": 1024,
+  "learning_rate": 0.0001,
+  "window_size": 32,
+  "model_path": "res/roberta.large"
+}
