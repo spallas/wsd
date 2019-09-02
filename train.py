@@ -368,12 +368,6 @@ class TrainerLM(BaseTrainer):
     def _build_model(self):
         pass
 
-    def train_epoch(self, epoch_i):
-        pass
-
-    def test(self, loader=None):
-        pass
-
 
 class ElmoLSTMTrainer(BaseTrainer):
 
@@ -425,13 +419,10 @@ class ElmoTransformerTrainer(BaseTrainer):
 
 class RobertaDenseTrainer(BaseTrainer):
 
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+
     def _build_model(self):
-        pass
-
-    def train_epoch(self, epoch_i):
-        pass
-
-    def test(self, loader=None):
         pass
 
 
