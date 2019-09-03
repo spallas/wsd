@@ -27,9 +27,9 @@ def build_sense2id(dict_path='res/dictionaries/senses.txt',
             senses_set.update(line.strip().split(' ')[1:])
         for line in ff:
             senses_set.update(line.strip().split(' ')[1:])
-
+    senses_list = list(sorted(senses_set))
     with open(dict_path, 'w') as f:
-        for i, w in enumerate(senses_set, start=1):
+        for i, w in enumerate(senses_list, start=1):
             sense2id[w] = i
             print(f"{w} {i}", file=f)
     return sense2id
@@ -72,7 +72,7 @@ class FlatSemCorDataset(Dataset):
                     word_senses = instance2ids[word.attrib['id']] if word.tag == 'instance' else [NOT_AMB_SYMBOL]
                     self.all_senses.append(word_senses)
                     self.first_senses.append(word_senses[0])
-                    self.train_sense_map.setdefault(lemma, []).extend(word_senses)
+                    self.train_sense_map.setdefault(lemma, Counter()).update(word_senses)
 
     def __len__(self):
         return len(self.dataset_lemmas)

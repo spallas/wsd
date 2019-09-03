@@ -13,6 +13,6 @@
   "num_layers": 6,
   "num_heads": 4,
   "learning_rate": 0.0001,
-  "window_size": 32,
+  "window_size": 64,
   "model_path": "res/roberta.large"
 }

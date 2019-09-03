@@ -46,37 +46,6 @@ class ElmoConfig(Config):
 
 @dataclass_json
 @dataclass
-class TransformerConfig(Config):
-
-    checkpoint_path: str = 'saved_weights/transformer_wsd_checkpoint.pt'
-    report_path: str = 'logs/transformer_wsd_report.txt'
-
-    learning_rate: float = 0.0001
-    num_layers: int = 6
-
-    pos_embed_dim = 32
-    num_heads = 8
-    encoder_embed_dim = 768 + 32
-    d_model = 512
-    encoder_attention_heads = 8
-    attention_dropout = 0.5
-    dropout = 0.5
-    encoder_normalize_before = True
-    encoder_ffn_embed_dim = 512
-
-    activation_fn: str = 'gelu_accurate'
-    activation_dropout: float = 0.1
-    bert_trainable: bool = False
-    subword_aggregation_mode: str = 'mean'  # or 'first'
-
-    @staticmethod
-    def from_json_file(file_name, **kwargs):
-        with open(file_name) as f:
-            return TransformerConfig.from_json(f.read(), **kwargs)
-
-
-@dataclass_json
-@dataclass
 class BertTransformerConfig(Config):
 
     checkpoint_path: str = 'saved_weights/bert_wsd_checkpoint.pt'

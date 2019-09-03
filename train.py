@@ -127,7 +127,7 @@ class BaseTrainer:
             for step, (b_x, b_p, b_y, b_z) in enumerate(loader):
                 scores = self.model(b_x)
                 true += [item for seq in b_y.tolist() for item in seq]
-                pred += [item for seq in self._select_senses(scores, None, b_x, b_p, None, b_y) for item in seq]
+                pred += [item for seq in self._select_senses(scores, b_x, b_p, b_y) for item in seq]
                 z += [item for seq in b_z for item in seq]
             return self._get_metrics(true, pred, z)
 
@@ -138,7 +138,7 @@ class BaseTrainer:
         self._save_best(f1, num_epoch)
         return f1
 
-    def _select_senses(self, b_scores, b_vec, b_str, b_pos, b_lengths, b_labels):
+    def _select_senses(self, b_scores, b_str, b_pos, b_labels):
         """
         Get the max of scores only of possible senses for a given lemma+pos
         :param b_scores: shape = (batch_s x win_s x sense_vocab_s)
@@ -158,7 +158,10 @@ class BaseTrainer:
         for i, sent in enumerate(b_str):
             impossible_senses = []
             for j, lemma in enumerate(sent):
-                sense_ids = to_ids(wn.synsets(lemma, pos=util.id2wnpos[b_pos[i][j]]))
+                if b_labels[i, j] == NOT_AMB_SYMBOL:
+                    sense_ids = set()
+                else:
+                    sense_ids = to_ids(wn.synsets(lemma, pos=util.id2wnpos[b_pos[i][j]]))
                 # if lemma in self.train_sense_map:
                 #     sense_ids &= set(self.train_sense_map[lemma])
                 padded = set2padded(set(range(b_scores.shape[-1])) - sense_ids)
