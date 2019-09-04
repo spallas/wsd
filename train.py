@@ -271,19 +271,17 @@ class TrainerLM(BaseTrainer):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         # Load BERT
-        self.bert_tokenizer = BertTokenizer.from_pretrained('bert-base-uncased', do_lower_case=False)
+        self.bert_tokenizer = BertTokenizer.from_pretrained('bert-base-uncased', do_lower_case=True)
         self.language_model = BertForMaskedLM.from_pretrained('bert-base-uncased')
         self.language_model.eval()
         self.all_syn_lemmas = {}
 
-    def _select_senses(self, b_scores, b_vec, b_str, b_pos, b_lengths, b_labels):
+    def _select_senses(self, b_scores, b_str, b_pos, b_labels):
         """
         Use Language model to get a second score and use geometric mean on scores.
         :param b_scores: shape = (batch_s x win_s x sense_vocab_s)
-        :param b_vec:
         :param b_str:
         :param b_pos:
-        :param b_lengths:
         :return:
         """
         def to_ids(synsets):
@@ -319,52 +317,40 @@ class TrainerLM(BaseTrainer):
         for i, sent in enumerate(b_str):
             for k, w in enumerate(sent):
                 if b_labels[i][k] != NOT_AMB_SYMBOL:  # i.e. sense tagged word
-                    if sent[0] != '[CLS]':
-                        text = ['[CLS]'] + sent + ['[SEP]']
-                        kk = k
-                        k = k + 1
-                    else:
-                        text = [] + sent
-                    text[k] = '[MASK]'
-                    tokenized_text = []
-                    for ww in text:
-                        tokenized_text += self.bert_tokenizer.tokenize(ww)
-                    masked_index = tokenized_text.index('[MASK]')
-                    indexed_tokens = self.bert_tokenizer.convert_tokens_to_ids(tokenized_text)
-                    tokens_tensor = torch.tensor([indexed_tokens])
+                    if len(wn.synsets(w, pos=util.id2wnpos[b_pos[i][k]])) == 1:
+                        continue
+                    k_bert = k + 1
+                    text = ['[CLS]'] + sent + ['[SEP]']
+                    text[k_bert] = '[MASK]'
+                    tokens_tensor = torch.tensor([self.bert_tokenizer.encode(' '.join(text))])
+                    masked_index = (tokens_tensor.squeeze() == 103).nonzero().squeeze().item()  # [MASK] index is 103
+                    # Run LM
                     outputs = self.language_model(tokens_tensor)
-                    predictions = outputs[0]
-                    probabilities = torch.nn.Softmax(dim=0)(predictions[0, masked_index])
+                    predictions = outputs[0][0, masked_index]
+                    predictions = torch.nn.Softmax(dim=0)(predictions)
 
-                    lm_ids, lm_scores = [], []
-                    net_score = {}
-                    for S in wn.synsets(w, pos=util.id2wnpos[b_pos[i][kk]]):
-                        if S.name() not in self.sense2id:
-                            continue
-                        if len(wn.synsets(w, pos=util.id2wnpos[b_pos[i][kk]])) == 1:
-                            continue
+                    lm_ids, lm_scores, net_score = [], [], {}
+                    possible_synsets = [s for s in wn.synsets(w, pos=util.id2wnpos[b_pos[i][k]]) if s.name() in self.sense2id]
+                    for S in possible_synsets:
                         s_id = self.sense2id[S.name()]
                         if S not in self.all_syn_lemmas:
                             self.all_syn_lemmas[S] = get_lemmas(S)
-                        syn_tok_ids = []
-                        for lemma in self.all_syn_lemmas[S]:
-                            tokenized = self.bert_tokenizer.tokenize(lemma)
-                            tok_ids = self.bert_tokenizer.convert_tokens_to_ids(tokenized)
-                            syn_tok_ids += tok_ids
-                        top_k = torch.topk(probabilities[syn_tok_ids, ], k=10)[0].tolist() \
-                            if len(syn_tok_ids) > 10 else probabilities[syn_tok_ids, ].tolist()
+                        syn_tok_ids = [tok_id for l in self.all_syn_lemmas[S]
+                                                  for tok_id in self.bert_tokenizer.encode(l)]
+                        top_k = torch.topk(predictions[syn_tok_ids, ], k=10)[0].tolist() \
+                            if len(syn_tok_ids) > 10 else predictions[syn_tok_ids, ].tolist()
                         s_score = sum(top_k)
                         lm_ids.append(s_id)
                         lm_scores.append(s_score)
-                        net_score[s_id] = b_scores[i, kk, s_id]
+                        net_score[s_id] = b_scores[i, k, s_id]
                     if not lm_scores:
                         continue
-                    lm_score = {k: v for k, v in zip(lm_ids, softmax(lm_scores))}
+                    lm_score = dict(zip(lm_ids, softmax(lm_scores)))
                     for s_id in lm_score:
                         if w in self.train_sense_map:
-                            b_scores[i, kk, s_id] = (net_score[s_id] * lm_score[s_id]) ** 0.5
+                            b_scores[i, k, s_id] = (net_score[s_id] * lm_score[s_id]) ** 0.5
                         else:
-                            b_scores[i, kk, s_id] = lm_score[s_id]
+                            b_scores[i, k, s_id] = lm_score[s_id]
 
         return np.argmax(b_scores, -1).tolist()
 

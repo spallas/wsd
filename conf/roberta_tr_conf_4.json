@@ -1,6 +1,6 @@
 {
   "num_epochs": 20,
-  "batch_size": 128,
+  "batch_size": 100,
   "checkpoint_path": "saved_weights/roberta_tr_checkpoint.pt",
   "log_interval": 300,
   "train_data":"res/wsd-train/semcor+glosses_data.xml",
@@ -13,6 +13,6 @@
   "num_layers": 6,
   "num_heads": 4,
   "learning_rate": 0.0001,
-  "window_size": 64,
+  "window_size": 50,
   "model_path": "res/roberta.large"
 }

@@ -2,12 +2,12 @@ import torch
 from fairseq.models.roberta import alignment_utils
 
 from data_preprocessing import FlatLoader, FlatSemCorDataset, load_sense2id
-from train import RobertaTrainer
+from train import RobertaTrainer, TrainerLM
 from utils.config import RobertaTransformerConfig
 from nltk.corpus import wordnet as wn
 
 
-class RobertaTest(RobertaTrainer):
+class RobertaTest(RobertaTrainer, TrainerLM):
 
     def test(self, loader=None):
         dataset = FlatSemCorDataset('res/wsd-test/se07/se07.xml', 'res/wsd-test/se07/se07.txt')
