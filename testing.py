@@ -2,7 +2,9 @@ import torch
 from fairseq.models.roberta import alignment_utils
 
 from data_preprocessing import FlatLoader, FlatSemCorDataset, load_sense2id
-from train import RobertaTrainer, TrainerLM
+from sim_server import SimilarityServer
+from train import RobertaTrainer
+from trainer_lm import TrainerLM
 from utils.config import RobertaTransformerConfig
 from nltk.corpus import wordnet as wn
 
@@ -10,9 +12,12 @@ from nltk.corpus import wordnet as wn
 class RobertaTest(RobertaTrainer, TrainerLM):
 
     def test(self, loader=None):
-        dataset = FlatSemCorDataset('res/wsd-test/se07/se07.xml', 'res/wsd-test/se07/se07.txt')
-        loader = FlatLoader(dataset, 10, 100, 'PAD')
+        dataset = FlatSemCorDataset('res/wsd-train/test_data.xml', 'res/wsd-train/test_tags.txt')
+        loader = FlatLoader(dataset, 100, 50, 'PAD')
         id2sense = {v: k for k, v in self.sense2id.items()}
+        # sim_server = SimilarityServer()
+        fs = open('logs/test-similar.txt', 'w')
+        fn = open('logs/test-dissimilar.txt', 'w')
         with torch.no_grad():
             pred, true, z, lemmas = [], [], [], []
             for step, (b_x, b_p, b_y, b_z) in enumerate(loader):
@@ -24,7 +29,8 @@ class RobertaTest(RobertaTrainer, TrainerLM):
                 never_seen = 0
                 tot_err = 0
                 not_in_train = 0
-                for l, t, p, zz in zip(lemmas, true, pred, z):
+                t_is_better = 0
+                for l, t, p, zz, i in zip(lemmas, true, pred, z, range(len(lemmas))):
                     t_key = id2sense.get(t, '_')
                     p_key = id2sense.get(p, '_')
                     z_keys = [id2sense.get(i, '_') for i in zz]
@@ -33,29 +39,45 @@ class RobertaTest(RobertaTrainer, TrainerLM):
                         p_syn = wn.synset(p_key)
                         train_senses = [id2sense.get(s, s) for s in self.train_sense_map.get(l, [])]
                         count_senses = [(id2sense.get(s, s), self.train_sense_map.get(l, {}).get(s, 0)) for s in self.train_sense_map.get(l, [])]
+                        # sim_server.set_context(t_syn.definition())
+                        # tp_similarity = sim_server.similarity(p_syn.definition())
+                        # context = ' '.join(lemmas[max(0, i-25):min(len(lemmas), i+25)])
+                        # sim_server.set_context(context)
+                        # cp_similarity = sim_server.similarity(p_syn.definition())
+                        # ct_similarity = sim_server.similarity(t_syn.definition())
+                        # f = fs if tp_similarity > 0.5 else fn
+                        f = fs
                         print(f"{l}\t{t_key}: {t_syn.lemma_names()}: {t_syn.definition()}\n"
                               f"\t\t\t{p_key}: {p_syn.lemma_names()}: {p_syn.definition()}\t{z_keys}\n"
-                              f"\t\t\t{count_senses}")
+                              f"\t\t\t{count_senses}\n"
+                              # f"\t\t\t{tp_similarity:.3f}\n"
+                              # f"\t\t\t{cp_similarity:.3f}\n"
+                              # f"\t\t\t{ct_similarity:.3f}"
+                              , file=f)
                         if l not in self.train_sense_map:
-                            print("NOT IN TRAINING\n")
+                            print("NOT IN TRAINING\n", file=f)
                             not_in_train += 1
                         if t_syn.name() not in train_senses:
-                            print("SENSE NEVER SEEN\n")
+                            print("SENSE NEVER SEEN\n", file=f)
                             never_seen += 1
+                        # t_is_better += 1 if ct_similarity > cp_similarity else 0
                         tot_err += 1
                     else:
                         pass
                         # print(f"{l}")
-                if step == 5:
-                    break
+                # if step == 5:
+                #     break
+            f.close()
             print(f"total errors: {tot_err}\n"
                   f"errors with senses never seen: {never_seen} ({(never_seen/tot_err)*100:.2f} %)\n"
-                  f"errors for lemmas not seen in training: {not_in_train} ({(not_in_train/tot_err)*100:.2f} %)")
+                  f"errors for lemmas not seen in training: {not_in_train} ({(not_in_train/tot_err)*100:.2f} %)\n"
+                  # f"true is better: {t_is_better} times ({(t_is_better/tot_err)*100:.3f} %)"
+                  )
             return self._get_metrics(true, pred, z)
 
 
 def test0():
-    c = RobertaTransformerConfig.from_json_file('conf/roberta_tr_conf_1.json')
+    c = RobertaTransformerConfig.from_json_file('conf/roberta_tr_conf_4.json')
     cd = c.__dict__
     cd['is_training'] = False
     t = RobertaTrainer(**cd)
@@ -63,7 +85,7 @@ def test0():
 
 
 def test1():
-    c = RobertaTransformerConfig.from_json_file('conf/roberta_tr_conf_1.json')
+    c = RobertaTransformerConfig.from_json_file('conf/roberta_tr_conf_4.json')
     cd = c.__dict__
     cd['is_training'] = False
     t = RobertaTest(**cd)

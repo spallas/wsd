@@ -1,9 +1,6 @@
-import torch
-from allennlp.modules.elmo import Elmo
 from torch import nn
-from torch.nn import CrossEntropyLoss
 
-from models import Attention, ElmoEmbeddings, WSDTransformerEncoder, \
+from models import ElmoEmbeddings, WSDTransformerEncoder, \
     RobertaEmbeddings, get_transformer_mask, BertEmbeddings, LSTMEncoder
 from utils.util import NOT_AMB_SYMBOL
 
@@ -17,7 +14,7 @@ class BaseWSD(nn.Module):
         self.tagset_size = num_senses
         self.win_size = max_len
         self.batch_size = batch_size
-        self.ce_loss = CrossEntropyLoss(ignore_index=NOT_AMB_SYMBOL)
+        self.ce_loss = nn.CrossEntropyLoss(ignore_index=NOT_AMB_SYMBOL)
 
     def forward(self, *inputs):
         raise NotImplementedError("Do not use base class, use concrete classes instead.")
@@ -112,6 +109,28 @@ class RobertaTransformerWSD(BaseWSD):
         self.transformer = WSDTransformerEncoder(self.d_embedding, self.d_model,
                                                  self.tagset_size, self.num_layers,
                                                  self.num_heads)
+
+    def forward(self, seq_list, lengths=None):
+        x = self.embedding(seq_list)
+        mask = get_transformer_mask(lengths, self.win_size, self.device)
+        x = self.transformer(x, mask)
+        return x
+
+
+class RobertaTransformerLM(RobertaTransformerWSD):
+
+    def __init__(self,
+                 device,
+                 num_senses,
+                 max_len,
+                 model_path,
+                 d_embedding: int = 1024,
+                 d_model: int = 512,
+                 num_heads: int = 8,
+                 num_layers: int = 4):
+        super().__init__(device, num_senses, max_len, model_path,
+                         d_embedding, d_model, num_heads, num_layers)
+        lm = None
 
     def forward(self, seq_list, lengths=None):
         x = self.embedding(seq_list)
