@@ -118,16 +118,15 @@ class MWEVocabExt:
     def __init__(self,
                  device,
                  saved_model_path,
-                 train_text=None):
-        if not os.path.exists(saved_model_path):
+                 train_text=None,
+                 is_training=True):
+        if is_training:
             self.device = device
             self.num_epochs = 10
             self.batch_size = 64
             self.learning_rate = 0.0001
             self.log_interval = 100
             self.checkpoint_path = saved_model_path
-            # with open('res/dictionaries/vocab_large.txt') as f:
-            #     self.wn_vocab = {w.strip(): i for i, w in enumerate(f.readlines())}
             self.train_text = train_text
             self.train_loader = MWETrainLoader(train_text, self.batch_size)
 
@@ -136,9 +135,9 @@ class MWEVocabExt:
             self.optimizer = optim.Adam(self.map_model.parameters(), lr=self.learning_rate)
             self._maybe_load_checkpoint()
         else:
-            self.saved_model_path = saved_model_path
-            with open(saved_model_path, 'rb') as f:
-                pass
+            self.checkpoint_path = saved_model_path
+            self.map_model = WVMapModel()
+            self._load_best()
 
     def train(self):
         for epoch in range(self.num_epochs):
