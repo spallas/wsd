@@ -122,7 +122,7 @@ class MWEVocabExt:
         if not os.path.exists(saved_model_path):
             self.device = device
             self.num_epochs = 10
-            self.batch_size = 4
+            self.batch_size = 64
             self.learning_rate = 0.0001
             self.log_interval = 100
             self.checkpoint_path = saved_model_path
