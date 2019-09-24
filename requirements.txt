@@ -11,3 +11,8 @@ future
 pillow
 dataclasses-json
 cython
+tensorflow
+tensorflow-hub
+sentencepiece
+tf-sentencepiece
+fasttext
