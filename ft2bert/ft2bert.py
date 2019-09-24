@@ -117,17 +117,17 @@ class MWEVocabExt:
 
     def __init__(self,
                  device,
-                 train_text=None,
-                 saved_model_path=None):
-        if saved_model_path is None:
+                 saved_model_path,
+                 train_text=None):
+        if not os.path.exists(saved_model_path):
             self.device = device
             self.num_epochs = 10
             self.batch_size = 4
             self.learning_rate = 0.0001
             self.log_interval = 100
-            self.checkpoint_path = saved_model_path + '.ckpt'
-            with open('res/dictionaries/vocab_large.txt') as f:
-                self.wn_vocab = {w.strip(): i for i, w in enumerate(f.readlines())}
+            self.checkpoint_path = saved_model_path
+            # with open('res/dictionaries/vocab_large.txt') as f:
+            #     self.wn_vocab = {w.strip(): i for i, w in enumerate(f.readlines())}
             self.train_text = train_text
             self.train_loader = MWETrainLoader(train_text, self.batch_size)
 
@@ -172,7 +172,6 @@ class MWEVocabExt:
                 'optimizer_state_dict': self.optimizer.state_dict(),
                 'min_loss': min_loss
             }, self.checkpoint_path)
-            torch.save({'model_state_dict': self.map_model.state_dict()})
 
     def _maybe_load_checkpoint(self):
         if os.path.exists(self.checkpoint_path):
@@ -209,6 +208,6 @@ if __name__ == '__main__':
     # print(cos_sim(vvv, v4))
     # print(cos_sim(v, v4))
 
-    t = MWEVocabExt('cpu', 'data/bert_examples.txt')
+    t = MWEVocabExt('cpu', 'logs/ft2bert.pth', 'data/bert_examples.txt')
     t.train()
 
