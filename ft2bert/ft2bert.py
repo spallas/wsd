@@ -69,13 +69,12 @@ class MWETrainLoader:
     def __init__(self,
                  train_dataset,
                  batch_size,
-                 ft_path='res/fasttext-vectors/cc.en.300.bin'):
+                 ft_model):
         """
         :param train_dataset: path to file of format: line: int \t List[str]
         """
         self.dataset_path = train_dataset
-        self.ft_model = fasttext.load_model(ft_path)
-        print("Loaded Fasttext vectors.", flush=True)
+        self.ft_model = ft_model
         self.bert_embed = BertEmbedder()
         self.bert_tok = self.bert_embed.tok
         self.data = []
@@ -99,6 +98,9 @@ class MWETrainLoader:
         b_y, b_i, b_x = [], [], []
         with torch.no_grad():
             for i in range(self.batch_size):
+                if self.offset + i >= len(self.data):
+                    self.stop_flag = True
+                    break
                 j, sent = self.data[self.offset + i]
                 ids = self.bert_tok.convert_tokens_to_ids(sent)
                 b_y.append(torch.tensor(ids))
@@ -119,7 +121,9 @@ class MWEVocabExt:
                  device,
                  saved_model_path,
                  train_text=None,
-                 is_training=True):
+                 is_training=True,
+                 ft_path='res/fasttext-vectors/cc.en.300.bin'):
+        self.ft_model = fasttext.load_model(ft_path)
         if is_training:
             self.device = device
             self.num_epochs = 10
@@ -141,6 +145,7 @@ class MWEVocabExt:
 
     def train(self):
         for epoch in range(self.num_epochs):
+            print(f"Epoch: {epoch}")
             for step, (b_x, b_y) in enumerate(self.train_loader):
                 loss, _ = self.map_model(b_x, b_y)
                 self._log(step, loss, epoch)
@@ -188,8 +193,26 @@ class MWEVocabExt:
             self.last_step = 0
             self.min_loss = 1e3
 
-    def get_mwe_embedding_matrix(self):
-        pass
+    def get_mwe_embedding_matrix(self, vocab: List[str]):
+        """
+        Get fastext vector for each string in vocab.
+        Transform vectors with current model and return.
+        :param vocab:
+        :return:
+        """
+        mwe_ft_vectors = []
+        for w in vocab:
+            w = w.replace('_', ' ')
+            vec = self.ft_model.get_sentence_vector(w)
+            mwe_ft_vectors.append(vec)
+        mwe_ft_matrix = torch.stack(mwe_ft_vectors)
+        bert_vectors = []
+        batch_size = 128
+        for i in range(0, mwe_ft_matrix.shape[0], batch_size):
+            bert_vec = self.map_model(mwe_ft_matrix[i:batch_size, :])
+            bert_vectors.append(bert_vec)
+        mwe_bert_matrix = torch.stack(bert_vectors)
+        return mwe_bert_matrix
 
 
 if __name__ == '__main__':
@@ -207,6 +230,6 @@ if __name__ == '__main__':
     # print(cos_sim(vvv, v4))
     # print(cos_sim(v, v4))
 
-    t = MWEVocabExt('cpu', 'logs/ft2bert.pth', 'data/bert_examples.txt')
+    t = MWEVocabExt('cpu', 'saved_weights/ft2bert.pth', 'data/bert_examples.txt')
     t.train()
 
