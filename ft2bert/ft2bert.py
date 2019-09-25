@@ -132,8 +132,7 @@ class MWEVocabExt:
             self.log_interval = 100
             self.checkpoint_path = saved_model_path
             self.train_text = train_text
-            self.train_loader = MWETrainLoader(train_text, self.batch_size)
-
+            self.train_loader = MWETrainLoader(train_text, self.batch_size, self.ft_model)
             self.bert_embed = BertEmbedder()
             self.map_model = WVMapModel()
             self.optimizer = optim.Adam(self.map_model.parameters(), lr=self.learning_rate)

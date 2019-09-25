@@ -8,6 +8,7 @@ from nltk.corpus import wordnet as wn
 from pytorch_transformers import BertTokenizer, BertForMaskedLM
 from scipy.special import softmax
 
+from ft2bert.ft2bert import MWEVocabExt
 from train import BaseTrainer
 from utils import util
 from utils.util import NOT_AMB_SYMBOL
@@ -77,11 +78,15 @@ class BertForMLMExt(BertForMaskedLM):
 
 class MaskedLMWrapper:
 
-    def __init__(self):
+    def __init__(self, device, mwe_vocab):
+        self.device = device
+        self.mwe_vocab = mwe_vocab
         with torch.no_grad():
             self.bert_tokenizer = BertTokenizer.from_pretrained('bert-base-cased', do_lower_case=False)
-            self.language_model = BertForMaskedLM.from_pretrained('bert-base-cased')
+            self.language_model = BertForMaskedLM.from_pretrained('bert-base-cased', output_hidden_states=True)
             self.language_model.eval()
+            mwe_model = MWEVocabExt(self.device, 'saved_weights/ft2bert.pth', is_training=False)
+            self.mwe_embed_matrix = mwe_model.get_mwe_embedding_matrix(self.mwe_vocab)
 
     def predict_masks(self,
                       masked_sent_list: List[List[str]],
@@ -93,6 +98,10 @@ class MaskedLMWrapper:
         encoded_sent_list, mask_map = sub_tokenize_and_map(self.bert_tokenizer, masked_sent_list)
         outputs_ = self.language_model(torch.tensor(encoded_sent_list))
         outputs = outputs_[0]
+        hidden_states_list = outputs_[1]
+        print(len(hidden_states_list))
+        for hs in hidden_states_list:
+            print(hs.shape)
         mapped_masks = []
         for i, m in enumerate(masks):
             mm = []
