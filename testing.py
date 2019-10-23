@@ -1,3 +1,6 @@
+import time
+import datetime
+
 import torch
 from fairseq.models.roberta import alignment_utils
 
@@ -93,7 +96,9 @@ def test1():
     cd = c.__dict__
     cd['is_training'] = False
     t = RobertaTrainerLM(**cd)
+    start = time.time()
     t.test()
+    print(f"Done in: {datetime.timedelta(seconds=time.time() - start)} s")
 
 
 def test2():
