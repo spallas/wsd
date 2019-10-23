@@ -15,9 +15,9 @@ from torch.utils.tensorboard import SummaryWriter
 from data_preprocessing import FlatSemCorDataset, \
     load_sense2id, FlatLoader
 from utils import util
-from utils.config import RobertaTransformerConfig
+from utils.config import RobertaTransformerConfig, WSDNetConfig
 from utils.util import NOT_AMB_SYMBOL
-from wsd import ElmoTransformerWSD, RobertaTransformerWSD, BertTransformerWSD, BaselineWSD
+from wsd import ElmoTransformerWSD, RobertaTransformerWSD, BertTransformerWSD, BaselineWSD, WSDNet
 
 warnings.filterwarnings("ignore", category=UndefinedMetricWarning)
 torch.manual_seed(42)
@@ -363,12 +363,47 @@ class BertTransformerTrainer(BaseTrainer):
                                         self.bert_model)
 
 
+class WSDNetTrainer(BaseTrainer):
+
+    def __init__(self,
+                 num_layers=2,
+                 d_embeddings=1024,
+                 d_model=2048,
+                 num_heads=4,
+                 model_path='res/roberta.large',
+                 output_vocab: str = 'res/dictionaries/syn_lemma_vocab.txt',
+                 sense_lemmas: str = 'res/dictionaries/sense_lemmas.txt',
+                 **kwargs):
+        self.num_layers = num_layers
+        self.d_model = d_model
+        self.d_embeddings = d_embeddings
+        self.num_heads = num_heads
+        self.model_path = model_path
+        self.output_vocab = output_vocab
+        self.sense_lemmas = sense_lemmas
+        super().__init__(**kwargs)
+
+    def _build_model(self):
+        self.model = WSDNet(self.device, len(self.sense2id) + 1, self.window_size,
+                            self.model_path, self.d_embeddings, self.d_model,
+                            self.num_heads, self.num_layers, self.output_vocab,
+                            self.sense_lemmas)
+
+
 if __name__ == '__main__':
 
     parser = argparse.ArgumentParser(description="Train with different models")
     parser.add_argument("-m", "--model", type=str, help="model name", required=True)
-    parser.add_argument("-c", "--config", type=str, help="config JSON file", required=True)
+    parser.add_argument("-c", "--config", type=str, help="config JSON file path", required=True)
+    args = parser.parse_args()
 
-    c = RobertaTransformerConfig.from_json_file('conf/roberta_tr_conf_2.json')
-    t = RobertaTrainer(**c.__dict__)
-    t.train()
+    if args.model == 'roberta':
+        c = RobertaTransformerConfig.from_json_file(args.config)
+        t = RobertaTrainer(**c.__dict__)
+        t.train()
+    elif args.model == 'wsdnet':
+        c = WSDNetConfig.from_json_file(args.config)
+        t = WSDNetTrainer(**c.__dict__)
+        t.train()
+    else:
+        print("Error: incorrect model. Specify -m wsdnet or -m roberta")

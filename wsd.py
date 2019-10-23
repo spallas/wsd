@@ -1,3 +1,6 @@
+from collections import OrderedDict
+
+import torch
 from torch import nn
 
 from models import ElmoEmbeddings, WSDTransformerEncoder, \
@@ -15,6 +18,7 @@ class BaseWSD(nn.Module):
         self.win_size = max_len
         self.batch_size = batch_size
         self.ce_loss = nn.CrossEntropyLoss(ignore_index=NOT_AMB_SYMBOL)
+        self.bce_loss = nn.BCEWithLogitsLoss()
 
     def forward(self, *inputs):
         raise NotImplementedError("Do not use base class, use concrete classes instead.")
@@ -117,7 +121,7 @@ class RobertaTransformerWSD(BaseWSD):
         return x
 
 
-class RobertaTransformerLM(RobertaTransformerWSD):
+class WSDNet(RobertaTransformerWSD):
 
     def __init__(self,
                  device,
@@ -127,16 +131,43 @@ class RobertaTransformerLM(RobertaTransformerWSD):
                  d_embedding: int = 1024,
                  d_model: int = 512,
                  num_heads: int = 8,
-                 num_layers: int = 4):
+                 num_layers: int = 4,
+                 output_vocab: str = 'res/dictionaries/syn_lemma_vocab.txt',
+                 sense_lemmas: str = 'res/dictionaries/sense_lemmas.txt'):
         super().__init__(device, num_senses, max_len, model_path,
                          d_embedding, d_model, num_heads, num_layers)
-        lm = None
+        self.out_vocab = OrderedDict()
+        with open(output_vocab) as f:
+            for i, line in enumerate(f):
+                self.out_vocab[line.strip()] = i
+        self.sense_lemmas = OrderedDict()
+        with open(sense_lemmas) as f:
+            for line in f:
+                sid = line.strip().split('\t')[0]
+                lemma_list = eval(line.strip().split('\t')[1])
+                self.sense_lemmas[sid] = lemma_list
+        print('WSDNet: dictionaries loaded.')
+        self.slm_output_size = len(self.out_vocab)
+        self.output_dense = nn.Linear(self.transformer.d_output, self.slm_output_size)
+        self.xv = None
 
     def forward(self, seq_list, lengths=None):
         x = self.embedding(seq_list)
         mask = get_transformer_mask(lengths, self.win_size, self.device)
         x = self.transformer(x, mask)
+        self.xv = self.output_dense(x)
         return x
+
+    def loss(self, scores, tags, pre_training=False):
+        y_true = tags.view(-1)
+        scores = scores.view(-1, self.tagset_size)
+        slm_scores = self.xv.view(-1, self.slm_output_size)
+        y_slm = torch.zeros_like(slm_scores)
+        assert y_true.size(0) == y_slm.size(0)
+        for y_i, y in enumerate(y_true):
+            y_slm[y_i][self.sense_lemmas[y], ] = 1
+        slm_loss = self.bce_loss(slm_scores, y_slm)
+        return self.ce_loss(scores, y_true) + slm_loss if not pre_training else slm_loss
 
 
 class RobertaDenseWSD(BaseWSD):
