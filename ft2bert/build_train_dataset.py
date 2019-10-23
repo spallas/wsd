@@ -14,7 +14,7 @@ def main():
 
     # output: one sentence per line
     # one train word per line
-    output_file = 'data/bert_examples.txt'
+    output_file = 'data/test_bert_examples.txt'
     num_sent_per_word = 10
 
     semcor_lemmas = FlatSemCorDataset().dataset_lemmas

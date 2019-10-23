@@ -5,6 +5,7 @@ from typing import List
 
 import fasttext
 import torch
+import numpy as np
 from numpy import dot
 from numpy.linalg import norm
 from pytorch_transformers import BertModel, BertTokenizer
@@ -123,6 +124,7 @@ class MWEVocabExt:
                  train_text=None,
                  is_training=True,
                  ft_path='res/fasttext-vectors/cc.en.300.bin'):
+        self.device = device
         self.ft_model = fasttext.load_model(ft_path)
         if is_training:
             self.device = device
@@ -139,6 +141,7 @@ class MWEVocabExt:
             self._maybe_load_checkpoint()
         else:
             self.checkpoint_path = saved_model_path
+            self.saved_model_path = saved_model_path
             self.map_model = WVMapModel()
             self._load_best()
 
@@ -194,7 +197,7 @@ class MWEVocabExt:
 
     def get_mwe_embedding_matrix(self, vocab: List[str]):
         """
-        Get fastext vector for each string in vocab.
+        Get pseudo-BERT vector for each string in vocab.
         Transform vectors with current model and return.
         :param vocab:
         :return:
@@ -203,13 +206,13 @@ class MWEVocabExt:
         for w in vocab:
             w = w.replace('_', ' ')
             vec = self.ft_model.get_sentence_vector(w)
-            mwe_ft_vectors.append(vec)
-        mwe_ft_matrix = torch.stack(mwe_ft_vectors)
+            mwe_ft_vectors.append(torch.tensor(vec))
+        mwe_ft_matrix = torch.stack(mwe_ft_vectors, dim=0)
         bert_vectors = []
-        batch_size = 128
-        for i in range(0, mwe_ft_matrix.shape[0], batch_size):
-            bert_vec = self.map_model(mwe_ft_matrix[i:batch_size, :])
-            bert_vectors.append(bert_vec)
+        # batch_size = 128
+        for i in range(0, mwe_ft_matrix.shape[0]):  # , batch_size):
+            bert_vec = self.map_model(mwe_ft_matrix[i].unsqueeze(0))
+            bert_vectors.append(bert_vec[0])
         mwe_bert_matrix = torch.stack(bert_vectors)
         return mwe_bert_matrix
 
@@ -229,6 +232,10 @@ if __name__ == '__main__':
     # print(cos_sim(vvv, v4))
     # print(cos_sim(v, v4))
 
-    t = MWEVocabExt('cpu', 'saved_weights/ft2bert.pth', 'data/bert_examples.txt')
-    t.train()
+    mwe_model = MWEVocabExt('cpu', 'saved_weights/ft2bert.pth', is_training=False)
+    a = mwe_model.map_model(torch.tensor(mwe_model.ft_model.get_sentence_vector('financial support'))).detach()
+    aa = mwe_model.map_model(torch.tensor(mwe_model.ft_model.get_sentence_vector('financial backing'))).detach()
+    b = mwe_model.map_model(torch.tensor(mwe_model.ft_model.get_sentence_vector('financial obligation'))).detach()
 
+    print(cos_sim(a, aa))
+    print(cos_sim(a, b))
