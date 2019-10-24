@@ -265,7 +265,7 @@ class FlatLoader:
                  batch_size: int,
                  win_size: int,
                  pad_symbol: str,
-                 do_overlap: bool = False):
+                 do_overlap: bool = True):
         self.dataset = dataset
         self.batch_size = batch_size
         self.win_size = win_size
@@ -283,7 +283,7 @@ class FlatLoader:
         b_t, b_x, b_l, b_p, b_y, b_s, b_z = [], [], [], [], [], [], []
         for i in range(self.batch_size):
             overlap = 16 if self.do_overlap else 0
-            n = min(self.last_offset + (i * self.win_size) - overlap, 0)
+            n = max(self.last_offset + (i * self.win_size) - overlap, 0)
             m = n + self.win_size
             if m > len(self.dataset):
                 self.stop_flag = True
@@ -310,8 +310,8 @@ class FlatLoader:
 
 if __name__ == '__main__':
 
-    dataset = FlatSemCorDataset()
-    data_loader = FlatLoader(dataset, 100, 100, 'PAD')
+    dataset_ = FlatSemCorDataset()
+    data_loader = FlatLoader(dataset_, 100, 100, 'PAD')
 
     for bx in enumerate(data_loader):
         print(bx)
