@@ -235,11 +235,11 @@ class BaseTrainer:
     def _log(self, step, loss, epoch_i):
         if step % self.log_interval == 0:
             print(f'\rLoss: {loss.item():.4f} ', end='')
-            self._plot('Train loss', loss.item(), step)
+            self._plot('Train_loss', loss.item(), step)
             self._gpu_mem_info()
             f1 = self._evaluate(epoch_i)
             self._maybe_checkpoint(loss, f1, epoch_i)
-            self._plot('Dev F1', f1, step)
+            self._plot('Dev_F1', f1, step)
             self.model.train()  # return to train mode after evaluation
 
     def _load_best(self):

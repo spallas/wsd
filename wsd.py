@@ -159,7 +159,7 @@ class WSDNet(RobertaTransformerWSD):
         self.x_slm = self.output_slm(h)
         return y
 
-    def loss(self, scores, tags, pre_training=False):
+    def loss(self, scores, tags, pre_training=True):
         y_true = tags.view(-1)
         scores = scores.view(-1, self.tagset_size)
         slm_scores = self.x_slm.view(-1, self.slm_output_size)
