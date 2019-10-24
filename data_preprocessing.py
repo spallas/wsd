@@ -1,7 +1,7 @@
 """
 Load data from SemCor files and SemEval/SensEval files.
 """
-
+import logging
 import os
 import xml.etree.ElementTree as Et
 from collections import Counter, defaultdict
@@ -63,7 +63,7 @@ class FlatSemCorDataset(Dataset):
         self.first_senses = []
         self.all_senses = []
         self.pos_tags = []
-        for text in tqdm(Et.parse(data_path).getroot()):
+        for text in tqdm(Et.parse(data_path).getroot(), desc=f'Loading data from {data_path}'):
             for sentence in text:
                 for word in sentence:
                     lemma = word.attrib['lemma'] if is_ascii(word.attrib['lemma']) else '#'
@@ -73,6 +73,8 @@ class FlatSemCorDataset(Dataset):
                     self.all_senses.append(word_senses)
                     self.first_senses.append(word_senses[0])
                     self.train_sense_map.setdefault(lemma, Counter()).update(word_senses)
+        logging.info(f'Loaded dataset from {data_path}/{tags_path}')
+        logging.info(f'Sense dict in {sense_dict}')
 
     def __len__(self):
         return len(self.dataset_lemmas)

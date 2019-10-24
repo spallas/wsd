@@ -1,3 +1,4 @@
+import logging
 from collections import OrderedDict
 
 import torch
@@ -117,7 +118,7 @@ class RobertaTransformerWSD(BaseWSD):
     def forward(self, seq_list, lengths=None):
         x = self.embedding(seq_list)
         mask = get_transformer_mask(lengths, self.win_size, self.device)
-        x = self.transformer(x, mask)
+        x, h = self.transformer(x, mask)
         return x
 
 
@@ -146,22 +147,22 @@ class WSDNet(RobertaTransformerWSD):
                 sid = line.strip().split('\t')[0]
                 lemma_list = eval(line.strip().split('\t')[1])
                 self.sense_lemmas[sid] = lemma_list
-        print('WSDNet: dictionaries loaded.')
+        logging.info('WSDNet: dictionaries loaded.')
         self.slm_output_size = len(self.out_vocab)
-        self.output_dense = nn.Linear(self.transformer.d_output, self.slm_output_size)
-        self.xv = None
+        self.output_slm = nn.Linear(self.transformer.d_model, self.slm_output_size)
+        self.x_slm = None
 
     def forward(self, seq_list, lengths=None):
         x = self.embedding(seq_list)
         mask = get_transformer_mask(lengths, self.win_size, self.device)
-        x = self.transformer(x, mask)
-        self.xv = self.output_dense(x)
-        return x
+        y, h = self.transformer(x, mask)
+        self.x_slm = self.output_slm(h)
+        return y
 
     def loss(self, scores, tags, pre_training=False):
         y_true = tags.view(-1)
         scores = scores.view(-1, self.tagset_size)
-        slm_scores = self.xv.view(-1, self.slm_output_size)
+        slm_scores = self.x_slm.view(-1, self.slm_output_size)
         y_slm = torch.zeros_like(slm_scores)
         assert y_true.size(0) == y_slm.size(0)
         for y_i, y in enumerate(y_true):
@@ -216,5 +217,5 @@ class BertTransformerWSD(BaseWSD):
         # x = torch.cat([x, x_p], dim=-1)
         x = self.bert_embedding(seq_list, lengths)
         mask = get_transformer_mask(lengths, self.win_size, self.device)
-        x = self.transformer(x, mask)
+        x, h = self.transformer(x, mask)
         return x

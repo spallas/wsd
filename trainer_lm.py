@@ -1,14 +1,13 @@
 import copy
-import time
-from functools import reduce
+import logging
 from typing import Set, Dict, List
 
 import numpy as np
 import torch
 from nltk.corpus import wordnet as wn
-from pytorch_transformers import BertTokenizer, BertForMaskedLM, BertModel
-from pytorch_transformers.modeling_bert import BertOnlyMLMHead
+from pytorch_transformers import BertTokenizer, BertForMaskedLM
 from scipy.special import softmax
+from torch import nn
 
 from ft2bert.ft2bert import MWEVocabExt
 from train import BaseTrainer
@@ -65,10 +64,12 @@ class LemmaSensesWords:
 class BertForMLMExt(BertForMaskedLM):
 
     def extend_vocab(self, extended_weights):
-        extended_vocab_weights = torch.cat([self.bert.embeddings.word_embeddings.weight,
-                                            extended_weights])
-        ext_vw_param = torch.nn.Parameter(extended_vocab_weights.clone())
-        self.cls = BertOnlyMLMHead(self.config, ext_vw_param)
+        self.cls.predictions.decoder.weight = nn.Parameter(torch.cat([self.cls.predictions.decoder.weight,
+                                                                      extended_weights]),
+                                                           False)
+        self.cls.predictions.bias = nn.Parameter(torch.cat([self.cls.predictions.bias,
+                                                            torch.zeros([extended_weights.size(0)])]),
+                                                 False)
 
 
 class MaskedLMWrapper:
@@ -142,7 +143,7 @@ class TrainerLM(BaseTrainer):
         self.distinct_lemmas: Dict[str, LemmaSensesWords] = {}
         self.batches_scores = []
         self.K = 10
-        print(f'Using top {self.K}')
+        logging.debug(f'Using top {self.K}')
 
     @staticmethod
     def _load_mwe_vocab():
@@ -222,7 +223,7 @@ class TrainerLM(BaseTrainer):
                     top_indices = top_k[1].tolist()
                     for top_i in top_indices:
                         if top_i >= 28996:
-                            print(f"Used extended vocab with index: {top_i}")
+                            logging.info(f"Used extended vocab with index: {top_i}")
                     top_k = top_k[0].tolist()
                     ext_tok_ids = [tid for tid in syn_tok_ids if tid >= 28996]
                     if not ext_tok_ids:

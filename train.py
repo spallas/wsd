@@ -1,4 +1,5 @@
 import argparse
+import logging
 import os
 import warnings
 from typing import Set
@@ -64,12 +65,17 @@ class BaseTrainer:
 
         self.best_model_path = self.checkpoint_path + '.best'
         self.sense2id = load_sense2id(sense_dict, train_tags, test_tags)
+        logging.debug('Loaded sense2id vocab')
         self.pad_symbol = pad_symbol
 
         dataset = FlatSemCorDataset(train_data, train_tags)
         self.train_sense_map = dataset.train_sense_map
         self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+        logging.info(f'Device is {self.device}')
         self._build_model()
+        logging.info(f'Number of parameters: {sum([p.numel() for p in self.model.parameters()])}')
+        logging.info(f'Number of trainable parameters: '
+                     f'{sum([p.numel() for p in self.model.parameters() if p.requires_grad])}')
 
         if is_training:
             self.data_loader = FlatLoader(dataset, batch_size=self.batch_size, win_size=self.window_size,
@@ -217,9 +223,9 @@ class BaseTrainer:
             self.last_step = checkpoint['last_step']
             self.min_loss = checkpoint['min_loss']
             self.best_f1_micro = checkpoint['f1']
-            print(f"Loaded checkpoint from: {self.checkpoint_path}")
+            logging.info(f"Loaded checkpoint from: {self.checkpoint_path}")
             if self.last_epoch >= self.num_epochs:
-                print("Training finished for this checkpoint")
+                logging.warning("Training finished for this checkpoint")
         else:
             self.last_epoch = 0
             self.last_step = 0
@@ -260,8 +266,8 @@ class BaseTrainer:
     @staticmethod
     def _gpu_mem_info():
         if torch.cuda.is_available():  # check if memory is leaking
-            print(f'Allocated GPU memory: '
-                  f'{torch.cuda.memory_allocated() / 1_000_000} MB', end='')
+            logging.info(f'Allocated GPU memory: '
+                         f'{torch.cuda.memory_allocated() / 1_000_000} MB')
 
 
 class ElmoLSTMTrainer(BaseTrainer):
@@ -396,7 +402,8 @@ if __name__ == '__main__':
     parser.add_argument("-m", "--model", type=str, help="model name", required=True)
     parser.add_argument("-c", "--config", type=str, help="config JSON file path", required=True)
     args = parser.parse_args()
-
+    logging.basicConfig(level=logging.DEBUG, format='%(asctime)s:%(levelname)s: %(message)s')
+    logging.info(f'Initializing... model = {args.model}')
     if args.model == 'roberta':
         c = RobertaTransformerConfig.from_json_file(args.config)
         t = RobertaTrainer(**c.__dict__)
@@ -406,4 +413,5 @@ if __name__ == '__main__':
         t = WSDNetTrainer(**c.__dict__)
         t.train()
     else:
-        print("Error: incorrect model. Specify -m wsdnet or -m roberta")
+        logging.error("Error: incorrect model. Specify -m wsdnet or -m roberta")
+
