@@ -144,7 +144,7 @@ class WSDNet(RobertaTransformerWSD):
         self.sense_lemmas = OrderedDict()
         with open(sense_lemmas) as f:
             for line in f:
-                sid = line.strip().split('\t')[0]
+                sid = int(line.strip().split('\t')[0])
                 lemma_list = eval(line.strip().split('\t')[1])
                 self.sense_lemmas[sid] = lemma_list
         logging.info('WSDNet: dictionaries loaded.')
