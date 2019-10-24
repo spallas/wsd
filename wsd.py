@@ -166,7 +166,7 @@ class WSDNet(RobertaTransformerWSD):
         y_slm = torch.zeros_like(slm_scores).to(self.device)
         assert y_true.size(0) == y_slm.size(0)
         for y_i, y in enumerate(y_true):
-            y_slm[y_i][self.sense_lemmas[y], ] = 1
+            y_slm[y_i][self.sense_lemmas[y.item()], ] = 1
         slm_loss = self.bce_loss(slm_scores, y_slm)
         return self.ce_loss(scores, y_true) + slm_loss if not pre_training else slm_loss
 
