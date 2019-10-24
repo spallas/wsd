@@ -163,7 +163,7 @@ class WSDNet(RobertaTransformerWSD):
         y_true = tags.view(-1)
         scores = scores.view(-1, self.tagset_size)
         slm_scores = self.x_slm.view(-1, self.slm_output_size)
-        y_slm = torch.zeros_like(slm_scores)
+        y_slm = torch.zeros_like(slm_scores).to(self.device)
         assert y_true.size(0) == y_slm.size(0)
         for y_i, y in enumerate(y_true):
             y_slm[y_i][self.sense_lemmas[y], ] = 1
