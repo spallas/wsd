@@ -103,23 +103,23 @@ class BaseTrainer:
         self.model.eval()
         self.model.to(self.device)
 
-    def train_epoch(self, epoch_i):
+    def train_epoch(self, epoch_i, pre_train=True):
         step = 0
         for step, (b_x, b_p, b_y, b_z) in enumerate(self.data_loader, self.last_step):
             self.model.zero_grad()
             scores = self.model(b_x)
-            loss = self.model.loss(scores, b_y.to(self.device))
+            loss = self.model.loss(scores, b_y.to(self.device), pre_train)
             loss.backward()
             self._log(step, loss, epoch_i)
             clip_grad_norm_(parameters=self.model.parameters(), max_norm=1.0)
             self.optimizer.step()  # update the weights
         self.last_step += step
 
-    def train(self):
+    def train(self, pre_train=True):
         self.model.train()
         for epoch in range(self.last_epoch + 1, self.num_epochs + 1):
             print(f'\nEpoch: {epoch}')
-            self.train_epoch(epoch)
+            self.train_epoch(epoch, pre_train)
 
     def test(self, loader=None):
         """
@@ -234,7 +234,7 @@ class BaseTrainer:
 
     def _log(self, step, loss, epoch_i):
         if step % self.log_interval == 0:
-            print(f'\rLoss: {loss.item():.4f} ', end='')
+            logging.info(f'\rLoss: {loss.item():.4f} ', end='')
             self._plot('Train_loss', loss.item(), step)
             self._gpu_mem_info()
             f1 = self._evaluate(epoch_i)
@@ -401,17 +401,22 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description="Train with different models")
     parser.add_argument("-m", "--model", type=str, help="model name", required=True)
     parser.add_argument("-c", "--config", type=str, help="config JSON file path", required=True)
+    parser.add_argument("-t", "--test", action='store_true', help="Train or test")
+    parser.add_argument("-p", "--pre-train", action='store_true', help="Run pre-training")
+
     args = parser.parse_args()
     logging.basicConfig(level=logging.DEBUG, format='%(asctime)s:%(levelname)s: %(message)s')
     logging.info(f'Initializing... model = {args.model}')
+    t = None
     if args.model == 'roberta':
         c = RobertaTransformerConfig.from_json_file(args.config)
         t = RobertaTrainer(**c.__dict__)
-        t.train()
     elif args.model == 'wsdnet':
         c = WSDNetConfig.from_json_file(args.config)
         t = WSDNetTrainer(**c.__dict__)
-        t.train()
     else:
         logging.error("Error: incorrect model. Specify -m wsdnet or -m roberta")
-
+    if args.test:
+        t.test()
+    else:
+        t.train(args.pre_train)
