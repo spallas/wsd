@@ -410,10 +410,14 @@ if __name__ == '__main__':
     t = None
     if args.model == 'roberta':
         c = RobertaTransformerConfig.from_json_file(args.config)
-        t = RobertaTrainer(**c.__dict__)
+        cd = c.__dict__
+        cd['is_training'] = args.test
+        t = RobertaTrainer(**cd)
     elif args.model == 'wsdnet':
         c = WSDNetConfig.from_json_file(args.config)
-        t = WSDNetTrainer(**c.__dict__)
+        cd = c.__dict__
+        cd['is_training'] = args.test
+        t = WSDNetTrainer(**cd)
     else:
         logging.error("Error: incorrect model. Specify -m wsdnet or -m roberta")
     if args.test:
