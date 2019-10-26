@@ -118,7 +118,7 @@ class BaseTrainer:
     def train(self, pre_train=True):
         self.model.train()
         for epoch in range(self.last_epoch + 1, self.num_epochs + 1):
-            print(f'\nEpoch: {epoch}')
+            logging.info(f'\nEpoch: {epoch}')
             self.train_epoch(epoch, pre_train)
 
     def test(self, loader=None):
@@ -184,7 +184,7 @@ class BaseTrainer:
                 digits=3),
                 file=fo)
         f1 = f1_score(true_eval, pred_eval, average='micro')
-        print(f"F1 = {f1}")
+        logging.info(f"F1 = {f1}")
         return f1
 
     def _get_metrics(self, true, pred, alternatives=None):
@@ -234,7 +234,7 @@ class BaseTrainer:
 
     def _log(self, step, loss, epoch_i):
         if step % self.log_interval == 0:
-            logging.info(f'\rLoss: {loss.item():.4f} ', end='')
+            logging.info(f'Loss: {loss.item():.4f} ')
             self._plot('Train_loss', loss.item(), step)
             self._gpu_mem_info()
             f1 = self._evaluate(epoch_i)
