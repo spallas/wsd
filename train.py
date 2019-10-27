@@ -411,7 +411,7 @@ if __name__ == '__main__':
     parser.add_argument("-t", "--test", action='store_true', help="Train or test")
     parser.add_argument("-p", "--pre-train", action='store_true', help="Run pre-training")
     parser.add_argument("-d", "--debug", action='store_true', help="Print debug information")
-    parser.add_argument("-h", "--half", action='store_true', help="Train with half precision floats")
+    parser.add_argument("-f", "--half", action='store_true', help="Train with half precision floats")
 
     args = parser.parse_args()
     log_level = logging.DEBUG if args.debug else logging.INFO
