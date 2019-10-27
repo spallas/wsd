@@ -13,8 +13,7 @@ from torch import optim
 from torch.nn.utils import clip_grad_norm_
 from torch.utils.tensorboard import SummaryWriter
 
-from data_preprocessing import FlatSemCorDataset, \
-    load_sense2id, FlatLoader
+from data_preprocessing import FlatSemCorDataset, load_sense2id, FlatLoader
 from utils import util
 from utils.config import RobertaTransformerConfig, WSDNetConfig
 from utils.util import NOT_AMB_SYMBOL
@@ -80,14 +79,14 @@ class BaseTrainer:
         if is_training:
             self.data_loader = FlatLoader(dataset, batch_size=self.batch_size, win_size=self.window_size,
                                           pad_symbol=self.pad_symbol)
-            self._setup_training(train_data, train_tags, eval_data, eval_tags)
+            self._setup_training(eval_data, eval_tags)
         else:
-            self._setup_testing(train_data, train_tags, test_data, test_tags)
+            self._setup_testing(test_data, test_tags)
 
     def _build_model(self):
         raise NotImplementedError("Do not use base class, use concrete classes instead.")
 
-    def _setup_training(self, train_data, train_tags, eval_data, eval_tags):
+    def _setup_training(self, eval_data, eval_tags):
         eval_dataset = FlatSemCorDataset(data_path=eval_data, tags_path=eval_tags)
         self.eval_loader = FlatLoader(eval_dataset, batch_size=self.batch_size, win_size=self.window_size,
                                       pad_symbol=self.pad_symbol)
@@ -95,7 +94,7 @@ class BaseTrainer:
         self.optimizer = optim.Adam(self.model.parameters(), lr=self.learning_rate)
         self._maybe_load_checkpoint()
 
-    def _setup_testing(self, train_data, train_tags, test_data, test_tags):
+    def _setup_testing(self, test_data, test_tags):
         test_dataset = FlatSemCorDataset(data_path=test_data, tags_path=test_tags)
         self.test_loader = FlatLoader(test_dataset, batch_size=self.batch_size, win_size=self.window_size,
                                       pad_symbol=self.pad_symbol)
@@ -118,7 +117,7 @@ class BaseTrainer:
     def train(self, pre_train=True):
         self.model.train()
         for epoch in range(self.last_epoch + 1, self.num_epochs + 1):
-            logging.info(f'\nEpoch: {epoch}')
+            logging.info(f'Epoch: {epoch}')
             self.train_epoch(epoch, pre_train)
 
     def test(self, loader=None):
@@ -136,7 +135,7 @@ class BaseTrainer:
             return self._get_metrics(true, pred, z)
 
     def _evaluate(self, num_epoch):
-        print("\nEvaluating...", flush=True)
+        logging.info("Evaluating...", flush=True)
         self.model.eval()
         f1 = self.test(self.eval_loader)
         self._save_best(f1, num_epoch)
@@ -224,9 +223,13 @@ class BaseTrainer:
             self.min_loss = checkpoint['min_loss']
             self.best_f1_micro = checkpoint['f1']
             logging.info(f"Loaded checkpoint from: {self.checkpoint_path}")
+            logging.debug(f"Last epoch: {self.last_epoch}")
+            logging.debug(f"Last best F1: {self.best_f1_micro}")
+            logging.debug(f"Min loss registered: {self.min_loss}")
             if self.last_epoch >= self.num_epochs:
                 logging.warning("Training finished for this checkpoint")
         else:
+            logging.debug(f"No checkpoint found in {self.checkpoint_path}")
             self.last_epoch = 0
             self.last_step = 0
             self.min_loss = 1e3
@@ -403,10 +406,13 @@ if __name__ == '__main__':
     parser.add_argument("-c", "--config", type=str, help="config JSON file path", required=True)
     parser.add_argument("-t", "--test", action='store_true', help="Train or test")
     parser.add_argument("-p", "--pre-train", action='store_true', help="Run pre-training")
+    parser.add_argument("-d", "--debug", action='store_true', help="Print debug information")
 
     args = parser.parse_args()
-    logging.basicConfig(level=logging.DEBUG, format='%(asctime)s:%(levelname)s: %(message)s')
+    log_level = logging.DEBUG if args.debug else logging.INFO
+    logging.basicConfig(level=log_level, format='%(asctime)s:%(levelname)s: %(message)s')
     logging.info(f'Initializing... model = {args.model}')
+
     t = None
     if args.model == 'roberta':
         c = RobertaTransformerConfig.from_json_file(args.config)
