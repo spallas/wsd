@@ -43,6 +43,7 @@ class BaseTrainer:
                  report_path='logs/baseline_elmo_report.txt',
                  pad_symbol='PAD',
                  is_training=True,
+                 half_precision=True,
                  **kwargs):
 
         self.num_epochs = num_epochs
@@ -72,6 +73,9 @@ class BaseTrainer:
         self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
         logging.info(f'Device is {self.device}')
         self._build_model()
+        if half_precision:
+            logging.info("Using half precision model.")
+            self.model.half()
         logging.info(f'Number of parameters: {sum([p.numel() for p in self.model.parameters()])}')
         logging.info(f'Number of trainable parameters: '
                      f'{sum([p.numel() for p in self.model.parameters() if p.requires_grad])}')
@@ -401,12 +405,13 @@ class WSDNetTrainer(BaseTrainer):
 
 if __name__ == '__main__':
 
-    parser = argparse.ArgumentParser(description="Train with different models")
+    parser = argparse.ArgumentParser(description="Train with different models and options")
     parser.add_argument("-m", "--model", type=str, help="model name", required=True)
     parser.add_argument("-c", "--config", type=str, help="config JSON file path", required=True)
     parser.add_argument("-t", "--test", action='store_true', help="Train or test")
     parser.add_argument("-p", "--pre-train", action='store_true', help="Run pre-training")
     parser.add_argument("-d", "--debug", action='store_true', help="Print debug information")
+    parser.add_argument("-h", "--half", action='store_true', help="Train with half precision floats")
 
     args = parser.parse_args()
     log_level = logging.DEBUG if args.debug else logging.INFO
@@ -418,11 +423,13 @@ if __name__ == '__main__':
         c = RobertaTransformerConfig.from_json_file(args.config)
         cd = c.__dict__
         cd['is_training'] = not args.test
+        cd['half_precision'] = args.half
         t = RobertaTrainer(**cd)
     elif args.model == 'wsdnet':
         c = WSDNetConfig.from_json_file(args.config)
         cd = c.__dict__
         cd['is_training'] = not args.test
+        cd['half_precision'] = args.half
         t = WSDNetTrainer(**cd)
     else:
         logging.error("Error: incorrect model. Specify -m wsdnet or -m roberta")
