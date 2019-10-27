@@ -139,7 +139,7 @@ class BaseTrainer:
             return self._get_metrics(true, pred, z)
 
     def _evaluate(self, num_epoch):
-        logging.info("Evaluating...", flush=True)
+        logging.info("Evaluating...")
         self.model.eval()
         f1 = self.test(self.eval_loader)
         self._save_best(f1, num_epoch)
