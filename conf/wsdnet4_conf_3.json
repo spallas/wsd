@@ -1,0 +1,21 @@
+{
+  "num_epochs": 25,
+  "batch_size": 16,
+  "checkpoint_path": "saved_weights/wsdnet_checkpoint_3.pt",
+  "log_interval": 1000,
+  "train_data":"res/wsd-train/semcor+glosses_data.xml",
+  "train_tags":"res/wsd-train/semcor+glosses_tags.txt",
+  "eval_data" :"res/wsd-test/se07/se07.xml",
+  "eval_tags" :"res/wsd-test/se07/se07.txt",
+  "test_data" :"res/wsd-train/test_data.xml",
+  "test_tags" :"res/wsd-train/test_tags.txt",
+  "report_path": "logs/wsdnet_report_3.txt",
+  "num_layers": 6,
+  "num_heads": 4,
+  "learning_rate": 0.0001,
+  "d_model": 256,
+  "window_size": 50,
+  "model_path": "res/roberta.large",
+  "output_vocab": "res/dictionaries/syn_lemma_vocab.txt",
+  "sense_lemmas": "res/dictionaries/sense_lemmas.txt"
+}

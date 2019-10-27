@@ -18,6 +18,7 @@ from utils import util
 from utils.config import RobertaTransformerConfig, WSDNetConfig
 from utils.util import NOT_AMB_SYMBOL
 from wsd import ElmoTransformerWSD, RobertaTransformerWSD, BertTransformerWSD, BaselineWSD, WSDNet
+from apex import amp
 
 warnings.filterwarnings("ignore", category=UndefinedMetricWarning)
 torch.manual_seed(42)
@@ -43,7 +44,7 @@ class BaseTrainer:
                  report_path='logs/baseline_elmo_report.txt',
                  pad_symbol='PAD',
                  is_training=True,
-                 half_precision=True,
+                 mixed_precision='O0',
                  **kwargs):
 
         self.num_epochs = num_epochs
@@ -73,9 +74,9 @@ class BaseTrainer:
         self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
         logging.info(f'Device is {self.device}')
         self._build_model()
-        if half_precision:
-            logging.info("Using half precision model.")
-            self.model.half()
+        if mixed_precision == 'O1' or mixed_precision == 'O2':
+            logging.info("Using mixed precision model.")
+        self.mixed = mixed_precision
         logging.info(f'Number of parameters: {sum([p.numel() for p in self.model.parameters()])}')
         logging.info(f'Number of trainable parameters: '
                      f'{sum([p.numel() for p in self.model.parameters() if p.requires_grad])}')
@@ -96,6 +97,8 @@ class BaseTrainer:
                                       pad_symbol=self.pad_symbol)
         self.model.to(self.device)
         self.optimizer = optim.Adam(self.model.parameters(), lr=self.learning_rate)
+        # Use apex to make model possibly faster.
+        self.model, self.optimizer = amp.initialize(self.model, self.optimizer, opt_level=self.mixed)
         self._maybe_load_checkpoint()
 
     def _setup_testing(self, test_data, test_tags):
@@ -112,7 +115,10 @@ class BaseTrainer:
             self.model.zero_grad()
             scores = self.model(b_x)
             loss = self.model.loss(scores, b_y.to(self.device), pre_train)
-            loss.backward()
+
+            with amp.scale_loss(loss, self.optimizer) as scaled_loss:
+                scaled_loss.backward()
+
             self._log(step, loss, epoch_i)
             clip_grad_norm_(parameters=self.model.parameters(), max_norm=1.0)
             self.optimizer.step()  # update the weights
@@ -212,6 +218,7 @@ class BaseTrainer:
                 'last_step': self.last_step,
                 'model_state_dict': self.model.state_dict(),
                 'optimizer_state_dict': self.optimizer.state_dict(),
+                'amp': amp.state_dict(),
                 'current_loss': current_loss,
                 'min_loss': min_loss,
                 'f1': self.best_f1_micro
@@ -222,6 +229,7 @@ class BaseTrainer:
             checkpoint = torch.load(self.checkpoint_path)
             self.model.load_state_dict(checkpoint['model_state_dict'])
             self.optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
+            amp.load_state_dict(checkpoint['amp'])
             self.last_epoch = checkpoint['epoch']
             self.last_step = checkpoint['last_step']
             self.min_loss = checkpoint['min_loss']
@@ -411,7 +419,9 @@ if __name__ == '__main__':
     parser.add_argument("-t", "--test", action='store_true', help="Train or test")
     parser.add_argument("-p", "--pre-train", action='store_true', help="Run pre-training")
     parser.add_argument("-d", "--debug", action='store_true', help="Print debug information")
-    parser.add_argument("-f", "--half", action='store_true', help="Train with half precision floats")
+    parser.add_argument("-o", "--mixed-level", type=str, help="Train with mixed precision floats: O0 for standard"
+                                                              "training, O1 for standard mixed precision, O2 for"
+                                                              "advanced mixed precision.", default='O0')
 
     args = parser.parse_args()
     log_level = logging.DEBUG if args.debug else logging.INFO
@@ -423,13 +433,13 @@ if __name__ == '__main__':
         c = RobertaTransformerConfig.from_json_file(args.config)
         cd = c.__dict__
         cd['is_training'] = not args.test
-        cd['half_precision'] = args.half
+        cd['mixed_precision'] = args.mixed_level
         t = RobertaTrainer(**cd)
     elif args.model == 'wsdnet':
         c = WSDNetConfig.from_json_file(args.config)
         cd = c.__dict__
         cd['is_training'] = not args.test
-        cd['half_precision'] = args.half
+        cd['mixed_precision'] = args.mixed_level
         t = WSDNetTrainer(**cd)
     else:
         logging.error("Error: incorrect model. Specify -m wsdnet or -m roberta")
