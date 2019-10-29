@@ -24,7 +24,7 @@ class BaseWSD(nn.Module):
     def forward(self, *inputs):
         raise NotImplementedError("Do not use base class, use concrete classes instead.")
 
-    def loss(self, scores, tags):
+    def loss(self, scores, tags, pre_training=False):
         y_true = tags.view(-1)
         scores = scores.view(-1, self.tagset_size)
         return self.ce_loss(scores, y_true)
