@@ -120,7 +120,7 @@ class BaseTrainer:
                 scaled_loss.backward()
 
             self._log(step, loss, epoch_i)
-            clip_grad_norm_(parameters=self.model.parameters(), max_norm=1.0)
+            clip_grad_norm_(parameters=amp.master_params(self.optimizer), max_norm=1.0)
             self.optimizer.step()  # update the weights
         self.last_step += step
 
