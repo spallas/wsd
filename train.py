@@ -434,7 +434,7 @@ if __name__ == '__main__':
     logging.info(f'Initializing... model = {args.model}')
 
     c = RobertaTransformerConfig.from_json_file(args.config) if args.model == 'roberta' else None
-    c = WSDNetConfig.from_json_file(args.config) if args.model == 'wsdnet' else None
+    c = WSDNetConfig.from_json_file(args.config) if args.model == 'wsdnet' else c
     if c is None:
         logging.error("Error: incorrect model. Specify -m wsdnet or -m roberta")
         exit(1)
@@ -445,7 +445,7 @@ if __name__ == '__main__':
         os.remove(cd['checkpoint_path'])
         os.remove(cd['checkpoint_path'] + '.best')
     t = RobertaTrainer(**cd) if args.model == 'roberta' else None
-    t = WSDNetTrainer(**cd) if args.model == 'wsdnet' else None
+    t = WSDNetTrainer(**cd) if args.model == 'wsdnet' else t
 
     if args.test:
         t.test()
