@@ -98,7 +98,9 @@ class BaseTrainer:
         self.model.to(self.device)
         self.optimizer = optim.Adam(self.model.parameters(), lr=self.learning_rate)
         # Use apex to make model possibly faster.
-        self.model, self.optimizer = amp.initialize(self.model, self.optimizer, opt_level=self.mixed)
+        loss_scale = 1 if self.mixed == 'O0' else 'dynamic'
+        self.model, self.optimizer = amp.initialize(self.model, self.optimizer,
+                                                    opt_level=self.mixed, loss_scale=loss_scale)
         self._maybe_load_checkpoint()
 
     def _setup_testing(self, test_data, test_tags):
@@ -419,6 +421,7 @@ if __name__ == '__main__':
     parser.add_argument("-t", "--test", action='store_true', help="Train or test")
     parser.add_argument("-p", "--pre-train", action='store_true', help="Run pre-training")
     parser.add_argument("-d", "--debug", action='store_true', help="Print debug information")
+    parser.add_argument("-x", "--clean", action='store_true', help="Clear old saved weights.")
     parser.add_argument("-o", "--mixed-level", type=str, help="Train with mixed precision floats: O0 for standard"
                                                               "training, O1 for standard mixed precision, O2 for"
                                                               "advanced mixed precision.", default='O0')
@@ -428,7 +431,7 @@ if __name__ == '__main__':
     logging.basicConfig(level=log_level, format='%(asctime)s:%(levelname)s: %(message)s')
     logging.info(f'Initializing... model = {args.model}')
 
-    t = None
+    t, cd = None, {}
     if args.model == 'roberta':
         c = RobertaTransformerConfig.from_json_file(args.config)
         cd = c.__dict__
@@ -443,6 +446,10 @@ if __name__ == '__main__':
         t = WSDNetTrainer(**cd)
     else:
         logging.error("Error: incorrect model. Specify -m wsdnet or -m roberta")
+        exit(1)
+    if args.clean:
+        os.remove(cd['checkpoint_path'])
+        os.remove(cd['checkpoint_path'] + '.best')
     if args.test:
         t.test()
     else:
