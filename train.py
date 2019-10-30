@@ -74,8 +74,10 @@ class BaseTrainer:
         self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
         logging.info(f'Device is {self.device}')
         self._build_model()
+        self.has_master_params = False
         if mixed_precision == 'O1' or mixed_precision == 'O2':
             logging.info("Using mixed precision model.")
+            self.has_master_params = True
         self.mixed = mixed_precision
         logging.info(f'Number of parameters: {sum([p.numel() for p in self.model.parameters()])}')
         logging.info(f'Number of trainable parameters: '
@@ -122,7 +124,8 @@ class BaseTrainer:
                 scaled_loss.backward()
 
             self._log(step, loss, epoch_i)
-            clip_grad_norm_(parameters=amp.master_params(self.optimizer), max_norm=1.0)
+            parameters = self.model.parameters() if not self.has_master_params else amp.master_params(self.optimizer)
+            clip_grad_norm_(parameters=parameters, max_norm=1.0)
             self.optimizer.step()  # update the weights
         self.last_step += step
 
@@ -425,31 +428,25 @@ if __name__ == '__main__':
     parser.add_argument("-o", "--mixed-level", type=str, help="Train with mixed precision floats: O0 for standard"
                                                               "training, O1 for standard mixed precision, O2 for"
                                                               "advanced mixed precision.", default='O0')
-
     args = parser.parse_args()
     log_level = logging.DEBUG if args.debug else logging.INFO
     logging.basicConfig(level=log_level, format='%(asctime)s:%(levelname)s: %(message)s')
     logging.info(f'Initializing... model = {args.model}')
 
-    t, cd = None, {}
-    if args.model == 'roberta':
-        c = RobertaTransformerConfig.from_json_file(args.config)
-        cd = c.__dict__
-        cd['is_training'] = not args.test
-        cd['mixed_precision'] = args.mixed_level
-        t = RobertaTrainer(**cd)
-    elif args.model == 'wsdnet':
-        c = WSDNetConfig.from_json_file(args.config)
-        cd = c.__dict__
-        cd['is_training'] = not args.test
-        cd['mixed_precision'] = args.mixed_level
-        t = WSDNetTrainer(**cd)
-    else:
+    c = RobertaTransformerConfig.from_json_file(args.config) if args.model == 'roberta' else None
+    c = WSDNetConfig.from_json_file(args.config) if args.model == 'wsdnet' else None
+    if c is None:
         logging.error("Error: incorrect model. Specify -m wsdnet or -m roberta")
         exit(1)
-    if args.clean:
+    cd = c.__dict__
+    cd['is_training'] = not args.test
+    cd['mixed_precision'] = args.mixed_level
+    if args.clean and os.path.exists(cd['checkpoint_path']):
         os.remove(cd['checkpoint_path'])
         os.remove(cd['checkpoint_path'] + '.best')
+    t = RobertaTrainer(**cd) if args.model == 'roberta' else None
+    t = WSDNetTrainer(**cd) if args.model == 'wsdnet' else None
+
     if args.test:
         t.test()
     else:
