@@ -10,6 +10,7 @@ class Config(object):
     num_epochs: int = 40
     window_size: int = 100
     mixed_precision: str = 'O0'
+    multi_gpu: bool = False
 
     train_data: str = 'res/wsd-train/semcor+glosses_data.xml'
     train_tags: str = 'res/wsd-train/semcor+glosses_tags.txt'

@@ -9,7 +9,7 @@ import torch
 from nltk.corpus import wordnet as wn
 from sklearn.exceptions import UndefinedMetricWarning
 from sklearn.metrics import classification_report, f1_score
-from torch import optim
+from torch import optim, nn
 from torch.nn.utils import clip_grad_norm_
 from torch.utils.tensorboard import SummaryWriter
 
@@ -45,6 +45,7 @@ class BaseTrainer:
                  pad_symbol='PAD',
                  is_training=True,
                  mixed_precision='O0',
+                 multi_gpu=False,
                  **kwargs):
 
         self.num_epochs = num_epochs
@@ -63,6 +64,7 @@ class BaseTrainer:
         self.test_loader = None
         self.train_sense_map = {}
         self.last_step = 0
+        self.multi_gpu = multi_gpu
 
         self.best_model_path = self.checkpoint_path + '.best'
         self.sense2id = load_sense2id(sense_dict, train_tags, test_tags)
@@ -97,6 +99,8 @@ class BaseTrainer:
         eval_dataset = FlatSemCorDataset(data_path=eval_data, tags_path=eval_tags)
         self.eval_loader = FlatLoader(eval_dataset, batch_size=self.batch_size, win_size=self.window_size,
                                       pad_symbol=self.pad_symbol)
+        if torch.cuda.device_count() > 1 and self.multi_gpu:
+            self.model = nn.DataParallel(self.model)
         self.model.to(self.device)
         self.optimizer = optim.Adam(self.model.parameters(), lr=self.learning_rate)
         # Use apex to make model possibly faster.
@@ -425,6 +429,7 @@ if __name__ == '__main__':
     parser.add_argument("-p", "--pre-train", action='store_true', help="Run pre-training")
     parser.add_argument("-d", "--debug", action='store_true', help="Print debug information")
     parser.add_argument("-x", "--clean", action='store_true', help="Clear old saved weights.")
+    parser.add_argument("-g", "--multi-gpu", action='store_true', help="Use all available GPUs.")
     parser.add_argument("-o", "--mixed-level", type=str, help="Train with mixed precision floats: O0 for standard"
                                                               "training, O1 for standard mixed precision, O2 for"
                                                               "advanced mixed precision.", default='O0')
@@ -441,6 +446,7 @@ if __name__ == '__main__':
     cd = c.__dict__
     cd['is_training'] = not args.test
     cd['mixed_precision'] = args.mixed_level
+    cd['multi_gpu'] = args.multi_gpu
     if args.clean and os.path.exists(cd['checkpoint_path']):
         os.remove(cd['checkpoint_path'])
         os.remove(cd['checkpoint_path'] + '.best')
