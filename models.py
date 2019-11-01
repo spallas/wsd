@@ -6,7 +6,7 @@ import torch
 from allennlp.modules import Elmo
 from allennlp.modules.elmo import batch_to_ids
 from fairseq.models.roberta import RobertaModel, alignment_utils
-from pytorch_transformers import BertConfig, BertModel, BertTokenizer
+from transformers import BertConfig, BertModel, BertTokenizer
 from torch import nn
 
 

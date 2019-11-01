@@ -7,7 +7,7 @@ nltk
 torch>=1.2.0
 allennlp
 fairseq
-pytorch-transformers
+transformers
 future
 pillow
 dataclasses-json

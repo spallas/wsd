@@ -5,7 +5,7 @@ from typing import Set, Dict, List
 import numpy as np
 import torch
 from nltk.corpus import wordnet as wn
-from pytorch_transformers import BertTokenizer, BertForMaskedLM
+from transformers import BertTokenizer, BertForMaskedLM
 from scipy.special import softmax
 from torch import nn
 
