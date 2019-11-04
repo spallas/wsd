@@ -1,0 +1,1022 @@
+d000.s000.t000 document.n.01
+d000.s000.t001 summary.n.01
+d000.s000.t002 european.a.01
+d000.s000.t003 public.a.01
+d000.s000.t004 judgment.n.02
+d000.s000.t005 report.n.01
+d000.s001.t000 explain.v.02 explain.v.01
+d000.s001.t001 committee.n.01
+d000.s001.t002 medicative.s.01
+d000.s001.t003 product.n.02
+d000.s001.t004 human.a.02
+d000.s001.t005 use.n.01 use.n.03
+d000.s001.t006 measure.v.04
+d000.s001.t007 survey.n.01
+d000.s001.t008 perform.v.01
+d000.s001.t009 reach.v.07 achieve.v.01
+d000.s001.t010 recommendation.n.01
+d000.s001.t011 use.v.01 use.v.02
+d000.s001.t012 medicine.n.02
+d000.s002.t000 need.v.03 want.v.02
+d000.s002.t001 more.a.01
+d000.s002.t002 data.n.01 information.n.02
+d000.s002.t003 medical.a.02
+d000.s002.t004 condition.n.06
+d000.s002.t005 treatment.n.01
+d000.s002.t006 read.v.01
+d000.s002.t007 package.n.01 package.n.02
+d000.s002.t008 booklet.n.01
+d000.s002.t009 besides.r.02
+d000.s002.t010 part.n.09 part.n.01
+d000.s002.t011 reach.v.04
+d000.s002.t012 doctor.n.01
+d000.s002.t013 pharmacist.n.01
+d000.s003.t000 desire.v.01
+d000.s003.t001 more.a.01
+d000.s003.t002 data.n.01 information.n.02
+d000.s003.t003 footing.n.02 basis.n.02
+d000.s003.t004 recommendation.n.01
+d000.s003.t005 read.v.01
+d000.s003.t006 scientific.a.02 scientific.a.01
+d000.s003.t007 discussion.n.01
+d000.s003.t008 besides.r.02
+d000.s003.t009 part.n.09 part.n.01
+d000.s005.t000 powder.n.03 powder.n.01
+d000.s005.t001 constitute.v.01
+d000.s005.t002 solution.n.01
+d000.s005.t003 infusion.n.03
+d000.s005.t004 dribble.v.02
+d000.s005.t005 vein.n.01
+d000.s006.t000 incorporate.v.02
+d000.s006.t001 active.a.06
+d000.s006.t002 substance.n.07 substance.n.04
+d000.s007.t000 use.v.01 use.v.02
+d000.s008.t000 use.v.01 use.v.02
+d000.s008.t001 treat.v.03
+d000.s008.t002 type.n.01
+d000.s008.t003 cancer.n.01
+d000.s008.t004 pleural.a.01
+d000.s008.t005 mesothelioma.n.01
+d000.s008.t006 cancer.n.01
+d000.s008.t007 lining.n.01
+d000.s008.t008 lung.n.01
+d000.s008.t009 normally.r.01
+d000.s008.t010 cause.v.01
+d000.s008.t011 exposure.n.10 vulnerability.n.01
+d000.s008.t012 asbestos.n.01
+d000.s009.t000 use.v.01 use.v.02
+d000.s009.t001 jointly.r.02
+d000.s009.t002 anticancer.a.01
+d000.s009.t003 medicine.n.02
+d000.s009.t004 cancer.n.01
+d000.s009.t005 remove.v.01
+d000.s009.t006 operation.n.06
+d000.s009.t007 alone.s.03
+d000.s009.t008 malignant.a.01
+d000.s009.t009 spread.v.02
+d000.s009.t010 probable.a.01 likely.a.01
+d000.s009.t011 spread.v.02
+d000.s009.t012 easily.r.01
+d000.s009.t013 other.a.01
+d000.s009.t014 part.n.03 part.n.09 part.n.01
+d000.s009.t015 body.n.01
+d000.s009.t016 patient.n.01
+d000.s009.t017 not.r.01
+d000.s009.t018 experience.v.03
+d000.s009.t019 chemotherapy.n.01
+d000.s009.t020 medicine.n.02
+d000.s009.t021 cancer.n.01
+d000.s009.t022 advanced.s.02
+d000.s009.t023 metastatic.a.01
+d000.s009.t024 cell.n.02
+d000.s009.t025 lung_cancer.n.01
+d000.s009.t026 not.r.01
+d000.s009.t027 affect.v.02
+d000.s009.t028 squamous_cell.n.01
+d000.s010.t000 use.v.01 use.v.02
+d000.s010.t001 combination.n.07 combination.n.01
+d000.s010.t002 patient.n.01
+d000.s010.t003 not.r.01
+d000.s010.t004 treat.v.03
+d000.s010.t005 patient.n.01
+d000.s010.t006 experience.v.03
+d000.s010.t007 type.n.01
+d000.s010.t008 chemotherapy.n.01
+d000.s010.t009 past.n.02 past.n.01
+d000.s011.t000 medicine.n.02
+d000.s011.t001 only.r.06
+d000.s011.t002 obtain.v.01
+d000.s011.t003 prescription.n.04
+d000.s012.t000 use.v.01 use.v.02
+d000.s013.t000 only.r.06
+d000.s013.t001 give.v.19
+d000.s013.t002 supervision.n.01
+d000.s013.t003 doctor.n.01
+d000.s013.t004 use.n.01 use.n.03
+d000.s013.t005 anticancer.a.01
+d000.s013.t006 chemotherapy.n.01
+d000.s014.t000 dose.n.01
+d000.s014.t001 milligram.n.01
+d000.s014.t002 square_meter.n.01
+d000.s014.t003 body.n.01
+d000.s014.t004 area.n.06
+d000.s014.t005 calculate.v.01
+d000.s014.t006 use.v.01
+d000.s014.t007 patient.n.01
+d000.s014.t008 stature.n.02
+d000.s014.t009 weight.n.01
+d000.s015.t000 give.v.19
+d000.s015.t001 once.r.01
+d000.s015.t002 every.s.02
+d000.s015.t003 week.n.01
+d000.s015.t004 intravenous.a.01
+d000.s015.t005 infusion.n.03
+d000.s015.t006 last.v.01
+d000.s015.t007 minute.n.01
+d000.s016.t000 reduce.v.11 reduce.v.01
+d000.s016.t001 side_effect.n.01
+d000.s016.t002 patient.n.01
+d000.s016.t003 consume.v.02
+d000.s016.t004 corticosteroid.n.01
+d000.s016.t005 vitamin_bc.n.01
+d000.s016.t006 type.n.01
+d000.s016.t007 vitamin.n.01
+d000.s016.t008 injection.n.03 injection.n.02
+d000.s016.t009 vitamin_b12.n.01
+d000.s016.t010 treatment.n.01
+d000.s017.t000 give.v.19
+d000.s017.t001 medicine.n.02
+d000.s017.t002 prevent.v.01 prevent.v.02
+d000.s017.t003 vomit.v.01
+d000.s017.t004 fluid.n.01 fluid.n.02
+d000.s017.t005 prevent.v.01 prevent.v.02
+d000.s017.t006 dehydration.n.02
+d000.s017.t007 besides.r.02
+d000.s017.t008 give.v.19
+d000.s017.t009 earlier.r.01
+d000.s017.t010 subsequently.r.01
+d000.s017.t011 dose.n.01
+d000.s018.t000 treatment.n.01
+d000.s018.t001 delay.v.02 delay.v.01
+d000.s018.t002 break.v.10 discontinue.v.01
+d000.s018.t003 dose.n.01
+d000.s018.t004 reduce.v.01
+d000.s018.t005 patient.n.01
+d000.s018.t006 blood_count.n.01
+d000.s018.t007 abnormal.a.01 abnormal.s.03
+d000.s018.t008 suffer.v.02 have.v.12
+d000.s018.t009 certain.s.01
+d000.s018.t010 other.a.01
+d000.s018.t011 side_effect.n.01
+d000.s019.t000 not.r.01
+d000.s019.t001 recommend.v.01
+d000.s019.t002 use.n.01 use.n.03
+d000.s019.t003 patient.n.01
+d000.s019.t004 moderate.a.01
+d000.s019.t005 severe.s.06
+d000.s019.t006 kidney.n.01
+d000.s019.t007 problem.n.01
+d000.s020.t000 more.a.01
+d000.s020.t001 data.n.01 information.n.02
+d000.s020.t002 examine.v.02
+d000.s020.t003 summary.n.01
+d000.s020.t004 product.n.02
+d000.s020.t005 besides.r.02
+d000.s020.t006 part.n.09 part.n.01
+d000.s022.t000 active.a.06
+d000.s022.t001 substance.n.07 substance.n.04
+d000.s022.t002 cytotoxic.a.01
+d000.s022.t003 medicine.n.02
+d000.s022.t004 medicine.n.02
+d000.s022.t005 kill.v.01
+d000.s022.t006 cell.n.02
+d000.s022.t007 separate.v.12 separate.v.07
+d000.s022.t008 cancer_cell.n.01
+d000.s022.t009 belong_to.v.01
+d000.s022.t010 group.n.01 group.n.02
+d000.s022.t011 antimetabolite.n.01
+d000.s023.t000 body.n.01
+d000.s023.t001 convert.v.02 convert.v.11
+d000.s023.t002 active.a.06 active.a.01
+d000.s023.t003 form.n.11
+d000.s023.t004 stop.v.03
+d000.s023.t005 bodily_process.n.01 natural_process.n.01
+d000.s023.t006 enzyme.n.01
+d000.s023.t007 involve.v.02
+d000.s023.t008 produce.v.01
+d000.s023.t009 nucleotide.n.01
+d000.s023.t010 unit.n.05
+d000.s023.t011 deoxyribonucleic_acid.n.01
+d000.s023.t012 ribonucleic_acid.n.01
+d000.s023.t013 genic.a.01
+d000.s023.t014 material.n.01
+d000.s023.t015 cell.n.02
+d000.s024.t000 analyze.v.01
+d000.s025.t000 treatment.n.01
+d000.s025.t001 malignant.a.01
+d000.s025.t002 pleural.a.01
+d000.s025.t003 mesothelioma.n.01
+d000.s025.t004 analyze.v.01
+d000.s025.t005 chief.s.01
+d000.s025.t006 survey.n.01
+d000.s025.t007 patient.n.01
+d000.s025.t008 not.r.01
+d000.s025.t009 experience.v.03
+d000.s025.t010 chemotherapy.n.01
+d000.s025.t011 disease.n.01
+d000.s025.t012 earlier.r.01
+d000.s026.t000 effect.n.06
+d000.s026.t001 combination.n.07 combination.n.01
+d000.s026.t002 compare.v.01
+d000.s026.t003 alone.r.02 entirely.r.02
+d000.s027.t000 treatment.n.01
+d000.s027.t001 cell.n.02
+d000.s027.t002 lung_cancer.n.01
+d000.s027.t003 effect.n.06
+d000.s027.t004 compare.v.01
+d000.s027.t005 anticancer.a.01
+d000.s027.t006 medicine.n.02
+d000.s027.t007 survey.n.01
+d000.s027.t008 involve.v.02
+d000.s027.t009 patient.n.01
+d000.s027.t010 locally.r.02
+d000.s027.t011 advanced.s.02
+d000.s027.t012 metastatic.a.01
+d000.s027.t013 disease.n.01
+d000.s027.t014 experience.v.03
+d000.s027.t015 chemotherapy.n.01
+d000.s027.t016 past.n.02 past.n.01
+d000.s028.t000 besides.r.02
+d000.s028.t001 compare.v.01
+d000.s028.t002 anticancer.a.01
+d000.s028.t003 medicine.n.02
+d000.s028.t004 combination.n.07 combination.n.01
+d000.s028.t005 survey.n.01
+d000.s028.t006 involve.v.02
+d000.s028.t007 patient.n.01
+d000.s028.t008 not.r.01
+d000.s028.t009 experience.v.03
+d000.s028.t010 chemotherapy.n.01
+d000.s028.t011 lung_cancer.n.01
+d000.s028.t012 past.n.02 past.n.01
+d000.s029.t000 survey.n.01 report.n.01
+d000.s029.t001 chief.s.01
+d000.s029.t002 measurement.n.01
+d000.s029.t003 potency.n.02 effectiveness.n.01
+d000.s029.t004 long.r.01
+d000.s029.t005 patient.n.01
+d000.s029.t006 survive.v.02 survive.v.01
+d000.s030.t000 benefit.n.02
+d000.s030.t001 prove.v.02 picture.v.02
+d000.s030.t002 survey.n.01
+d000.s031.t000 increase.v.02
+d000.s031.t001 survival.n.01
+d000.s031.t002 time.n.03
+d000.s031.t003 patient.n.01
+d000.s031.t004 malignant.a.01
+d000.s031.t005 pleural.a.01
+d000.s031.t006 mesothelioma.n.01
+d000.s032.t000 patient.n.01
+d000.s032.t001 experience.v.03
+d000.s032.t002 survive.v.02 survive.v.01
+d000.s032.t003 average.n.03
+d000.s032.t004 month.n.02
+d000.s032.t005 compare.v.01
+d000.s032.t006 month.n.02
+d000.s032.t007 alone.r.02
+d000.s033.t000 treatment.n.01
+d000.s033.t001 patient.n.01
+d000.s033.t002 cell.n.02
+d000.s033.t003 lung_cancer.n.01
+d000.s033.t004 equally.r.01
+d000.s033.t005 effective.a.01 effective.s.03
+d000.s033.t006 equally.r.01
+d000.s034.t000 patient.n.01
+d000.s034.t001 experience.v.03
+d000.s034.t002 chemotherapy.n.01
+d000.s034.t003 past.n.02 past.n.01
+d000.s034.t004 average.s.01 median.s.01
+d000.s034.t005 survival.n.01
+d000.s034.t006 time.n.03
+d000.s034.t007 month.n.02
+d000.s034.t008 compare.v.01
+d000.s034.t009 month.n.02
+d000.s035.t000 patient.n.01
+d000.s035.t001 not.r.01
+d000.s035.t002 experience.v.03
+d000.s035.t003 chemotherapy.n.01
+d000.s035.t004 past.n.02 past.n.01
+d000.s035.t005 average.s.01 median.s.01
+d000.s035.t006 survival.n.01
+d000.s035.t007 time.n.03
+d000.s035.t008 month.n.02
+d000.s035.t009 group.n.01
+d000.s036.t000 however.r.02
+d000.s036.t001 survey.n.01
+d000.s036.t002 patient.n.01
+d000.s036.t003 cancer.n.01
+d000.s036.t004 not.r.01
+d000.s036.t005 affect.v.02
+d000.s036.t006 squamous_cell.n.01
+d000.s036.t007 suffer.v.02 have.v.02
+d000.s036.t008 long.a.01
+d000.s036.t009 survival.n.01
+d000.s036.t010 time.n.03
+d000.s037.t000 contrast.n.01
+d000.s037.t001 patient.n.01
+d000.s037.t002 cancer.n.01
+d000.s037.t003 affect.v.02
+d000.s037.t004 squamous_cell.n.01
+d000.s037.t005 suffer.v.02 have.v.02
+d000.s037.t006 short.a.01
+d000.s037.t007 survival.n.01
+d000.s037.t008 time.n.03
+d001.s000.t000 mathematical.a.01
+d001.s000.t001 establish.v.08
+d001.s000.t002 markup.n.02
+d001.s001.t000 nowadays.r.01
+d001.s001.t001 capable.a.01
+d001.s001.t002 make.v.16
+d001.s001.t003 elementary.s.01
+d001.s001.t004 mathematical_process.n.01
+d001.s001.t005 arithmetical.a.01
+d001.s001.t006 three-d.n.02
+d001.s001.t007 graph.n.01
+d001.s002.t000 actually.r.04 actually.r.02
+d001.s002.t001 not.r.01
+d001.s002.t002 necessary.a.01
+d001.s002.t003 know.v.04 know.v.01
+d001.s002.t004 use.v.01
+d001.s003.t000 establish.v.08
+d001.s003.t001 graph.n.01
+d001.s004.t000 initially.r.01
+d001.s004.t001 tailor.v.01
+d001.s004.t002 now.r.04
+d001.s004.t003 use.v.01
+d001.s004.t004 small.a.01
+d001.s004.t005 mathematical.a.01
+d001.s004.t006 cognition.n.01
+d001.s005.t000 here.r.01
+d001.s005.t001 chief.s.01
+d001.s005.t002 window.n.08
+d001.s006.t000 chief.s.01
+d001.s006.t001 window.n.08
+d001.s007.t000 chief.s.01
+d001.s007.t001 window.n.08
+d001.s007.t002 consist.v.04
+d001.s007.t003 console.n.02
+d001.s007.t004 graph.n.01
+d001.s007.t005 three-d.n.02
+d001.s007.t006 graph.n.01
+d001.s007.t007 dictionary.n.01
+d001.s008.t000 below.r.01
+d001.s008.t001 detect.v.01
+d001.s008.t002 input.n.04
+d001.s008.t003 field.n.15
+d001.s008.t004 type.v.01
+d001.s008.t005 function.n.01
+d001.s008.t006 do.v.03 perform.v.01
+d001.s008.t007 calculation.n.02 calculation.n.01
+d001.s009.t000 desire.v.01
+d001.s009.t001 understand.v.01 understand.v.02
+d001.s009.t002 function.v.01
+d001.s009.t003 best.a.01 better.s.03
+d001.s009.t004 thing.n.02
+d001.s009.t005 do.v.03 perform.v.01
+d001.s009.t006 understand.v.02 recognize.v.02
+d001.s009.t007 input.n.04
+d001.s009.t008 convert.v.02 change.v.06
+d001.s009.t009 not.r.01
+d001.s009.t010 necessary.a.01
+d001.s009.t011 know.v.04 know.v.01
+d001.s010.t000 establish.v.08
+d001.s010.t001 basically.r.01
+d001.s010.t002 common_sense.n.01
+d001.s010.t003 not.r.01
+d001.s010.t004 difficult.a.01
+d001.s011.t000 look.v.01
+d001.s011.t001 close.r.02
+d001.s011.t002 look.v.09
+d001.s011.t003 very.r.01
+d001.s011.t004 like.a.01 similar.a.01 alike.a.01
+d001.s012.t000 summation.n.04
+d001.s012.t001 subtraction.n.01
+d001.s012.t002 multiplication.n.03
+d001.s012.t003 division.n.11
+d001.s013.t000 exponent.n.03
+d001.s013.t001 use.v.01
+d001.s014.t000 besides.r.02
+d001.s014.t001 possible.a.01
+d001.s014.t002 use.v.01
+d001.s015.t000 exponent.n.03
+d001.s015.t001 means.n.01
+d001.s015.t002 make.v.16
+d001.s015.t003 root.n.04
+d001.s015.t004 besides.r.02
+d001.s016.t000 manner.n.01
+d001.s016.t001 specify.v.02
+d001.s016.t002 bounded.s.01
+d001.s016.t003 variable.n.04
+d001.s016.t004 function.n.01
+d001.s017.t000 use.v.01
+d001.s017.t001 pin_down.v.01 specify.v.02
+d001.s017.t002 high.a.01
+d001.s017.t003 priority.n.02 precedence.n.01
+d001.s018.t000 parser.n.01
+d001.s018.t001 detect.v.01 determine.v.01
+d001.s018.t002 function.n.01
+d001.s018.t003 determine.v.08
+d001.s018.t004 operator.n.01
+d001.s019.t000 treat.v.08
+d001.s019.t001 operator.n.01
+d001.s019.t002 not.r.01
+d001.s019.t003 treat.v.08
+d001.s019.t004 user.n.01
+d001.s019.t005 function.n.01
+d001.s020.t000 use.v.01
+d001.s020.t001 specify.v.02
+d001.s020.t002 value.n.01
+d001.s021.t000 condition.n.02
+d001.s021.t001 definition.n.01
+d001.s022.t000 manner.n.01
+d001.s022.t001 specify.v.02
+d001.s022.t002 conditional.a.02
+d001.s022.t003 mathematical_process.n.01
+d001.s023.t000 insert.v.01
+d001.s023.t001 condition.n.02
+d001.s023.t002 use.v.01
+d001.s023.t003 condition.n.02
+d001.s023.t004 only.r.06
+d001.s023.t005 truthful.a.01 true.a.01
+d001.s023.t006 detect.v.01
+d001.s023.t007 condition.n.02
+d001.s023.t008 enter.v.01
+d001.s023.t009 last.a.02 final.s.02
+d001.s023.t010 case.n.01
+d001.s025.t000 use.v.01
+d001.s025.t001 specify.v.02 define.v.03
+d001.s026.t000 chiefly.r.01
+d001.s026.t001 utilitarian.s.01 useful.a.01
+d001.s026.t002 work.v.01
+d001.s027.t000 now.r.04 now.r.03
+d001.s027.t001 ask.v.05
+d001.s027.t002 user.n.01
+d001.s028.t000 easy.a.01
+d001.s028.t001 operate.v.03
+d001.s028.t002 function.n.01
+d001.s028.t003 cosine.n.01
+d001.s028.t004 sine.n.01
+d001.s028.t005 other.a.01
+d001.s028.t006 trigonometric.a.01
+d001.s028.t007 function.n.01
+d001.s028.t008 sum.n.02 sum.n.03
+d001.s028.t009 product.n.03
+d001.s029.t000 not.r.01
+d001.s029.t001 count.v.02
+d001.s029.t002 kind.n.01
+d001.s030.t000 use.v.01
+d001.s030.t001 summation.n.04
+d001.s030.t002 multiplication.n.03
+d001.s030.t003 have.v.01 have.v.02
+d001.s030.t004 operator.n.01
+d001.s031.t000 utilitarian.s.01 useful.a.01
+d001.s032.t000 there.r.01
+d001.s032.t001 have.v.01 have.v.02
+d001.s032.t002 list.n.01
+d001.s032.t003 variable.n.04
+d001.s033.t000 watch.v.03
+d001.s033.t001 let.v.01
+d001.s033.t002 change.v.01
+d001.s033.t003 value.n.01
+d001.s033.t004 merely.r.01
+d001.s033.t005 means.n.01
+d001.s033.t006 flim-flam.v.01
+d001.s033.t007 log.n.03
+d001.s034.t000 time.n.01
+d001.s034.t001 insert.v.01 record.v.01
+d001.s034.t002 formula.n.01
+d001.s034.t003 variable.n.04
+d001.s034.t004 value.n.01
+d001.s034.t005 change.v.01
+d001.s034.t006 last.a.02 last.s.01
+d001.s034.t007 result.n.03
+d001.s035.t000 new.s.05 new.a.01
+d001.s035.t001 window.n.08
+d001.s036.t000 log.n.03
+d001.s037.t000 load.v.03
+d001.s038.t000 perform.v.01 carry_through.v.01
+d001.s038.t001 instruction.n.04
+d001.s038.t002 file.n.01
+d001.s038.t003 consecutive.r.01
+d001.s039.t000 nice.a.01
+d001.s039.t001 desire.v.01
+d001.s039.t002 specify.v.02 define.v.03
+d001.s039.t003 library.n.04
+d001.s039.t004 resume.v.01
+d001.s039.t005 previous.s.01
+d001.s039.t006 work.n.01
+d001.s040.t000 write.v.08
+d001.s041.t000 write.v.08
+d001.s041.t001 instruction.n.04
+d001.s041.t002 type.v.01
+d001.s041.t003 begin.v.05
+d001.s041.t004 able.s.02 able.a.01
+d001.s041.t005 recycle.v.02
+d001.s042.t000 generate.v.01
+d001.s042.t001 text_file.n.01
+d001.s042.t002 easy.a.01
+d001.s042.t003 repair.v.01
+d001.s042.t004 use.v.01
+d001.s042.t005 text_editor.n.02
+d001.s043.t000 write.v.08
+d001.s043.t001 log.n.03
+d001.s044.t000 write.v.08
+d001.s044.t001 log.n.03
+d001.s044.t002 result.n.03
+d001.s044.t003 hypertext_markup_language.n.01
+d001.s044.t004 able.s.02 able.a.01
+d001.s044.t005 print.v.04
+d001.s044.t006 publish.v.02
+d001.s045.t000 discontinue.v.01 depart.v.04
+d001.s046.t000 program.n.07
+d001.s046.t001 down.r.06
+d001.s047.t000 add.v.01
+d001.s047.t001 new.s.05 new.a.01
+d001.s047.t002 graph.n.01
+d001.s047.t003 do.v.03 perform.v.01
+d001.s047.t004 travel.v.01
+d001.s047.t005 graph.n.01
+d001.s047.t006 add.v.01
+d001.s047.t007 add.v.01
+d001.s047.t008 new.s.05 new.a.01
+d001.s047.t009 function.n.01
+d001.s048.t000 then.r.01
+d001.s048.t001 focus.n.01
+d001.s048.t002 input.n.04
+d001.s048.t003 text.n.01
+d001.s048.t004 box.n.05
+d001.s048.t005 type.v.01
+d001.s048.t006 function.n.01
+d001.s049.t000 desire.v.01
+d001.s049.t001 use.v.01
+d001.s049.t002 typical.s.03
+d001.s049.t003 not.r.01
+d001.s049.t004 necessary.a.01
+d001.s049.t005 pin_down.v.01 specify.v.02
+d001.s050.t000 insert.v.01 record.v.01
+d001.s050.t001 function.n.01
+d001.s050.t002 all_right.s.01
+d001.s050.t003 expose.v.03
+d001.s050.t004 graph.n.01
+d001.s050.t005 chief.s.01
+d001.s050.t006 window.n.08
+d001.s051.t000 put.v.01
+d001.s051.t001 several.s.01
+d001.s051.t002 graph.n.01
+d001.s051.t003 same.a.01
+d001.s051.t004 view.n.10
+d001.s052.t000 merely.r.01
+d001.s052.t001 use.v.01
+d001.s052.t002 add.v.01
+d001.s052.t003 list.n.01
+d001.s052.t004 mode.n.02
+d001.s053.t000 put.v.01
+d001.s053.t001 graph.n.01
+d001.s053.t002 color.n.08 color.n.01
+d002.s000.t000 foundation.n.02
+d002.s000.t001 recently.r.01
+d002.s000.t002 involve.v.02
+d002.s000.t003 organize.v.02
+d002.s000.t004 conference.n.01
+d002.s000.t005 manage.v.02 deal.v.03
+d002.s000.t006 critical.s.05 critical.a.06
+d002.s000.t007 challenge.n.01
+d002.s001.t000 participant.n.01
+d002.s001.t001 chief.s.01
+d002.s001.t002 interest.n.06
+d002.s001.t003 attend.v.01
+d002.s001.t004 debate.v.01 debate.v.03
+d002.s001.t005 issue.n.01 topic.n.02
+d002.s001.t006 role.n.04 function.n.03
+d002.s001.t007 cardinal.s.01
+d002.s001.t008 actor.n.02
+d002.s001.t009 include.v.02 include.v.01 include.v.03
+d002.s001.t010 public.s.02 public.a.01
+d002.s001.t011 authority.n.02 authority.n.03 agency.n.01
+d002.s001.t012 social.a.01
+d002.s001.t013 voluntary.a.01
+d002.s001.t014 community.n.01
+d002.s001.t015 organization.n.01 administration.n.02
+d002.s001.t016 besides.r.02
+d002.s001.t017 service.n.01
+d002.s001.t018 user.n.01
+d002.s002.t000 relatively.r.01
+d002.s002.t001 few.a.01
+d002.s002.t002 case.n.08 case.n.01
+d002.s002.t003 report.v.04
+d002.s002.t004 attempt.n.01
+d002.s002.t005 involve.v.02
+d002.s002.t006 user.n.01
+d002.s002.t007 service.n.01
+d002.s002.t008 planning.n.02 planning.n.01
+d002.s002.t009 engagement.n.07
+d002.s002.t010 service.n.01
+d002.s002.t011 provision.n.02
+d002.s002.t012 detect.v.01 determine.v.01
+d002.s002.t013 more.r.01
+d002.s002.t014 common.s.04
+d002.s003.t000 note.n.01
+d002.s003.t001 besides.r.02
+d002.s003.t002 diverseness.n.01
+d002.s003.t003 unlike.a.01 different.s.05
+d002.s003.t004 role.n.04 function.n.03
+d002.s003.t005 play.v.02
+d002.s003.t006 public.s.02
+d002.s003.t007 social_welfare.n.01
+d002.s004.t000 foundation.n.02
+d002.s004.t001 european.a.01
+d002.s004.t002 committee.n.01 deputation.n.01
+d002.s004.t003 spanish.a.01
+d002.s004.t004 ministry.n.03
+d002.s004.t005 social.a.01
+d002.s004.t006 affairs.n.02
+d002.s004.t007 regional.s.02
+d002.s004.t008 government.n.01
+d002.s004.t009 european.a.01
+d002.s004.t010 conference.n.01
+d002.s004.t011 social.a.01
+d002.s004.t012 exclusion.n.01 ejection.n.02
+d002.s004.t013 major.a.02 major.a.01
+d002.s004.t014 challenge.n.01
+d002.s004.t015 public.s.02
+d002.s004.t016 social_welfare.n.01
+d002.s004.t017 service.n.01
+d002.s005.t000 foundation.n.02
+d002.s005.t001 recently.r.01
+d002.s005.t002 print.v.01 publish.v.02
+d002.s005.t003 comparative.a.01
+d002.s005.t004 report.n.01
+d002.s005.t005 part.n.09
+d002.s005.t006 project.n.02
+d002.s005.t007 measure.v.04
+d002.s005.t008 extent.n.01
+d002.s005.t009 direct.s.02
+d002.s005.t010 engagement.n.07
+d002.s005.t011 humanize.v.01
+d002.s005.t012 employment.n.02
+d002.s005.t013 increase.v.02
+d002.s005.t014 profitableness.n.02
+d002.s006.t000 survey.n.01
+d002.s006.t001 establish.v.08
+d002.s006.t002 personal.s.02
+d002.s006.t003 interview.n.01
+d002.s006.t004 senior.a.01
+d002.s006.t005 official.n.01
+d002.s006.t006 social.a.01
+d002.s006.t007 representative.n.01 spokesperson.n.01
+d002.s006.t008 national.a.02 national.a.03 national.a.01
+d002.s006.t009 grade.n.02
+d002.s006.t010 organization.n.01 administration.n.02
+d002.s006.t011 fifteen.s.01
+d002.s006.t012 european.a.01
+d002.s006.t013 country.n.02 state.n.04
+d002.s007.t000 important.a.01
+d002.s007.t001 industrial.a.01
+d002.s007.t002 sector.n.02
+d002.s007.t003 metallic_element.n.01
+d002.s007.t004 industry.n.02
+d002.s007.t005 banking.n.01
+d002.s007.t006 sector.n.02
+d002.s007.t007 besides.r.02
+d002.s007.t008 include.v.02 include.v.01 include.v.03
+d002.s008.t000 speaker.n.01
+d002.s008.t001 social.a.01
+d002.s008.t002 exclusion.n.01 ejection.n.02
+d002.s008.t003 conference.n.01
+d002.s008.t004 left.n.01
+d002.s008.t005 right.n.02
+d002.s008.t006 employment.n.03 employment.n.02
+d002.s008.t007 industrial.a.01
+d002.s008.t008 relations.n.01
+d002.s008.t009 social_gathering.n.01
+d002.s008.t010 directorate.n.01
+d002.s008.t011 european.a.01
+d002.s008.t012 committee.n.01 deputation.n.01
+d002.s008.t013 eminent.s.01
+d002.s008.t014 committee.n.01
+d002.s008.t015 member.n.01
+d002.s008.t016 european.a.01
+d002.s008.t017 parliament.n.01
+d002.s008.t018 vice_president.n.01
+d002.s008.t019 european.a.01
+d002.s008.t020 parliament.n.01
+d002.s008.t021 economic.a.01
+d002.s008.t022 social.a.01
+d002.s008.t023 committee.n.01
+d002.s009.t000 case_study.n.01 case_study.n.02
+d002.s009.t001 national.a.02 national.a.03 national.a.01
+d002.s009.t002 report.n.01
+d002.s009.t003 incorporate.v.02
+d002.s009.t004 portfolio.n.02
+d002.s009.t005 first_step.n.01
+d002.s009.t006 present.v.02
+d002.s009.t007 policy.n.01
+d002.s009.t008 practice.n.01
+d002.s009.t009 better.v.02
+d002.s009.t010 recruitment.n.01
+d002.s009.t011 training.n.01
+d002.s009.t012 development.n.01
+d002.s009.t013 age.v.01
+d002.s009.t014 worker.n.01
+d002.s009.t015 employment.n.02
+d002.s009.t016 place.n.02 topographic_point.n.01
+d002.s009.t017 community.n.01
+d002.s010.t000 country.n.02 state.n.04
+d002.s010.t001 first_step.n.01
+d002.s010.t002 choose.v.01
+d002.s010.t003 further.s.01
+d002.s010.t004 depth.n.02 depth.n.06
+d002.s010.t005 case_study.n.01 case_study.n.02
+d002.s011.t000 case_study.n.01 case_study.n.02
+d002.s011.t001 analyze.v.03 analyze.v.01
+d002.s011.t002 setting.n.02 background.n.03
+d002.s011.t003 first_step.n.01
+d002.s011.t004 impact.n.02 impingement.n.01
+d002.s011.t005 employment.n.03
+d002.s011.t006 pattern.n.05 practice.n.01
+d002.s011.t007 work.n.01
+d002.s011.t008 administration.n.02
+d002.s011.t009 measure.v.04
+d002.s011.t010 benefit.n.02
+d002.s011.t011 problem.n.01
+d002.s011.t012 first_step.n.01
+d002.s012.t000 visit.n.03
+d002.s012.t001 interview.n.01
+d002.s012.t002 cardinal.s.01
+d002.s012.t003 force.n.04
+d002.s012.t004 besides.r.02
+d002.s012.t005 undertake.v.02 undertake.v.01
+d002.s013.t000 national.a.02 national.a.03 national.a.01
+d002.s013.t001 survey.n.01
+d002.s013.t002 form.v.02
+d002.s013.t003 basis.n.03
+d002.s013.t004 european.a.01
+d002.s013.t005 report.n.01
+d002.s013.t006 synthesize.v.01
+d002.s013.t007 overall.s.01 overall.s.02
+d002.s013.t008 practice.n.01
+d002.s014.t000 report.n.01
+d002.s014.t001 casebook.n.01
+d002.s014.t002 first_step.n.01
+d002.s014.t003 print.v.01 publish.v.02
+d002.s014.t004 provide.v.02
+d002.s014.t005 conference.n.01
+d002.s014.t006 stage.v.02
+d002.s014.t007 fall.n.01
+d002.s015.t000 foundation.n.02
+d002.s015.t001 aim.v.02
+d002.s015.t002 document.v.01
+d002.s015.t003 characteristic.n.02 feature.n.01
+d002.s015.t004 age.n.01
+d002.s015.t005 barrier.n.02
+d002.s015.t006 occupation.n.01
+d002.s015.t007 recruitment.n.01
+d002.s015.t008 training.n.01
+d002.s015.t009 analyze.v.03 analyze.v.01
+d002.s015.t010 cause.n.01
+d002.s016.t000 position.n.03
+d002.s016.t001 social.a.01
+d002.s016.t002 besides.r.02
+d002.s016.t003 analyze.v.01 probe.v.01
+d002.s016.t004 especial.s.01
+d002.s016.t005 attention.n.01
+d002.s016.t006 give.v.05 give.v.10
+d002.s016.t007 proposal.n.01
+d002.s016.t008 get_rid_of.v.01 remove.v.01
+d002.s016.t009 age.n.01
+d002.s016.t010 barrier.n.02
+d002.s017.t000 third.r.01
+d002.s017.t001 project.n.02
+d002.s017.t002 measure.v.04
+d002.s017.t003 first_step.n.01
+d002.s017.t004 public.s.02 public.a.01
+d002.s017.t005 individual.s.04
+d002.s017.t006 sector.n.02
+d002.s017.t007 age.n.01
+d002.s017.t008 barrier.n.02
+d002.s017.t009 particularly.r.01
+d002.s017.t010 old.a.01 old.s.04
+d002.s017.t011 worker.n.01
+d002.s018.t000 search.v.01
+d002.s018.t001 option.n.02
+d002.s018.t002 early.a.01
+d002.s018.t003 retirement.n.01
+d002.s018.t004 redundancy.n.02
+d002.s018.t005 project.n.02
+d002.s018.t006 chiefly.r.01 primarily.r.02
+d002.s018.t007 refer.v.02
+d002.s018.t008 retention.n.01
+d002.s018.t009 reintegrate.v.01
+d002.s018.t010 retrain.v.02 retrain.v.01
+d002.s018.t011 old.a.01 old.s.04
+d002.s018.t012 worker.n.01
+d002.s019.t000 sex.n.04
+d002.s019.t001 cultural.s.02
+d002.s019.t002 background.n.01
+d002.s019.t003 worker.n.01
+d002.s019.t004 associate.v.01
+d002.s019.t005 age.n.01 age.n.03
+d002.s019.t006 discrimination.n.01
+d002.s019.t007 analyze.v.01 probe.v.01
+d002.s020.t000 project.n.02
+d002.s020.t001 besides.r.02
+d002.s020.t002 consider.v.05 study.v.03 consider.v.03
+d002.s020.t003 first_step.n.01
+d002.s020.t004 age.n.01 age.n.03
+d002.s020.t005 discrimination.n.01
+d002.s020.t006 country.n.04
+d002.s020.t007 minor.s.10
+d002.s020.t008 enterprise.n.02
+d002.s021.t000 member.n.04
+d002.s021.t001 state.n.04
+d002.s021.t002 embrace.v.01
+d002.s021.t003 project.n.02
+d002.s021.t004 united.a.01
+d002.s021.t005 kingdom.n.02 kingdom.n.04
+d003.s000.t000 document.n.01
+d003.s000.t001 summary.n.01
+d003.s000.t002 european.a.01
+d003.s000.t003 public.a.01
+d003.s000.t004 appraisal.n.01
+d003.s000.t005 report.n.01
+d003.s001.t000 explain.v.02 explain.v.01
+d003.s001.t001 committee.n.01
+d003.s001.t002 medicative.s.01
+d003.s001.t003 product.n.02
+d003.s001.t004 veterinarian.n.01
+d003.s001.t005 use.n.01
+d003.s001.t006 measure.v.04
+d003.s001.t007 survey.n.01
+d003.s001.t008 perform.v.01
+d003.s001.t009 reach.v.07
+d003.s001.t010 recommendation.n.01
+d003.s001.t011 use.v.01 use.v.02
+d003.s001.t012 medicine.n.02
+d003.s003.t000 incorporate.v.02
+d003.s003.t001 active.a.06
+d003.s003.t002 substance.n.01 substance.n.07 substance.n.04
+d003.s003.t003 available.a.01
+d003.s003.t004 pill.n.02
+d003.s003.t005 solution.n.01
+d003.s003.t006 injection.n.03
+d003.s004.t000 pill.n.02
+d003.s004.t001 have.v.01 have.v.02
+d003.s004.t002 score.n.08
+d003.s004.t003 wrinkle.n.01 line.n.02
+d003.s004.t004 side.n.03 side.n.05 side.n.04
+d003.s004.t005 so.r.07
+d003.s004.t006 halve.v.01
+d003.s005.t000 pill.n.02
+d003.s005.t001 score.v.02
+d003.s005.t002 logo.n.01
+d003.s005.t003 side.n.03 side.n.05 side.n.04
+d003.s005.t004 letter.n.02
+d003.s005.t005 measure.n.02
+d003.s005.t006 other.a.01
+d003.s005.t007 side.n.03 side.n.05 side.n.04
+d003.s006.t000 use.v.01 use.v.02
+d003.s007.t000 antiemetic.n.01
+d003.s007.t001 mean.v.01 mean.v.03
+d003.s007.t002 stop.v.05 stop.v.03
+d003.s007.t003 vomit.v.01
+d003.s008.t000 use.v.01 use.v.02
+d003.s008.t001 dog.n.01
+d003.s008.t002 prevent.v.01 prevent.v.02
+d003.s008.t003 vomit.v.01
+d003.s008.t004 vomit.v.01
+d003.s008.t005 cause.v.01
+d003.s008.t006 chemotherapy.n.01
+d003.s008.t007 medicine.n.02
+d003.s008.t008 use.v.01 use.v.02
+d003.s008.t009 treatment.n.01
+d003.s008.t010 cancer.n.01
+d003.s008.t011 know.v.03
+d003.s008.t012 cause.v.01
+d003.s008.t013 vomit.v.01
+d003.s009.t000 combination.n.01
+d003.s009.t001 supportive.a.01
+d003.s009.t002 measure.n.01
+d003.s009.t003 other.a.01
+d003.s009.t004 veterinary.a.01
+d003.s009.t005 treatment.n.01
+d003.s009.t006 special.s.04 particular.s.01
+d003.s009.t007 diet.n.01
+d003.s009.t008 besides.r.02
+d003.s009.t009 use.v.01 use.v.02
+d003.s009.t010 treatment.n.01
+d003.s009.t011 vomit.n.03
+d003.s009.t012 injection.n.03
+d003.s009.t013 injection.n.03
+d003.s009.t014 follow.v.10
+d003.s009.t015 pill.n.02
+d003.s010.t000 purpose.n.01
+d003.s010.t001 give.v.19
+d003.s010.t002 day.n.04
+d003.s012.t000 obstruct.v.01 stop.v.03
+d003.s012.t001 receptor.n.01
+d003.s012.t002 act.v.01
+d003.s012.t003 central_nervous_system.n.01
+d003.s013.t000 analyze.v.01
+d003.s014.t000 battalion.n.02
+d003.s014.t001 survey.n.01
+d003.s014.t002 carry_through.v.01 follow_through.v.02
+d003.s014.t003 lab.n.01
+d003.s014.t004 dog.n.01
+d003.s014.t005 patient.n.01
+d003.s014.t006 veterinary.a.01
+d003.s014.t007 several.s.01
+d003.s014.t008 european_country.n.01
+d003.s015.t000 benefit.n.02
+d003.s015.t001 testify.v.02 prove.v.02
+d003.s015.t002 survey.n.01
+d003.s016.t000 result.n.03 consequence.n.01
+d003.s016.t001 survey.n.01
+d003.s016.t002 testify.v.02 prove.v.02
+d003.s016.t003 more.r.01
+d003.s016.t004 effective.a.01 effective.s.03
+d003.s016.t005 placebo.n.01
+d003.s016.t006 less.a.01
+d003.s016.t007 vomit.n.03
+d003.s016.t008 determine.v.08 see.v.10
+d003.s016.t009 dog.n.01
+d003.s016.t010 experience.v.03
+d003.s016.t011 medicine.n.02
+d003.s016.t012 dog.n.01
+d003.s016.t013 experience.v.03
+d003.s016.t014 placebo.n.01
+d003.s016.t015 treatment.n.01
+d003.s016.t016 prevention.n.01
+d003.s016.t017 vomit.n.03
+d003.s017.t000 treatment.n.01
+d003.s017.t001 vomit.n.03
+d003.s017.t002 dog.n.01
+d003.s017.t003 begin.v.08
+d003.s017.t004 injection.n.03
+d003.s017.t005 vomit.n.03
+d003.s017.t006 animal.n.01
+d003.s017.t007 not.r.01
+d003.s017.t008 able.s.03 able.a.01
+d003.s017.t009 pill.n.02
+d003.s017.t010 intact.s.04 integral.s.02
+d003.s017.t011 pill.n.02
+d003.s017.t012 again.r.01
+d003.s018.t000 follow-up.n.02 follow-up.n.03
+d003.s018.t001 treatment.n.01
+d003.s018.t002 owner.n.02
+d003.s018.t003 administer.v.04
+d003.s018.t004 pill.n.02
+d003.s018.t005 dog.n.01
+d003.s019.t000 besides.r.02
+d003.s019.t001 treatment.n.01
+d003.s019.t002 vomit.n.03
+d003.s019.t003 entirely.r.02
+d003.s019.t004 jointly.r.02
+d003.s019.t005 other.a.01
+d003.s019.t006 supportive.a.01
+d003.s019.t007 measure.n.01
+d003.s019.t008 other.a.01
+d003.s019.t009 veterinary.a.01
+d003.s019.t010 therapy.n.01
+d003.s019.t011 address.v.05
+d003.s019.t012 underlie.v.01
+d003.s019.t013 cause.n.01
+d003.s019.t014 vomit.n.03
+d003.s020.t000 hazard.n.01
+d003.s020.t001 associate.v.01
+d003.s021.t000 generally.r.02 by_and_large.r.01
+d003.s021.t001 well.r.01
+d003.s021.t002 tolerate.v.03
+d003.s021.t003 administer.v.04
+d003.s021.t004 daily.r.01
+d003.s021.t005 dose.n.01
+d003.s021.t006 time.n.01
+d003.s021.t007 recommend.v.01
+d003.s021.t008 dose.n.01
+d003.s021.t009 drawn-out.s.01
+d003.s021.t010 time_period.n.01
+d003.s021.t011 time.n.01
+d003.s021.t012 maximal.a.01
+d003.s021.t013 duration.n.01 duration.n.03
+d003.s021.t014 treatment.n.01
+d003.s022.t000 precaution.n.01
+d003.s022.t001 person.n.01
+d003.s022.t002 give.v.19
+d003.s022.t003 medicine.n.02
+d003.s022.t004 come_by.v.02
+d003.s022.t005 contact.n.02 contact.n.03
+d003.s022.t006 animal.n.01
+d003.s023.t000 not.r.01
+d003.s023.t001 constitute.v.01
+d003.s023.t002 especial.s.01 particular.s.02
+d003.s023.t003 hazard.n.01
+d003.s023.t004 multitude.n.03 people.n.01
