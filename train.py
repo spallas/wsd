@@ -138,6 +138,8 @@ class BaseTrainer:
         self.model.train()
         for epoch in range(self.last_epoch + 1, self.num_epochs + 1):
             logging.info(f'Epoch: {epoch}')
+            if TELEGRAM:
+                telegram_send(f'Epoch: {epoch}')
             self.train_epoch(epoch, pre_train)
 
     def test(self, loader=None):
