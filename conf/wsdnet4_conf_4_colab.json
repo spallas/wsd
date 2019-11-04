@@ -17,5 +17,5 @@
   "window_size": 50,
   "model_path": "res/roberta.large",
   "output_vocab": "drive/My Drive/wsd/res/dictionaries/syn_lemma_vocab.txt",
-  "sense_lemmas": "drive/My Drive/wsd/res/dictionaries/sense_lemmas.txt"
+  "sense_lemmas": "drive/My Drive/wsd/res/dictionaries/sense_lemmas_synset.txt"
 }

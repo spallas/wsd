@@ -16,13 +16,14 @@ from torch.utils.tensorboard import SummaryWriter
 from data_preprocessing import FlatSemCorDataset, load_sense2id, FlatLoader
 from utils import util
 from utils.config import RobertaTransformerConfig, WSDNetConfig
-from utils.util import NOT_AMB_SYMBOL
+from utils.util import NOT_AMB_SYMBOL, telegram_on_failure
 from wsd import ElmoTransformerWSD, RobertaTransformerWSD, BertTransformerWSD, BaselineWSD, WSDNet
 from apex import amp
 
 warnings.filterwarnings("ignore", category=UndefinedMetricWarning)
 torch.manual_seed(42)
 np.random.seed(42)
+TELEGRAM = True
 
 
 class BaseTrainer:
@@ -430,12 +431,16 @@ if __name__ == '__main__':
     parser.add_argument("-d", "--debug", action='store_true', help="Print debug information")
     parser.add_argument("-x", "--clean", action='store_true', help="Clear old saved weights.")
     parser.add_argument("-g", "--multi-gpu", action='store_true', help="Use all available GPUs.")
+    parser.add_argument("-l", "--log", type=str, help="log file name")
     parser.add_argument("-o", "--mixed-level", type=str, help="Train with mixed precision floats: O0 for standard"
                                                               "training, O1 for standard mixed precision, O2 for"
                                                               "advanced mixed precision.", default='O0')
     args = parser.parse_args()
     log_level = logging.DEBUG if args.debug else logging.INFO
-    logging.basicConfig(level=log_level, format='%(asctime)s:%(levelname)s: %(message)s')
+    if args.log:
+        logging.basicConfig(filename=args.log, level=log_level, format='%(asctime)s:%(levelname)s: %(message)s')
+    else:
+        logging.basicConfig(level=log_level, format='%(asctime)s:%(levelname)s: %(message)s')
     logging.info(f'Initializing... model = {args.model}')
 
     c = RobertaTransformerConfig.from_json_file(args.config) if args.model == 'roberta' else None
@@ -454,6 +459,6 @@ if __name__ == '__main__':
     t = WSDNetTrainer(**cd) if args.model == 'wsdnet' else t
 
     if args.test:
-        t.test()
+        telegram_on_failure(t.test)
     else:
-        t.train(args.pre_train)
+        telegram_on_failure(t.train, args.pre_train, 'oh')

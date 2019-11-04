@@ -19,3 +19,4 @@ tf-sentencepiece
 fasttext
 awscli
 future
+python-telegram-bot

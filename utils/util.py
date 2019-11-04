@@ -1,11 +1,20 @@
 
 from collections import defaultdict
 from typing import List
+import logging
 
 from nltk.corpus import wordnet as wn
 from transformers import BertTokenizer
 
+import telegram
+
 # MAPS for Part Of Speech #############
+
+with open('data/bot_token.txt') as f:
+    token = f.read().strip()
+bot = telegram.Bot(token=token)
+logging.debug('Initialized telegram bot.')
+chat_id = 105475495
 
 tag_map = defaultdict(lambda: wn.NOUN)
 tag_map['J'] = wn.ADJ
@@ -35,6 +44,21 @@ UNK_SENSE = -2
 PAD_SYMBOL = 'PAD'  # '<pad>'
 
 #######################################
+
+
+def telegram_on_failure(function, *args, **kwargs):
+    try:
+        function(*args, **kwargs)
+    except Exception as e:
+        bot.send_message(chat_id=chat_id,
+                         text=f'ERROR!\n{e}')
+        print(e)
+        exit(1)
+
+
+def telegram_result_value(function, *args, **kwargs):
+    return_val = function(*args, **kwargs)
+    bot.send_message(chat_id=chat_id, text=f'{return_val}')
 
 
 def example_to_input(lemma_list: List[str],
