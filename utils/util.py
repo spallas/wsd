@@ -59,6 +59,7 @@ def telegram_on_failure(function, *args, **kwargs):
 def telegram_result_value(function, *args, **kwargs):
     return_val = function(*args, **kwargs)
     bot.send_message(chat_id=chat_id, text=f'{return_val}')
+    return return_val
 
 
 def example_to_input(lemma_list: List[str],
