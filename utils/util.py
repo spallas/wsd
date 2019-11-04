@@ -62,6 +62,10 @@ def telegram_result_value(function, *args, **kwargs):
     return return_val
 
 
+def telegram_send(message: str):
+    bot.send_message(chat_id=chat_id, text=message)
+
+
 def example_to_input(lemma_list: List[str],
                      tags_list: List[int],
                      tok: BertTokenizer):

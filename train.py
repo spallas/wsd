@@ -16,7 +16,7 @@ from torch.utils.tensorboard import SummaryWriter
 from data_preprocessing import FlatSemCorDataset, load_sense2id, FlatLoader
 from utils import util
 from utils.config import RobertaTransformerConfig, WSDNetConfig
-from utils.util import NOT_AMB_SYMBOL, telegram_on_failure, telegram_result_value
+from utils.util import NOT_AMB_SYMBOL, telegram_on_failure, telegram_result_value, telegram_send
 from wsd import ElmoTransformerWSD, RobertaTransformerWSD, BertTransformerWSD, BaselineWSD, WSDNet
 from apex import amp
 
@@ -128,10 +128,7 @@ class BaseTrainer:
             with amp.scale_loss(loss, self.optimizer) as scaled_loss:
                 scaled_loss.backward()
 
-            if TELEGRAM:
-                telegram_result_value(self._log, step, loss, epoch_i)
-            else:
-                self._log(step, loss, epoch_i)
+            self._log(step, loss, epoch_i)
             parameters = self.model.parameters() if not self.has_master_params else amp.master_params(self.optimizer)
             clip_grad_norm_(parameters=parameters, max_norm=1.0)
             self.optimizer.step()  # update the weights
@@ -155,8 +152,6 @@ class BaseTrainer:
                 true += [item for seq in b_y.tolist() for item in seq]
                 pred += [item for seq in self._select_senses(scores, b_x, b_p, b_y) for item in seq]
                 z += [item for seq in b_z for item in seq]
-            if TELEGRAM:
-                return telegram_result_value(self._get_metrics, true, pred, z)
             return self._get_metrics(true, pred, z)
 
     def _evaluate(self, num_epoch):
@@ -164,6 +159,8 @@ class BaseTrainer:
         self.model.eval()
         f1 = self.test(self.eval_loader)
         self._save_best(f1, num_epoch)
+        if TELEGRAM:
+            telegram_send(f'F1: {f1:.6f}')
         return f1
 
     def _select_senses(self, b_scores, b_str, b_pos, b_labels):
@@ -271,7 +268,8 @@ class BaseTrainer:
             self._maybe_checkpoint(loss, f1, epoch_i)
             self._plot('Dev_F1', f1, step)
             self.model.train()  # return to train mode after evaluation
-            return f'Loss: {loss.item():.4f} '
+            if TELEGRAM:
+                telegram_send(f'Loss: {loss.item():.4f} ')
 
     def _load_best(self):
         if os.path.exists(self.best_model_path):
