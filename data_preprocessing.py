@@ -8,7 +8,7 @@ from collections import Counter, defaultdict
 from typing import List, Dict
 
 import torch
-from pytorch_transformers import BertTokenizer
+from transformers import BertTokenizer
 from torch import nn
 from torch.utils.data import Dataset
 from tqdm import tqdm

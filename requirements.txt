@@ -8,13 +8,14 @@ torch>=1.2.0
 allennlp
 fairseq
 transformers
-future
 pillow
 dataclasses-json
 cython
 tensorflow~=1.14.0
 tensorflow-hub
+tensorboard
 sentencepiece
 tf-sentencepiece
 fasttext
 awscli
+future

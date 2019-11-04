@@ -5,6 +5,7 @@ mkdir res/fasttext-vectors/
 wget https://dl.fbaipublicfiles.com/fairseq/models/roberta.large.tar.gz
 mv roberta.large.tar.gz res/
 tar -xzf res/roberta.large.tar.gz -C res/
+rm res/roberta.large.tar.gz
 
 pip install awscli
 
