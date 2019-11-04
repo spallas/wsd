@@ -3,7 +3,7 @@ from collections import defaultdict
 from typing import List
 
 from nltk.corpus import wordnet as wn
-from pytorch_pretrained_bert import BertTokenizer
+from transformers import BertTokenizer
 
 # MAPS for Part Of Speech #############
 
