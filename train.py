@@ -461,4 +461,4 @@ if __name__ == '__main__':
     if args.test:
         telegram_on_failure(t.test)
     else:
-        telegram_on_failure(t.train, args.pre_train, 'oh')
+        telegram_on_failure(t.train, args.pre_train)
