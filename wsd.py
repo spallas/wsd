@@ -19,7 +19,7 @@ class BaseWSD(nn.Module):
         self.win_size = max_len
         self.batch_size = batch_size
         self.ce_loss = nn.CrossEntropyLoss(ignore_index=NOT_AMB_SYMBOL)
-        self.bce_loss = nn.BCEWithLogitsLoss()
+        self.bce_loss = nn.BCEWithLogitsLoss(reduction='mean')  # also 'sum'
 
     def forward(self, *inputs):
         raise NotImplementedError("Do not use base class, use concrete classes instead.")
@@ -150,26 +150,30 @@ class WSDNet(RobertaTransformerWSD):
         logging.info('WSDNet: dictionaries loaded.')
         self.slm_output_size = len(self.out_vocab)
         self.output_slm = nn.Linear(self.transformer.d_model, self.slm_output_size)
+        self.pre_training = False
         self.x_slm = None
 
-    def forward(self, seq_list, lengths=None):
+    def forward(self, seq_list, lengths=None, pre_training=True):
         x = self.embedding(seq_list)
         mask = get_transformer_mask(lengths, self.win_size, self.device)
         y, h = self.transformer(x, mask)
-        self.x_slm = self.output_slm(h)
+        if self.pre_training:
+            self.x_slm = self.output_slm(h)
         return y
 
-    def loss(self, scores, tags, pre_training=True):
+    def loss(self, scores, tags, opt1=False):
         y_true = tags.view(-1)
         scores = scores.view(-1, self.tagset_size)
-        slm_scores = self.x_slm.view(-1, self.slm_output_size)
-        y_slm = torch.zeros_like(slm_scores).to(self.device)
-        assert y_true.size(0) == y_slm.size(0)
-        for y_i, y in enumerate(y_true):
-            if y != NOT_AMB_SYMBOL:
-                y_slm[y_i][self.sense_lemmas[y.item()], ] = 1
-        slm_loss = self.bce_loss(slm_scores, y_slm)
-        return self.ce_loss(scores, y_true) + slm_loss if not pre_training else slm_loss
+        if self.pre_training:
+            slm_scores = self.x_slm.view(-1, self.slm_output_size)
+            y_slm = torch.zeros_like(slm_scores).to(self.device)
+            assert y_true.size(0) == y_slm.size(0)
+            for y_i, y in enumerate(y_true):
+                if y != NOT_AMB_SYMBOL:
+                    y_slm[y_i][self.sense_lemmas[y.item()], ] = 1
+            slm_loss = self.bce_loss(slm_scores, y_slm)
+            return slm_loss
+        return self.ce_loss(scores, y_true)
 
 
 class RobertaDenseWSD(BaseWSD):

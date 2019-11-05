@@ -1,5 +1,4 @@
 import argparse
-import logging
 import os
 import warnings
 from typing import Set
@@ -19,6 +18,7 @@ from utils.config import RobertaTransformerConfig, WSDNetConfig
 from utils.util import NOT_AMB_SYMBOL, telegram_on_failure, telegram_result_value, telegram_send
 from wsd import ElmoTransformerWSD, RobertaTransformerWSD, BertTransformerWSD, BaselineWSD, WSDNet
 from apex import amp
+import logging
 
 warnings.filterwarnings("ignore", category=UndefinedMetricWarning)
 torch.manual_seed(42)
@@ -154,7 +154,10 @@ class BaseTrainer:
                 true += [item for seq in b_y.tolist() for item in seq]
                 pred += [item for seq in self._select_senses(scores, b_x, b_p, b_y) for item in seq]
                 z += [item for seq in b_z for item in seq]
-            return self._get_metrics(true, pred, z)
+            metrics = self._get_metrics(true, pred, z)
+            if TELEGRAM:
+                telegram_send(f'{metrics}')
+            return metrics
 
     def _evaluate(self, num_epoch):
         logging.info("Evaluating...")
@@ -463,7 +466,8 @@ if __name__ == '__main__':
         os.remove(cd['checkpoint_path'] + '.best')
     t = RobertaTrainer(**cd) if args.model == 'roberta' else None
     t = WSDNetTrainer(**cd) if args.model == 'wsdnet' else t
-
+    if args.model == 'wsdnet':
+        t.pre_training = args.pre_train
     if args.test:
         telegram_on_failure(t.test)
     else:
