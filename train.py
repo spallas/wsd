@@ -31,6 +31,7 @@ class BaseTrainer:
     def __init__(self,
                  num_epochs=40,
                  batch_size=32,
+                 accumulation_steps=4,
                  window_size=64,
                  learning_rate=0.0001,
                  checkpoint_path='saved_weights/baseline_elmo_checkpoint.pt',
@@ -51,6 +52,7 @@ class BaseTrainer:
 
         self.num_epochs = num_epochs
         self.batch_size = batch_size
+        self.accumulation_steps = accumulation_steps
         self.window_size = window_size
         self.learning_rate = learning_rate
         self.checkpoint_path = checkpoint_path
@@ -120,18 +122,20 @@ class BaseTrainer:
 
     def train_epoch(self, epoch_i, pre_train=True):
         step = 0
+        self.model.zero_grad()
         for step, (b_x, b_p, b_y, b_z) in enumerate(self.data_loader, self.last_step):
-            self.model.zero_grad()
             scores = self.model(b_x)
             loss = self.model.loss(scores, b_y.to(self.device), pre_train)
-
+            loss = loss / self.accumulation_steps
             with amp.scale_loss(loss, self.optimizer) as scaled_loss:
                 scaled_loss.backward()
-
-            self._log(step, loss, epoch_i)
             parameters = self.model.parameters() if not self.has_master_params else amp.master_params(self.optimizer)
             clip_grad_norm_(parameters=parameters, max_norm=1.0)
-            self.optimizer.step()  # update the weights
+
+            if (step+1) % self.accumulation_steps == 0:
+                self._log(step, loss, epoch_i)
+                self.optimizer.step()  # update the weights
+                self.model.zero_grad()
         self.last_step += step
 
     def train(self, pre_train=True):

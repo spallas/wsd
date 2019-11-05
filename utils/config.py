@@ -7,6 +7,7 @@ from dataclasses_json import dataclass_json
 class Config(object):
 
     batch_size: int = 32
+    accumulation_steps: int = 4
     num_epochs: int = 40
     window_size: int = 100
     mixed_precision: str = 'O0'
