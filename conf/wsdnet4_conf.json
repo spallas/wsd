@@ -1,9 +1,9 @@
 {
   "num_epochs": 27,
-  "batch_size": 32,
+  "batch_size": 64,
   "accumulation_steps": 4,
   "checkpoint_path": "saved_weights/wsdnet_checkpoint.pt",
-  "log_interval": 200,
+  "log_interval": 100,
   "train_data":"res/wsd-train/semcor+glosses_data.xml",
   "train_tags":"res/wsd-train/semcor+glosses_tags.txt",
   "eval_data" :"res/wsd-test/se07/se07.xml",

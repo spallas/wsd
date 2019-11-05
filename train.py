@@ -124,6 +124,7 @@ class BaseTrainer:
     def train_epoch(self, epoch_i, pre_train=True):
         step = 0
         self.model.zero_grad()
+        local_step = 0
         for step, (b_x, b_p, b_y, b_z) in enumerate(self.data_loader, self.last_step):
             scores = self.model(b_x)
             loss = self.model.loss(scores, b_y.to(self.device), pre_train)
@@ -134,7 +135,8 @@ class BaseTrainer:
             clip_grad_norm_(parameters=parameters, max_norm=1.0)
 
             if (step+1) % self.accumulation_steps == 0:
-                self._log(step, loss, epoch_i)
+                local_step += 1
+                self._log(local_step, loss, epoch_i)
                 self.optimizer.step()  # update the weights
                 self.model.zero_grad()
         self.last_step += step
