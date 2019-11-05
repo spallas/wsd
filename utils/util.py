@@ -13,7 +13,6 @@ import telegram
 with open('data/bot_token.txt') as f:
     token = f.read().strip()
 bot = telegram.Bot(token=token)
-logging.debug('Initialized telegram bot.')
 chat_id = 105475495
 
 tag_map = defaultdict(lambda: wn.NOUN)

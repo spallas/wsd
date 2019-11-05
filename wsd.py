@@ -147,6 +147,7 @@ class WSDNet(RobertaTransformerWSD):
                 sid = int(line.strip().split('\t')[0])
                 lemma_list = eval(line.strip().split('\t')[1])
                 self.sense_lemmas[sid] = lemma_list
+        self.slm_scale = 1000
         logging.info('WSDNet: dictionaries loaded.')
         self.slm_output_size = len(self.out_vocab)
         self.output_slm = nn.Linear(self.transformer.d_model, self.slm_output_size)
@@ -161,9 +162,10 @@ class WSDNet(RobertaTransformerWSD):
             self.x_slm = self.output_slm(h)
         return y
 
-    def loss(self, scores, tags, opt1=False):
+    def loss(self, scores, tags, combined=False):
         y_true = tags.view(-1)
         scores = scores.view(-1, self.tagset_size)
+        wsd_loss = self.ce_loss(scores, y_true)
         if self.pre_training:
             slm_scores = self.x_slm.view(-1, self.slm_output_size)
             y_slm = torch.zeros_like(slm_scores).to(self.device)
@@ -172,8 +174,40 @@ class WSDNet(RobertaTransformerWSD):
                 if y != NOT_AMB_SYMBOL:
                     y_slm[y_i][self.sense_lemmas[y.item()], ] = 1
             slm_loss = self.bce_loss(slm_scores, y_slm)
-            return slm_loss
-        return self.ce_loss(scores, y_true)
+            if combined:
+                wsd_loss += slm_loss * self.slm_scale
+            else:
+                return slm_loss
+        return wsd_loss
+
+
+class WSDNetX(WSDNet):
+
+    def __init__(self,
+                 device,
+                 num_senses,
+                 max_len,
+                 model_path,
+                 d_embedding: int = 1024,
+                 d_model: int = 512,
+                 num_heads: int = 8,
+                 num_layers: int = 4,
+                 output_vocab: str = 'res/dictionaries/syn_lemma_vocab.txt',
+                 sense_lemmas: str = 'res/dictionaries/sense_lemmas.txt'):
+        super().__init__(device, num_senses, max_len, model_path,
+                         d_embedding, d_model, num_heads, num_layers,
+                         output_vocab, sense_lemmas)
+        # TODO: delete not used weights
+        self.sense_lemmas_sparse = nn.Linear(self.transformer.d_model, self.tagset_size)
+        # TODO: set linear layer to
+
+    def forward(self, seq_list, lengths=None, pre_training=True):
+        x = self.embedding(seq_list)
+        mask = get_transformer_mask(lengths, self.win_size, self.device)
+        y, h = self.transformer(x, mask)
+        hh = self.sense_lemmas_sparse(h)
+        # TODO: adjust to make logits sum.
+        return y + hh
 
 
 class RobertaDenseWSD(BaseWSD):

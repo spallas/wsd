@@ -1,10 +1,12 @@
 import argparse
+import logging
 import os
 import warnings
 from typing import Set
 
 import numpy as np
 import torch
+from apex import amp
 from nltk.corpus import wordnet as wn
 from sklearn.exceptions import UndefinedMetricWarning
 from sklearn.metrics import classification_report, f1_score
@@ -15,15 +17,14 @@ from torch.utils.tensorboard import SummaryWriter
 from data_preprocessing import FlatSemCorDataset, load_sense2id, FlatLoader
 from utils import util
 from utils.config import RobertaTransformerConfig, WSDNetConfig
-from utils.util import NOT_AMB_SYMBOL, telegram_on_failure, telegram_result_value, telegram_send
+from utils.util import NOT_AMB_SYMBOL, telegram_on_failure, telegram_send
 from wsd import ElmoTransformerWSD, RobertaTransformerWSD, BertTransformerWSD, BaselineWSD, WSDNet
-from apex import amp
-import logging
 
 warnings.filterwarnings("ignore", category=UndefinedMetricWarning)
 torch.manual_seed(42)
 np.random.seed(42)
 TELEGRAM = True
+START_LOG_EPOCH = 15
 
 
 class BaseTrainer:
@@ -146,6 +147,19 @@ class BaseTrainer:
                 telegram_send(f'Epoch: {epoch}')
             self.train_epoch(epoch, pre_train)
 
+    def _log(self, step, loss, epoch_i):
+        if step % self.log_interval == 0:
+            logging.info(f'Loss: {loss.item():.4f} ')
+            self._plot('Train_loss', loss.item(), step)
+            self._gpu_mem_info()
+            self._maybe_checkpoint(loss, epoch_i)
+            if epoch_i > START_LOG_EPOCH:
+                f1 = self._evaluate(epoch_i)
+                self._plot('Dev_F1', f1, step)
+                self.model.train()  # return to train mode after evaluation
+            if TELEGRAM:
+                telegram_send(f'Loss: {loss.item():.4f} ')
+
     def test(self, loader=None):
         """
         """
@@ -230,7 +244,7 @@ class BaseTrainer:
                 pred_eval.append(pred[i])
         return self._print_metrics(true_eval, pred_eval)
 
-    def _maybe_checkpoint(self, loss, f1, epoch_i):
+    def _maybe_checkpoint(self, loss, epoch_i):
         current_loss = loss.item()
         if current_loss < self.min_loss:
             min_loss = current_loss
@@ -267,18 +281,6 @@ class BaseTrainer:
             self.last_step = 0
             self.min_loss = 1e3
             self.best_f1_micro = 0.0
-
-    def _log(self, step, loss, epoch_i):
-        if step % self.log_interval == 0:
-            logging.info(f'Loss: {loss.item():.4f} ')
-            self._plot('Train_loss', loss.item(), step)
-            self._gpu_mem_info()
-            f1 = self._evaluate(epoch_i)
-            self._maybe_checkpoint(loss, f1, epoch_i)
-            self._plot('Dev_F1', f1, step)
-            self.model.train()  # return to train mode after evaluation
-            if TELEGRAM:
-                telegram_send(f'Loss: {loss.item():.4f} ')
 
     def _load_best(self):
         if os.path.exists(self.best_model_path):
@@ -451,9 +453,9 @@ if __name__ == '__main__':
     args = parser.parse_args()
     log_level = logging.DEBUG if args.debug else logging.INFO
     if args.log:
-        logging.basicConfig(filename=args.log, level=log_level, format='%(asctime)s:%(levelname)s: %(message)s')
+        logging.basicConfig(filename=args.log, level=log_level, format='%(asctime)s: %(levelname)s: %(message)s')
     else:
-        logging.basicConfig(level=log_level, format='%(asctime)s:%(levelname)s: %(message)s')
+        logging.basicConfig(level=log_level, format='%(asctime)s: %(levelname)s: %(message)s')
     logging.info(f'Initializing... model = {args.model}')
 
     c = RobertaTransformerConfig.from_json_file(args.config) if args.model == 'roberta' else None
@@ -475,4 +477,4 @@ if __name__ == '__main__':
     if args.test:
         telegram_on_failure(t.test)
     else:
-        telegram_on_failure(t.train, args.pre_train)
+        telegram_on_failure(t.train, True)

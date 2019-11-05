@@ -123,6 +123,16 @@ class WSDNetConfig(RobertaTransformerConfig):
             return WSDNetConfig.from_json(f.read(), **kwargs)
 
 
+@dataclass_json
+@dataclass
+class WSDNetXConfig(WSDNetConfig):
+
+    @staticmethod
+    def from_json_file(file_name, **kwargs):
+        with open(file_name) as f:
+            return WSDNetXConfig.from_json(f.read(), **kwargs)
+
+
 # Test
 if __name__ == "__main__":
     c = ElmoConfig.from_json_file("../conf/baseline_elmo_conf.json")
