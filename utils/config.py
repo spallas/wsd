@@ -23,6 +23,7 @@ class Config(object):
     pad_symbol: str = 'PAD'  # or '<pad>'
 
     log_interval: int = 400
+    cache_embeddings: bool = False
 
 
 @dataclass_json

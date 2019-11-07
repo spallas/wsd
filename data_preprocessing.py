@@ -12,7 +12,9 @@ from transformers import BertTokenizer
 from torch import nn
 from torch.utils.data import Dataset
 from tqdm import tqdm
+import numpy as np
 
+from models import RobertaAlignedEmbed
 from utils import util
 from utils.util import UNK_SENSE, NOT_AMB_SYMBOL, is_ascii
 
@@ -306,6 +308,44 @@ class FlatLoader:
         self.last_offset = m
         b_y = nn.utils.rnn.pad_sequence(b_y, batch_first=True, padding_value=NOT_AMB_SYMBOL)
         return b_x, b_p, b_y, b_z
+
+
+class CachedEmbedLoader:
+
+    def __init__(self,
+                 cache_file: str,
+                 device,
+                 model_path: str,
+                 flat_loader: FlatLoader = None):
+        self.flat_loader = None
+        self.embed = None
+        self.npz_file = None
+        self.cache_file = cache_file
+        self.offset = 0
+        self.cache = []
+        if os.path.exists(cache_file):
+            self.npz_file = np.load(self.cache_file)
+        else:
+            self.flat_loader = flat_loader
+            self.embed = RobertaAlignedEmbed(device, model_path)
+            self._create_cache()
+
+    def _create_cache(self):
+        for i, (b_x, b_p, b_y, b_z) in enumerate(self.flat_loader):
+            self.cache.append(self.embed(b_x).numpy())
+        np.savez(self.cache_file, *self.cache)
+
+    def __iter__(self):
+        self.offset = 0
+        return self
+
+    def __next__(self):
+        try:
+            batch = self.npz_file[f'arr_{self.offset}'] if len(self.cache) == 0 else self.cache[self.offset]
+            self.offset += 1
+            return batch
+        except (KeyError, IndexError):
+            raise StopIteration
 
 
 if __name__ == '__main__':

@@ -242,7 +242,7 @@ class ElmoEmbeddings(nn.Module):
         return x
 
 
-class RobertaEmbeddings(nn.Module):
+class RobertaAlignedEmbed(nn.Module):
 
     def __init__(self,
                  device,

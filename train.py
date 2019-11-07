@@ -14,7 +14,7 @@ from torch import optim, nn
 from torch.nn.utils import clip_grad_norm_
 from torch.utils.tensorboard import SummaryWriter
 
-from data_preprocessing import FlatSemCorDataset, load_sense2id, FlatLoader
+from data_preprocessing import FlatSemCorDataset, load_sense2id, FlatLoader, CachedEmbedLoader
 from utils import util
 from utils.config import RobertaTransformerConfig, WSDNetConfig
 from utils.util import NOT_AMB_SYMBOL, telegram_on_failure, telegram_send
@@ -49,6 +49,7 @@ class BaseTrainer:
                  is_training=True,
                  mixed_precision='O0',
                  multi_gpu=False,
+                 cache_embeddings=False,
                  **kwargs):
 
         self.num_epochs = num_epochs
@@ -69,6 +70,7 @@ class BaseTrainer:
         self.train_sense_map = {}
         self.last_step = 0
         self.multi_gpu = multi_gpu
+        self.cache_embeddings = cache_embeddings
 
         self.best_model_path = self.checkpoint_path + '.best'
         self.sense2id = load_sense2id(sense_dict, train_tags, test_tags)
@@ -92,6 +94,12 @@ class BaseTrainer:
         if is_training:
             self.data_loader = FlatLoader(dataset, batch_size=self.batch_size, win_size=self.window_size,
                                           pad_symbol=self.pad_symbol)
+
+            if self.cache_embeddings:
+                self.cached_data_loader = CachedEmbedLoader('res/cache.npz', self.device,
+                                                            kwargs.get('model_path', None),
+                                                            self.data_loader)
+                logging.debug('Created cache')
             self._setup_training(eval_data, eval_tags)
         else:
             self._setup_testing(test_data, test_tags)
@@ -125,8 +133,8 @@ class BaseTrainer:
         step = 0
         self.model.zero_grad()
         local_step = 0
-        for step, (b_x, b_p, b_y, b_z) in enumerate(self.data_loader, self.last_step):
-            scores = self.model(b_x)
+        for step, ((b_x, b_p, b_y, b_z), b_x_e) in enumerate(zip(self.data_loader, self.cached_data_loader), self.last_step):
+            scores = self.model(b_x, b_x_e)
             loss = self.model.loss(scores, b_y.to(self.device), pre_train)
             loss = loss / self.accumulation_steps
             with amp.scale_loss(loss, self.optimizer) as scaled_loss:
@@ -451,7 +459,7 @@ if __name__ == '__main__':
     parser.add_argument("-l", "--log", type=str, help="log file name")
     parser.add_argument("-o", "--mixed-level", type=str, help="Train with mixed precision floats: O0 for standard"
                                                               "training, O1 for standard mixed precision, O2 for"
-                                                              "advanced mixed precision.", default='O0')
+                                                              "advanced mixed precision.", default='')
     args = parser.parse_args()
     log_level = logging.DEBUG if args.debug else logging.INFO
     if args.log:
@@ -479,4 +487,4 @@ if __name__ == '__main__':
     if args.test:
         telegram_on_failure(t.test)
     else:
-        telegram_on_failure(t.train, True)
+        telegram_on_failure(t.train, args.pre_train)

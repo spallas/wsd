@@ -5,7 +5,7 @@ import torch
 from torch import nn
 
 from models import ElmoEmbeddings, WSDTransformerEncoder, \
-    RobertaEmbeddings, get_transformer_mask, BertEmbeddings, LSTMEncoder
+    RobertaAlignedEmbed, get_transformer_mask, BertEmbeddings, LSTMEncoder
 from utils.util import NOT_AMB_SYMBOL
 
 
@@ -110,7 +110,7 @@ class RobertaTransformerWSD(BaseWSD):
         self.d_model = d_model
         self.num_heads = num_heads
         self.num_layers = num_layers
-        self.embedding = RobertaEmbeddings(device, model_path)
+        self.embedding = RobertaAlignedEmbed(device, model_path)
         self.transformer = WSDTransformerEncoder(self.d_embedding, self.d_model,
                                                  self.tagset_size, self.num_layers,
                                                  self.num_heads)
@@ -154,7 +154,7 @@ class WSDNet(RobertaTransformerWSD):
         self.pre_training = False
         self.x_slm = None
 
-    def forward(self, seq_list, lengths=None, pre_training=True):
+    def forward(self, seq_list, lengths=None, opt1=True):
         x = self.embedding(seq_list)
         mask = get_transformer_mask(lengths, self.win_size, self.device)
         y, h = self.transformer(x, mask)
