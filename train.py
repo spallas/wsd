@@ -96,11 +96,11 @@ class BaseTrainer:
                                           pad_symbol=self.pad_symbol)
 
             if self.cache_embeddings:
+                if 'model_path' not in kwargs:
+                    print(kwargs)
                 self.cached_data_loader = CachedEmbedLoader('res/cache.npz', self.device,
                                                             kwargs.get('model_path', 'res/roberta.large'),
                                                             self.data_loader)
-                if 'model_path' not in kwargs:
-                    print(kwargs)
                 logging.debug('Created cache')
             self._setup_training(eval_data, eval_tags)
         else:

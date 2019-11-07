@@ -331,7 +331,7 @@ class CachedEmbedLoader:
             self._create_cache()
 
     def _create_cache(self):
-        for i, (b_x, b_p, b_y, b_z) in enumerate(self.flat_loader):
+        for i, (b_x, b_p, b_y, b_z) in tqdm(enumerate(self.flat_loader)):
             self.cache.append(self.embed(b_x).cpu().numpy())
         np.savez(self.cache_file, *self.cache)
 
