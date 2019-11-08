@@ -154,8 +154,8 @@ class WSDNet(RobertaTransformerWSD):
         self.pre_training = False
         self.x_slm = None
 
-    def forward(self, seq_list, lengths=None, opt1=True):
-        x = self.embedding(seq_list)
+    def forward(self, seq_list, lengths=None, cached_embeddings=None):
+        x = self.embedding(seq_list) if cached_embeddings is None else cached_embeddings
         mask = get_transformer_mask(lengths, self.win_size, self.device)
         y, h = self.transformer(x, mask)
         if self.pre_training:

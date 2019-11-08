@@ -136,7 +136,10 @@ class BaseTrainer:
         self.model.zero_grad()
         local_step = 0
         for step, ((b_x, b_p, b_y, b_z), b_x_e) in enumerate(zip(self.data_loader, self.cached_data_loader), self.last_step):
-            scores = self.model(b_x, b_x_e)
+            try:
+                scores = self.model(b_x, cached_embeddings=b_x_e)
+            except TypeError:  # model doesn't support embeddings caching
+                scores = self.model(b_x)
             loss = self.model.loss(scores, b_y.to(self.device), pre_train)
             loss = loss / self.accumulation_steps
             with amp.scale_loss(loss, self.optimizer) as scaled_loss:
