@@ -51,7 +51,7 @@ def telegram_on_failure(function, *args, **kwargs):
     except Exception as e:
         bot.send_message(chat_id=chat_id,
                          text=f'ERROR!\n{e}')
-        print(e)
+        print(traceback.format_exc())
         exit(1)
 
 
