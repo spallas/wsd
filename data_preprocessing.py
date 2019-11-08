@@ -343,7 +343,7 @@ class CachedEmbedLoader:
         try:
             batch = self.npz_file[f'arr_{self.offset}'] if len(self.cache) == 0 else self.cache[self.offset]
             self.offset += 1
-            return batch
+            return torch.tensor(batch)
         except (KeyError, IndexError):
             raise StopIteration
 
