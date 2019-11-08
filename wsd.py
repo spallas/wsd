@@ -104,13 +104,14 @@ class RobertaTransformerWSD(BaseWSD):
                  d_embedding: int = 1024,
                  d_model: int = 512,
                  num_heads: int = 8,
-                 num_layers: int = 4):
+                 num_layers: int = 4,
+                 cached_embeddings: bool = False):
         super().__init__(device, num_senses, max_len)
         self.d_embedding = d_embedding
         self.d_model = d_model
         self.num_heads = num_heads
         self.num_layers = num_layers
-        self.embedding = RobertaAlignedEmbed(device, model_path)
+        self.embedding = RobertaAlignedEmbed(device, model_path) if cached_embeddings else None
         self.transformer = WSDTransformerEncoder(self.d_embedding, self.d_model,
                                                  self.tagset_size, self.num_layers,
                                                  self.num_heads)
@@ -134,9 +135,10 @@ class WSDNet(RobertaTransformerWSD):
                  num_heads: int = 8,
                  num_layers: int = 4,
                  output_vocab: str = 'res/dictionaries/syn_lemma_vocab.txt',
-                 sense_lemmas: str = 'res/dictionaries/sense_lemmas.txt'):
-        super().__init__(device, num_senses, max_len, model_path,
-                         d_embedding, d_model, num_heads, num_layers)
+                 sense_lemmas: str = 'res/dictionaries/sense_lemmas.txt',
+                 cached_embeddings: bool = False):
+        super().__init__(device, num_senses, max_len, model_path, d_embedding,
+                         d_model, num_heads, num_layers, cached_embeddings)
         self.out_vocab = OrderedDict()
         with open(output_vocab) as f:
             for i, line in enumerate(f):
@@ -193,10 +195,11 @@ class WSDNetX(WSDNet):
                  num_heads: int = 8,
                  num_layers: int = 4,
                  output_vocab: str = 'res/dictionaries/syn_lemma_vocab.txt',
-                 sense_lemmas: str = 'res/dictionaries/sense_lemmas.txt'):
+                 sense_lemmas: str = 'res/dictionaries/sense_lemmas.txt',
+                 cached_embeddings: bool = False):
         super().__init__(device, num_senses, max_len, model_path,
                          d_embedding, d_model, num_heads, num_layers,
-                         output_vocab, sense_lemmas)
+                         output_vocab, sense_lemmas, cached_embeddings)
         # TODO: delete not used weights
         self.sense_lemmas_sparse = nn.Linear(self.transformer.d_model, self.tagset_size)
         # TODO: set linear layer to

@@ -24,7 +24,7 @@ warnings.filterwarnings("ignore", category=UndefinedMetricWarning)
 torch.manual_seed(42)
 np.random.seed(42)
 TELEGRAM = True
-START_LOG_EPOCH = 15
+START_EVAL_EPOCH = 15
 
 
 class BaseTrainer:
@@ -98,7 +98,7 @@ class BaseTrainer:
             if self.cache_embeddings:
                 if 'model_path' not in kwargs:
                     print(kwargs)
-                self.cached_data_loader = CachedEmbedLoader('res/cache.npz', self.device,
+                self.cached_data_loader = CachedEmbedLoader(f'res/cache_{self.batch_size}.npz', self.device,
                                                             kwargs.get('model_path', 'res/roberta.large'),
                                                             self.data_loader)
                 logging.debug('Created cache')
@@ -113,6 +113,13 @@ class BaseTrainer:
         eval_dataset = FlatSemCorDataset(data_path=eval_data, tags_path=eval_tags)
         self.eval_loader = FlatLoader(eval_dataset, batch_size=self.batch_size, win_size=self.window_size,
                                       pad_symbol=self.pad_symbol)
+        if self.cache_embeddings:
+            try:
+                model_path = self.model_path
+            except AttributeError:
+                model_path = 'res/roberta.large'
+            self.cached_data_loader = CachedEmbedLoader(f'res/eval_cache_{self.batch_size}.npz', self.device,
+                                                        model_path, self.eval_loader)
         if torch.cuda.device_count() > 1 and self.multi_gpu:
             self.model = nn.DataParallel(self.model)
         self.model.to(self.device)
@@ -127,6 +134,13 @@ class BaseTrainer:
         test_dataset = FlatSemCorDataset(data_path=test_data, tags_path=test_tags)
         self.test_loader = FlatLoader(test_dataset, batch_size=self.batch_size, win_size=self.window_size,
                                       pad_symbol=self.pad_symbol)
+        if self.cache_embeddings:
+            try:
+                model_path = self.model_path
+            except AttributeError:
+                model_path = 'res/roberta.large'
+            self.cached_data_loader = CachedEmbedLoader(f'res/test_cache_{self.batch_size}.npz', self.device,
+                                                        model_path, self.test_loader)
         self._load_best()
         self.model.eval()
         self.model.to(self.device)
@@ -168,12 +182,12 @@ class BaseTrainer:
             self._plot('Train_loss', loss.item(), step)
             self._gpu_mem_info()
             self._maybe_checkpoint(loss, epoch_i)
-            if epoch_i > START_LOG_EPOCH:
+            if epoch_i > START_EVAL_EPOCH:
                 f1 = self._evaluate(epoch_i)
                 self._plot('Dev_F1', f1, step)
                 self.model.train()  # return to train mode after evaluation
             if TELEGRAM:
-                telegram_send(f'Loss: {loss.item():.4f} ')
+                telegram_send(f'Loss: {loss.item():.7f} ')
 
     def test(self, loader=None):
         """
@@ -189,7 +203,7 @@ class BaseTrainer:
                 z += [item for seq in b_z for item in seq]
             metrics = self._get_metrics(true, pred, z)
             if TELEGRAM:
-                telegram_send(f'{metrics}')
+                telegram_send(f'F1: {metrics:.6f}')
             return metrics
 
     def _evaluate(self, num_epoch):
@@ -197,8 +211,6 @@ class BaseTrainer:
         self.model.eval()
         f1 = self.test(self.eval_loader)
         self._save_best(f1, num_epoch)
-        if TELEGRAM:
-            telegram_send(f'F1: {f1:.6f}')
         return f1
 
     def _select_senses(self, b_scores, b_str, b_pos, b_labels):

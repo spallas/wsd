@@ -1,6 +1,6 @@
 {
   "num_epochs": 30,
-  "batch_size": 100,
+  "batch_size": 64,
   "accumulation_steps": 2,
   "checkpoint_path": "saved_weights/wsdnet_checkpoint_2.pt",
   "log_interval": 100,
