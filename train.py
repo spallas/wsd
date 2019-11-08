@@ -118,7 +118,7 @@ class BaseTrainer:
                 model_path = self.model_path
             except AttributeError:
                 model_path = 'res/roberta.large'
-            self.cached_data_loader = CachedEmbedLoader(f'res/eval_cache_{self.batch_size}.npz', self.device,
+            self.cached_eval_loader = CachedEmbedLoader(f'res/eval_cache_{self.batch_size}.npz', self.device,
                                                         model_path, self.eval_loader)
         if torch.cuda.device_count() > 1 and self.multi_gpu:
             self.model = nn.DataParallel(self.model)
@@ -139,7 +139,7 @@ class BaseTrainer:
                 model_path = self.model_path
             except AttributeError:
                 model_path = 'res/roberta.large'
-            self.cached_data_loader = CachedEmbedLoader(f'res/test_cache_{self.batch_size}.npz', self.device,
+            self.cached_test_loader = CachedEmbedLoader(f'res/test_cache_{self.batch_size}.npz', self.device,
                                                         model_path, self.test_loader)
         self._load_best()
         self.model.eval()
@@ -194,10 +194,16 @@ class BaseTrainer:
         """
         if not loader:
             loader = self.test_loader
+            cache_loader = self.cached_test_loader
+        else:
+            cache_loader = self.cached_eval_loader
         with torch.no_grad():
             pred, true, z = [], [], []
-            for step, (b_x, b_p, b_y, b_z) in enumerate(loader):
-                scores = self.model(b_x)
+            for step, ((b_x, b_p, b_y, b_z), b_x_e) in enumerate(zip(loader, cache_loader)):
+                try:
+                    scores = self.model(b_x, cached_embeddings=b_x_e)
+                except TypeError:  # model doesn't support embeddings caching
+                    scores = self.model(b_x)
                 true += [item for seq in b_y.tolist() for item in seq]
                 pred += [item for seq in self._select_senses(scores, b_x, b_p, b_y) for item in seq]
                 z += [item for seq in b_z for item in seq]
