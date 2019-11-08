@@ -461,7 +461,7 @@ if __name__ == '__main__':
     parser.add_argument("-l", "--log", type=str, help="log file name")
     parser.add_argument("-o", "--mixed-level", type=str, help="Train with mixed precision floats: O0 for standard"
                                                               "training, O1 for standard mixed precision, O2 for"
-                                                              "advanced mixed precision.", default='')
+                                                              "advanced mixed precision.", default='O0')
     args = parser.parse_args()
     log_level = logging.DEBUG if args.debug else logging.INFO
     if args.log:
