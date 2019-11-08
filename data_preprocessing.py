@@ -323,6 +323,7 @@ class CachedEmbedLoader:
         self.cache_file = cache_file
         self.offset = 0
         self.cache = []
+        self.device = device
         if os.path.exists(cache_file):
             self.npz_file = np.load(self.cache_file)
         else:
@@ -343,7 +344,7 @@ class CachedEmbedLoader:
         try:
             batch = self.npz_file[f'arr_{self.offset}'] if len(self.cache) == 0 else self.cache[self.offset]
             self.offset += 1
-            return torch.tensor(batch)
+            return torch.tensor(batch).to(self.device)
         except (KeyError, IndexError):
             raise StopIteration
 
