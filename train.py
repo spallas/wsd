@@ -6,7 +6,10 @@ from typing import Set
 
 import numpy as np
 import torch
-from apex import amp
+try:
+    from apex import amp
+except ImportError:
+    print('WARNING: Apex not available.')
 from nltk.corpus import wordnet as wn
 from sklearn.exceptions import UndefinedMetricWarning
 from sklearn.metrics import classification_report, f1_score
@@ -50,6 +53,7 @@ class BaseTrainer:
                  mixed_precision='O0',
                  multi_gpu=False,
                  cache_embeddings=False,
+                 cache_path='res/cache.npz',
                  **kwargs):
 
         self.num_epochs = num_epochs
@@ -71,6 +75,7 @@ class BaseTrainer:
         self.last_step = 0
         self.multi_gpu = multi_gpu
         self.cache_embeddings = cache_embeddings
+        self.cache_path = cache_path
 
         self.best_model_path = self.checkpoint_path + '.best'
         self.sense2id = load_sense2id(sense_dict, train_tags, test_tags)
@@ -98,7 +103,7 @@ class BaseTrainer:
             if self.cache_embeddings:
                 if 'model_path' not in kwargs:
                     print(kwargs)
-                self.cached_data_loader = CachedEmbedLoader(f'res/cache_{self.batch_size}.npz', self.device,
+                self.cached_data_loader = CachedEmbedLoader(f'{self.cache_path}_{self.batch_size}.npz', self.device,
                                                             kwargs.get('model_path', 'res/roberta.large'),
                                                             self.data_loader)
                 logging.debug('Created cache')
@@ -118,7 +123,7 @@ class BaseTrainer:
                 model_path = self.model_path
             except AttributeError:
                 model_path = 'res/roberta.large'
-            self.cached_eval_loader = CachedEmbedLoader(f'res/eval_cache_{self.batch_size}.npz', self.device,
+            self.cached_eval_loader = CachedEmbedLoader(f'{self.cache_path}_eval_{self.batch_size}.npz', self.device,
                                                         model_path, self.eval_loader)
         if torch.cuda.device_count() > 1 and self.multi_gpu:
             self.model = nn.DataParallel(self.model)
@@ -139,7 +144,7 @@ class BaseTrainer:
                 model_path = self.model_path
             except AttributeError:
                 model_path = 'res/roberta.large'
-            self.cached_test_loader = CachedEmbedLoader(f'res/test_cache_{self.batch_size}.npz', self.device,
+            self.cached_test_loader = CachedEmbedLoader(f'{self.cache_path}_test_{self.batch_size}.npz', self.device,
                                                         model_path, self.test_loader)
         self._load_best()
         self.model.eval()
@@ -483,6 +488,7 @@ if __name__ == '__main__':
     parser.add_argument("-o", "--mixed-level", type=str, help="Train with mixed precision floats: O0 for standard"
                                                               "training, O1 for standard mixed precision, O2 for"
                                                               "advanced mixed precision.", default='O0')
+    parser.add_argument("-z", "--cache", type=str, help="Embeddings cache", default='res/cache')
     args = parser.parse_args()
     log_level = logging.DEBUG if args.debug else logging.INFO
     if args.log:
@@ -500,6 +506,7 @@ if __name__ == '__main__':
     cd['is_training'] = not args.test
     cd['mixed_precision'] = args.mixed_level
     cd['multi_gpu'] = args.multi_gpu
+    cd['cache_path'] = args.cache
     if args.clean and os.path.exists(cd['checkpoint_path']):
         os.remove(cd['checkpoint_path'])
         os.remove(cd['checkpoint_path'] + '.best')

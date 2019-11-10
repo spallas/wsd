@@ -24,6 +24,7 @@ class Config(object):
 
     log_interval: int = 400
     cache_embeddings: bool = False
+    cache_path: str = 'res/cache.npz'
 
 
 @dataclass_json
