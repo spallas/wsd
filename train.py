@@ -8,8 +8,9 @@ import numpy as np
 import torch
 try:
     from apex import amp
+    AMP = True
 except ImportError:
-    print('WARNING: Apex not available.')
+    AMP = False
 from nltk.corpus import wordnet as wn
 from sklearn.exceptions import UndefinedMetricWarning
 from sklearn.metrics import classification_report, f1_score
@@ -131,8 +132,8 @@ class BaseTrainer:
         self.optimizer = optim.Adam(self.model.parameters(), lr=self.learning_rate)
         # Use apex to make model possibly faster.
         loss_scale = 1 if self.mixed == 'O0' else 'dynamic'
-        self.model, self.optimizer = amp.initialize(self.model, self.optimizer,
-                                                    opt_level=self.mixed, loss_scale=loss_scale)
+        self.model, self.optimizer = amp.initialize(self.model, self.optimizer, opt_level=self.mixed,
+                                                    loss_scale=loss_scale) if AMP else self.model, self.optimizer
         self._maybe_load_checkpoint()
 
     def _setup_testing(self, test_data, test_tags):
@@ -161,8 +162,11 @@ class BaseTrainer:
                 scores = self.model(b_x)
             loss = self.model.loss(scores, b_y.to(self.device), pre_train)
             loss = loss / self.accumulation_steps
-            with amp.scale_loss(loss, self.optimizer) as scaled_loss:
-                scaled_loss.backward()
+            if AMP:
+                with amp.scale_loss(loss, self.optimizer) as scaled_loss:
+                    scaled_loss.backward()
+            else:
+                loss.backward()
             parameters = self.model.parameters() if not self.has_master_params else amp.master_params(self.optimizer)
             clip_grad_norm_(parameters=parameters, max_norm=1.0)
 
@@ -286,12 +290,13 @@ class BaseTrainer:
         current_loss = loss.item()
         if current_loss < self.min_loss:
             min_loss = current_loss
+            ad = amp.state_dict() if AMP else {}
             torch.save({
                 'epoch': epoch_i,
                 'last_step': self.last_step,
                 'model_state_dict': self.model.state_dict(),
                 'optimizer_state_dict': self.optimizer.state_dict(),
-                'amp': amp.state_dict(),
+                'amp': ad,
                 'current_loss': current_loss,
                 'min_loss': min_loss,
                 'f1': self.best_f1_micro
@@ -302,7 +307,8 @@ class BaseTrainer:
             checkpoint = torch.load(self.checkpoint_path)
             self.model.load_state_dict(checkpoint['model_state_dict'])
             self.optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
-            amp.load_state_dict(checkpoint['amp'])
+            if AMP:
+                amp.load_state_dict(checkpoint['amp'])
             self.last_epoch = checkpoint['epoch']
             self.last_step = checkpoint['last_step']
             self.min_loss = checkpoint['min_loss']
