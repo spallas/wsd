@@ -6,8 +6,10 @@ from typing import Set
 
 import numpy as np
 import torch
+
 try:
     from apex import amp
+
     AMP = True
 except ImportError:
     AMP = False
@@ -132,8 +134,9 @@ class BaseTrainer:
         self.optimizer = optim.Adam(self.model.parameters(), lr=self.learning_rate)
         # Use apex to make model possibly faster.
         loss_scale = 1 if self.mixed == 'O0' else 'dynamic'
-        self.model, self.optimizer = amp.initialize(self.model, self.optimizer, opt_level=self.mixed,
-                                                    loss_scale=loss_scale) if AMP else self.model, self.optimizer
+        (self.model, _), self.optimizer = amp.initialize(self.model, self.optimizer,
+                                                         opt_level=self.mixed, loss_scale=loss_scale) \
+            if AMP else (self.model, None), self.optimizer
         self._maybe_load_checkpoint()
 
     def _setup_testing(self, test_data, test_tags):
@@ -155,7 +158,8 @@ class BaseTrainer:
         step = 0
         self.model.zero_grad()
         local_step = 0
-        for step, ((b_x, b_p, b_y, b_z), b_x_e) in enumerate(zip(self.data_loader, self.cached_data_loader), self.last_step):
+        for step, ((b_x, b_p, b_y, b_z), b_x_e) in enumerate(zip(self.data_loader, self.cached_data_loader),
+                                                             self.last_step):
             try:
                 scores = self.model(b_x, cached_embeddings=b_x_e)
             except TypeError:  # model doesn't support embeddings caching
@@ -170,7 +174,7 @@ class BaseTrainer:
             parameters = self.model.parameters() if not self.has_master_params else amp.master_params(self.optimizer)
             clip_grad_norm_(parameters=parameters, max_norm=1.0)
 
-            if (step+1) % self.accumulation_steps == 0:
+            if (step + 1) % self.accumulation_steps == 0:
                 local_step += 1
                 self._log(local_step, loss, epoch_i)
                 self.optimizer.step()  # update the weights
@@ -237,6 +241,7 @@ class BaseTrainer:
         :param b_pos:
         :return:
         """
+
         def to_ids(synsets):
             return set([self.sense2id.get(x.name(), 0) for x in synsets]) - {0}
 
