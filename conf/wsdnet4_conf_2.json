@@ -18,5 +18,5 @@
   "model_path": "res/roberta.large",
   "output_vocab": "res/dictionaries/syn_lemma_vocab.txt",
   "sense_lemmas": "res/dictionaries/sense_lemmas_synset.txt",
-  "cache_embeddings": "True"
+  "cache_embeddings": true
 }

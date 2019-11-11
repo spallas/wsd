@@ -54,7 +54,7 @@ class BaseTrainer:
                  mixed_precision='O0',
                  multi_gpu=False,
                  cache_embeddings=False,
-                 cache_path='res/cache.npz',
+                 cache_path='res/cache',
                  **kwargs):
 
         self.num_epochs = num_epochs
@@ -178,6 +178,7 @@ class BaseTrainer:
         self.last_step += step
 
     def train(self, pre_train=True):
+        print(self.model)
         self.model.train()
         for epoch in range(self.last_epoch + 1, self.num_epochs + 1):
             logging.info(f'Epoch: {epoch}')
