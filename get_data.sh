@@ -1,6 +1,7 @@
 
 mkdir res/ logs/ saved_weights/
 mkdir res/fasttext-vectors/
+mkdir res/dictionaries/
 
 wget https://dl.fbaipublicfiles.com/fairseq/models/roberta.large.tar.gz
 mv roberta.large.tar.gz res/

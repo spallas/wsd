@@ -208,6 +208,8 @@ class WSDNetX(WSDNet):
                 sparse_coord.append([syn, i])
         keys = torch.LongTensor(sparse_coord)
         vals = torch.ones(keys.shape[0])
+        print(keys)
+        print(vals)
         self.sv_matrix = torch.sparse.FloatTensor(keys.t(), vals, torch.Size(sv_size))
 
     def forward(self, seq_list, lengths=None, cached_embeddings=None):
