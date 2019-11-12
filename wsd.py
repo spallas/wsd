@@ -19,7 +19,7 @@ class BaseWSD(nn.Module):
         self.win_size = max_len
         self.batch_size = batch_size
         self.ce_loss = nn.CrossEntropyLoss(ignore_index=NOT_AMB_SYMBOL)
-        self.bce_loss = nn.BCEWithLogitsLoss(reduction='mean')  # also 'sum'
+        self.bce_loss = nn.BCEWithLogitsLoss(reduction='sum')  # also 'sum'
 
     def forward(self, *inputs):
         raise NotImplementedError("Do not use base class, use concrete classes instead.")
@@ -111,7 +111,7 @@ class RobertaTransformerWSD(BaseWSD):
         self.d_model = d_model
         self.num_heads = num_heads
         self.num_layers = num_layers
-        self.embedding = RobertaAlignedEmbed(device, model_path) if cached_embeddings else None
+        self.embedding = RobertaAlignedEmbed(device, model_path) if not cached_embeddings else None
         self.transformer = WSDTransformerEncoder(self.d_embedding, self.d_model,
                                                  self.tagset_size, self.num_layers,
                                                  self.num_heads)
@@ -200,17 +200,25 @@ class WSDNetX(WSDNet):
         super().__init__(device, num_senses, max_len, model_path,
                          d_embedding, d_model, num_heads, num_layers,
                          output_vocab, sense_lemmas, cached_embeddings)
-        # TODO: delete not used weights
-        self.sense_lemmas_sparse = nn.Linear(self.transformer.d_model, self.tagset_size)
-        # TODO: set linear layer to
+        # build |S| x |V| matrix
+        sv_size = (len(self.sense_lemmas) + 1, len(self.out_vocab))
+        sparse_coord = []
+        for syn in self.sense_lemmas:
+            for i in self.sense_lemmas[syn]:
+                sparse_coord.append([syn, i])
+        keys = torch.LongTensor(sparse_coord)
+        vals = torch.ones(keys.shape[0])
+        self.sv_matrix = torch.sparse.FloatTensor(keys.t(), vals, torch.Size(sv_size))
 
-    def forward(self, seq_list, lengths=None, pre_training=True):
-        x = self.embedding(seq_list)
+    def forward(self, seq_list, lengths=None, cached_embeddings=None):
+        x = self.embedding(seq_list) if cached_embeddings is None else cached_embeddings
         mask = get_transformer_mask(lengths, self.win_size, self.device)
         y, h = self.transformer(x, mask)
-        hh = self.sense_lemmas_sparse(h)
-        # TODO: adjust to make logits sum.
-        return y + hh
+        v = self.output_slm(h).transpose(1, 2)
+        # slm_logits = torch.sparse.mm(self.sv_matrix, v).transpose(2, 1)
+        # slm_logits = torch.matmul(self.sv_matrix.to_dense(), v).transpose(2, 1)
+        slm_logits = torch.stack([torch.sparse.mm(self.sv_matrix, v[i, :]) for i in range(v.shape[0])]).transpose(2, 1)
+        return y + slm_logits
 
 
 class RobertaDenseWSD(BaseWSD):

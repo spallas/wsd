@@ -11,8 +11,6 @@ transformers
 pillow
 dataclasses-json
 cython
-tensorflow~=1.14.0
-tensorflow-hub
 tensorboard
 sentencepiece
 tf-sentencepiece

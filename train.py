@@ -2,6 +2,7 @@ import argparse
 import logging
 import os
 import warnings
+from itertools import count
 from typing import Set
 
 import numpy as np
@@ -22,9 +23,9 @@ from torch.utils.tensorboard import SummaryWriter
 
 from data_preprocessing import FlatSemCorDataset, load_sense2id, FlatLoader, CachedEmbedLoader
 from utils import util
-from utils.config import RobertaTransformerConfig, WSDNetConfig
+from utils.config import RobertaTransformerConfig, WSDNetConfig, WSDNetXConfig
 from utils.util import NOT_AMB_SYMBOL, telegram_on_failure, telegram_send
-from wsd import ElmoTransformerWSD, RobertaTransformerWSD, BertTransformerWSD, BaselineWSD, WSDNet
+from wsd import ElmoTransformerWSD, RobertaTransformerWSD, BertTransformerWSD, BaselineWSD, WSDNet, WSDNetX
 
 warnings.filterwarnings("ignore", category=UndefinedMetricWarning)
 torch.manual_seed(42)
@@ -110,6 +111,8 @@ class BaseTrainer:
                                                             kwargs.get('model_path', 'res/roberta.large'),
                                                             self.data_loader)
                 logging.debug('Created cache')
+            else:
+                self.cached_data_loader = count()
             self._setup_training(eval_data, eval_tags)
         else:
             self._setup_testing(test_data, test_tags)
@@ -128,6 +131,8 @@ class BaseTrainer:
                 model_path = 'res/roberta.large'
             self.cached_eval_loader = CachedEmbedLoader(f'{self.cache_path}_eval_{self.batch_size}.npz', self.device,
                                                         model_path, self.eval_loader)
+        else:
+            self.cached_eval_loader = count()
         if torch.cuda.device_count() > 1 and self.multi_gpu:
             self.model = nn.DataParallel(self.model)
         self.model.to(self.device)
@@ -150,6 +155,8 @@ class BaseTrainer:
                 model_path = 'res/roberta.large'
             self.cached_test_loader = CachedEmbedLoader(f'{self.cache_path}_test_{self.batch_size}.npz', self.device,
                                                         model_path, self.test_loader)
+        else:
+            self.cached_test_loader = count()
         self._load_best()
         self.model.eval()
         self.model.to(self.device)
@@ -161,6 +168,7 @@ class BaseTrainer:
         for step, ((b_x, b_p, b_y, b_z), b_x_e) in enumerate(zip(self.data_loader, self.cached_data_loader),
                                                              self.last_step):
             try:
+                b_x_e = b_x_e if self.cache_embeddings else None
                 scores = self.model(b_x, cached_embeddings=b_x_e)
             except TypeError:  # model doesn't support embeddings caching
                 scores = self.model(b_x)
@@ -215,6 +223,7 @@ class BaseTrainer:
             pred, true, z = [], [], []
             for step, ((b_x, b_p, b_y, b_z), b_x_e) in enumerate(zip(loader, cache_loader)):
                 try:
+                    b_x_e = b_x_e if self.cache_embeddings else None
                     scores = self.model(b_x, cached_embeddings=b_x_e)
                 except TypeError:  # model doesn't support embeddings caching
                     scores = self.model(b_x)
@@ -486,13 +495,41 @@ class WSDNetTrainer(BaseTrainer):
                             self.sense_lemmas)
 
 
+class WSDNetXTrainer(BaseTrainer):
+
+    def __init__(self,
+                 num_layers=2,
+                 d_embeddings=1024,
+                 d_model=2048,
+                 num_heads=4,
+                 model_path='res/roberta.large',
+                 output_vocab: str = 'res/dictionaries/syn_lemma_vocab.txt',
+                 sense_lemmas: str = 'res/dictionaries/sense_lemmas.txt',
+                 **kwargs):
+        self.num_layers = num_layers
+        self.d_model = d_model
+        self.d_embeddings = d_embeddings
+        self.num_heads = num_heads
+        self.model_path = model_path
+        self.output_vocab = output_vocab
+        self.sense_lemmas = sense_lemmas
+        super().__init__(**kwargs)
+
+    def _build_model(self):
+        self.model = WSDNetX(self.device, len(self.sense2id) + 1, self.window_size,
+                             self.model_path, self.d_embeddings, self.d_model,
+                             self.num_heads, self.num_layers, self.output_vocab,
+                             self.sense_lemmas)
+
+
 if __name__ == '__main__':
 
     parser = argparse.ArgumentParser(description="Train with different models and options")
-    parser.add_argument("-m", "--model", type=str, help="model name", required=True)
+    parser.add_argument("-m", "--model", type=str, help="model name",
+                        required=True, choices=('roberta', 'wsdnet', 'wsdnetx'))
     parser.add_argument("-c", "--config", type=str, help="config JSON file path", required=True)
-    parser.add_argument("-t", "--test", action='store_true', help="Train or test")
-    parser.add_argument("-p", "--pre-train", action='store_true', help="Run pre-training")
+    parser.add_argument("-t", "--test", action='store_true', help="If test else run training")
+    parser.add_argument("-p", "--pre-train", action='store_true', help="Run w/ pre-training")
     parser.add_argument("-d", "--debug", action='store_true', help="Print debug information")
     parser.add_argument("-x", "--clean", action='store_true', help="Clear old saved weights.")
     parser.add_argument("-g", "--multi-gpu", action='store_true', help="Use all available GPUs.")
@@ -509,11 +546,13 @@ if __name__ == '__main__':
         logging.basicConfig(level=log_level, format='%(asctime)s: %(levelname)s: %(message)s')
     logging.info(f'Initializing... model = {args.model}')
 
-    c = RobertaTransformerConfig.from_json_file(args.config) if args.model == 'roberta' else None
-    c = WSDNetConfig.from_json_file(args.config) if args.model == 'wsdnet' else c
-    if c is None:
-        logging.error("Error: incorrect model. Specify -m wsdnet or -m roberta")
-        exit(1)
+    c, t = None, None
+    if args.model == 'roberta':
+        c = RobertaTransformerConfig.from_json_file(args.config)
+    elif args.model == 'wsdnet':
+        c = WSDNetConfig.from_json_file(args.config)
+    elif args.model == 'wsdnetx':
+        c = WSDNetXConfig.from_json_file(args.config)
     cd = c.__dict__
     cd['is_training'] = not args.test
     cd['mixed_precision'] = args.mixed_level
@@ -522,10 +561,13 @@ if __name__ == '__main__':
     if args.clean and os.path.exists(cd['checkpoint_path']):
         os.remove(cd['checkpoint_path'])
         os.remove(cd['checkpoint_path'] + '.best')
-    t = RobertaTrainer(**cd) if args.model == 'roberta' else None
-    t = WSDNetTrainer(**cd) if args.model == 'wsdnet' else t
-    if args.model == 'wsdnet':
+    if args.model == 'roberta':
+        t = RobertaTrainer(**cd)
         t.pre_training = args.pre_train
+    elif args.model == 'wsdnet':
+        t = WSDNetTrainer(**cd)
+    elif args.model == 'wsdnetx':
+        t = WSDNetXTrainer(**cd)
     if args.test:
         telegram_on_failure(t.test)
     else:

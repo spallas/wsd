@@ -1,12 +1,9 @@
-import traceback
 from collections import defaultdict
 from typing import List
-import logging
-
-from nltk.corpus import wordnet as wn
-from transformers import BertTokenizer
 
 import telegram
+from nltk.corpus import wordnet as wn
+from transformers import BertTokenizer
 
 # MAPS for Part Of Speech #############
 

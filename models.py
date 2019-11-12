@@ -118,9 +118,9 @@ class WSDTransformerEncoder(nn.Module):
         x = x.transpose(1, 0)  # make batch second dim for transformer layer
         x = self.encoder(x, src_key_padding_mask=mask)
         x = x.transpose(1, 0)  # restore batch first
-        h = x.contiguous().view(-1, x.shape[2])
+        h = x.contiguous().view(-1, x.shape[1], x.shape[2])
         y = self.output_dense(h)
-        y = nn.LogSoftmax(dim=1)(y)
+        # y = nn.LogSoftmax(dim=1)(y)
         scores = y.view(-1, seq_len, self.d_output)
         return scores, h
 
