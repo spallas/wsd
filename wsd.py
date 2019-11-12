@@ -210,7 +210,7 @@ class WSDNetX(WSDNet):
         vals = torch.ones(keys.shape[0])
         print(keys)
         print(vals)
-        self.sv_matrix = torch.sparse.FloatTensor(keys.t(), vals, torch.Size(sv_size))
+        self.sv_matrix = torch.sparse.FloatTensor(keys.t(), vals, torch.Size(sv_size)).to(self.device)
 
     def forward(self, seq_list, lengths=None, cached_embeddings=None):
         x = self.embedding(seq_list) if cached_embeddings is None else cached_embeddings
