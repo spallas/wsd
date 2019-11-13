@@ -171,33 +171,31 @@ class CachedEmbedLoader:
 
     def _load_cache(self):
         self.npz_file = np.load(self.cache_file)
-        arrays, i = [], 0
-        while True:
-            try:
-                arrays.append(self.npz_file[f'arr_{i}'])
-            except KeyError:
-                break
-        self.dataset = np.stack(arrays)
-        print('DONE LOADING EXITING NOW...')
-        time.sleep(10000)
-        exit(1)
+    #     arrays, i = [], 0
+    #     while True:
+    #         try:
+    #             arrays.append(self.npz_file[f'arr_{i}'])
+    #         except KeyError:
+    #             break
+    #     self.dataset = np.stack(arrays)
 
     def __iter__(self):
         self.offset = 0
-        self.stop_flag = False
+        # self.stop_flag = False
         return self
 
     def __next__(self):
-        if self.stop_flag:
-            raise StopIteration
+        # if self.stop_flag:
+        #     raise StopIteration
         try:
-            # batch = self.npz_file[f'arr_{self.offset}'] if len(self.cache) == 0 else self.cache[self.offset]
-            batch = self.dataset[self.offset*self.batch_size: (self.offset+1)*self.batch_size]
+            batch = self.npz_file[f'arr_{self.offset}'] if len(self.cache) == 0 else self.cache[self.offset]
+            # batch = self.dataset[self.offset*self.batch_size: (self.offset+1)*self.batch_size]
             self.offset += 1
             return torch.tensor(batch).to(self.device)
         except (KeyError, IndexError):
-            self.stop_flag = True
-            return self.dataset[self.offset*self.batch_size:]
+            raise StopIteration
+            # self.stop_flag = True
+            # return self.dataset[self.offset*self.batch_size:]
 
 
 if __name__ == '__main__':
