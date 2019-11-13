@@ -96,12 +96,12 @@ class FlatLoader:
                  batch_size: int,
                  win_size: int,
                  pad_symbol: str,
-                 do_overlap: bool = True):
+                 overlap: int = 0):
         self.dataset = dataset
         self.batch_size = batch_size
         self.win_size = win_size
         self.pad_symbol = pad_symbol
-        self.do_overlap = do_overlap
+        self.overlap = overlap
 
     def __iter__(self):
         self.last_offset = 0
@@ -113,8 +113,7 @@ class FlatLoader:
             raise StopIteration
         b_t, b_x, b_l, b_p, b_y, b_s, b_z = [], [], [], [], [], [], []
         for i in range(self.batch_size):
-            overlap = 16 if self.do_overlap else 0
-            n = max(self.last_offset + (i * self.win_size) - overlap, 0)
+            n = max(self.last_offset + (i * self.win_size) - self.overlap, 0)
             m = n + self.win_size
             if m > len(self.dataset):
                 self.stop_flag = True
@@ -156,6 +155,7 @@ class CachedEmbedLoader:
         self.dataset = None
         self.device = device
         self.batch_size = batch_size
+        self.stop_flag = False
         if os.path.exists(self.cache_file):
             self._load_cache()
         else:
@@ -183,15 +183,20 @@ class CachedEmbedLoader:
 
     def __iter__(self):
         self.offset = 0
+        self.stop_flag = False
         return self
 
     def __next__(self):
+        if self.stop_flag:
+            raise StopIteration
         try:
-            batch = self.npz_file[f'arr_{self.offset}'] if len(self.cache) == 0 else self.cache[self.offset]
+            # batch = self.npz_file[f'arr_{self.offset}'] if len(self.cache) == 0 else self.cache[self.offset]
+            batch = self.dataset[self.offset*self.batch_size: (self.offset+1)*self.batch_size]
             self.offset += 1
             return torch.tensor(batch).to(self.device)
         except (KeyError, IndexError):
-            raise StopIteration
+            self.stop_flag = True
+            return self.dataset[self.offset*self.batch_size:]
 
 
 if __name__ == '__main__':

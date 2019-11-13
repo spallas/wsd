@@ -17,3 +17,5 @@ aws s3 sync s3://spallas-wsd-us/dictionaries res/dictionaries/
 git clone https://github.com/NVIDIA/apex
 cd apex || exit
 pip install -v --no-cache-dir --global-option="--cpp_ext" --global-option="--cuda_ext" ./
+
+python -c "import nltk; nltk.download('wordnet')"
