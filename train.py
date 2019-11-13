@@ -58,6 +58,7 @@ class BaseTrainer:
                  multi_gpu=False,
                  cache_embeddings=False,
                  cache_path='res/cache',
+                 embed_model_path='',
                  **kwargs):
 
         self.num_epochs = num_epochs
@@ -80,6 +81,7 @@ class BaseTrainer:
         self.multi_gpu = multi_gpu
         self.cache_embeddings = cache_embeddings
         self.cache_path = cache_path
+        self.embed_model_path = embed_model_path
 
         self.best_model_path = self.checkpoint_path + '.best'
         self.sense2id = load_sense2id(sense_dict, train_tags, test_tags)
@@ -87,6 +89,10 @@ class BaseTrainer:
         self.pad_symbol = pad_symbol
 
         dataset = FlatSemCorDataset(train_data, train_tags)
+        self.secret = False
+        semcor_train, semcor_tags = 'res/wsd-train/semcor_data.xml', 'res/wsd-train/semcor_tags.txt'
+        if os.path.exists(semcor_train) and os.path.exists(semcor_tags):
+            secret_dataset, self.secret = FlatSemCorDataset(semcor_train, semcor_tags), True
         self.train_sense_map = dataset.train_sense_map
         self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
         logging.info(f'Device is {self.device}')
@@ -102,17 +108,13 @@ class BaseTrainer:
 
         if is_training:
             self.data_loader = FlatLoader(dataset, batch_size=self.batch_size, win_size=self.window_size,
-                                          pad_symbol=self.pad_symbol)
-
-            if self.cache_embeddings:
-                if 'model_path' not in kwargs:
-                    print(kwargs)
-                self.cached_data_loader = CachedEmbedLoader(f'{self.cache_path}_{self.batch_size}.npz', self.device,
-                                                            kwargs.get('model_path', 'res/roberta.large'),
-                                                            self.data_loader)
-                logging.debug('Created cache')
-            else:
-                self.cached_data_loader = count()
+                                          pad_symbol=self.pad_symbol, do_overlap=False)
+            self.cached_data_loader = CachedEmbedLoader(f'{self.cache_path}_{self.batch_size}.npz', self.device,
+                                                        self.embed_model_path, self.data_loader) \
+                if self.cache_embeddings else count()
+            if self.secret:
+                self.secret_loader = FlatLoader(secret_dataset, self.batch_size, self.window_size,
+                                                self.pad_symbol, False)
             self._setup_training(eval_data, eval_tags)
         else:
             self._setup_testing(test_data, test_tags)
@@ -124,15 +126,9 @@ class BaseTrainer:
         eval_dataset = FlatSemCorDataset(data_path=eval_data, tags_path=eval_tags)
         self.eval_loader = FlatLoader(eval_dataset, batch_size=self.batch_size, win_size=self.window_size,
                                       pad_symbol=self.pad_symbol)
-        if self.cache_embeddings:
-            try:
-                model_path = self.model_path
-            except AttributeError:
-                model_path = 'res/roberta.large'
-            self.cached_eval_loader = CachedEmbedLoader(f'{self.cache_path}_eval_{self.batch_size}.npz', self.device,
-                                                        model_path, self.eval_loader)
-        else:
-            self.cached_eval_loader = count()
+        self.cached_eval_loader = CachedEmbedLoader(f'{self.cache_path}_eval_{self.batch_size}.npz', self.device,
+                                                    self.embed_model_path, self.data_loader) \
+            if self.cache_embeddings else count()
         if torch.cuda.device_count() > 1 and self.multi_gpu:
             self.model = nn.DataParallel(self.model)
         self.model.to(self.device)
@@ -148,15 +144,9 @@ class BaseTrainer:
         test_dataset = FlatSemCorDataset(data_path=test_data, tags_path=test_tags)
         self.test_loader = FlatLoader(test_dataset, batch_size=self.batch_size, win_size=self.window_size,
                                       pad_symbol=self.pad_symbol)
-        if self.cache_embeddings:
-            try:
-                model_path = self.model_path
-            except AttributeError:
-                model_path = 'res/roberta.large'
-            self.cached_test_loader = CachedEmbedLoader(f'{self.cache_path}_test_{self.batch_size}.npz', self.device,
-                                                        model_path, self.test_loader)
-        else:
-            self.cached_test_loader = count()
+        self.cached_data_loader = CachedEmbedLoader(f'{self.cache_path}_test_{self.batch_size}.npz', self.device,
+                                                    self.embed_model_path, self.data_loader) \
+            if self.cache_embeddings else count()
         self._load_best()
         self.model.eval()
         self.model.to(self.device)
@@ -180,7 +170,7 @@ class BaseTrainer:
             else:
                 loss.backward()
             parameters = self.model.parameters() if not self.has_master_params else amp.master_params(self.optimizer)
-            clip_grad_norm_(parameters=parameters, max_norm=1.0)
+            clip_grad_norm_(parameters=parameters, max_norm=5.0)
 
             if (step + 1) % self.accumulation_steps == 0:
                 local_step += 1
@@ -196,6 +186,8 @@ class BaseTrainer:
             logging.info(f'Epoch: {epoch}')
             if TELEGRAM:
                 telegram_send(f'Epoch: {epoch}')
+            if epoch > START_EVAL_EPOCH and self.secret:
+                self.data_loader = self.secret_loader
             self.train_epoch(epoch, pre_train)
 
     def _log(self, step, loss, epoch_i):

@@ -1,7 +1,7 @@
 {
   "num_epochs": 30,
   "batch_size": 100,
-  "accumulation_steps": 2,
+  "accumulation_steps": 1,
   "checkpoint_path": "saved_weights/wsdnet_checkpoint_3.pt",
   "log_interval": 50,
   "train_data":"res/wsd-train/semcor+glosses_data.xml",
@@ -17,6 +17,6 @@
   "window_size": 50,
   "model_path": "res/roberta.large",
   "output_vocab": "res/dictionaries/syn_lemma_vocab.txt",
-  "sense_lemmas": "res/dictionaries/sense_lemmas_synset.txt",
+  "sense_lemmas": "res/dictionaries/sense_lemmas_hyper.txt",
   "cache_embeddings": true
 }

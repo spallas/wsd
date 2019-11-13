@@ -25,6 +25,7 @@ class Config(object):
     log_interval: int = 400
     cache_embeddings: bool = False
     cache_path: str = 'res/cache.npz'
+    embed_model_path: str = 'res/roberta.large'
 
 
 @dataclass_json
