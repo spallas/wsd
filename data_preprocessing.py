@@ -157,6 +157,7 @@ class CachedEmbedLoader:
         self.batch_size = batch_size
         self.stop_flag = False
         if os.path.exists(self.cache_file):
+            logging.info(f'Loading cache from {self.cache_file}')
             self._load_cache()
         else:
             self.flat_loader = flat_loader
