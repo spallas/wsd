@@ -106,6 +106,7 @@ class RobertaTransformerConfig(Config):
     d_model: int = 512
     pos_embed_dim: int = 32
     num_heads: int = 4
+    num_layers: int = 6
 
     @staticmethod
     def from_json_file(file_name, **kwargs):
