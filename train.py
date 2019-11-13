@@ -437,7 +437,7 @@ class RobertaTrainer(BaseTrainer):
     def _build_model(self):
         self.model = RobertaTransformerWSD(self.device, len(self.sense2id) + 1, self.window_size,
                                            self.model_path, self.d_embeddings, self.d_model,
-                                           self.num_heads, self.num_layers)
+                                           self.num_heads, self.num_layers, self.cache_embeddings)
 
 
 class BertTransformerTrainer(BaseTrainer):
@@ -484,7 +484,7 @@ class WSDNetTrainer(BaseTrainer):
         self.model = WSDNet(self.device, len(self.sense2id) + 1, self.window_size,
                             self.model_path, self.d_embeddings, self.d_model,
                             self.num_heads, self.num_layers, self.output_vocab,
-                            self.sense_lemmas)
+                            self.sense_lemmas, self.cache_embeddings)
 
 
 class WSDNetXTrainer(BaseTrainer):
@@ -511,7 +511,7 @@ class WSDNetXTrainer(BaseTrainer):
         self.model = WSDNetX(self.device, len(self.sense2id) + 1, self.window_size,
                              self.model_path, self.d_embeddings, self.d_model,
                              self.num_heads, self.num_layers, self.output_vocab,
-                             self.sense_lemmas)
+                             self.sense_lemmas, self.cache_embeddings)
 
 
 if __name__ == '__main__':
