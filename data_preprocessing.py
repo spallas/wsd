@@ -140,11 +140,14 @@ class FlatLoader:
 
 class CachedEmbedLoader:
 
+    HALF = 0
+    SINGLE = 1
+
     def __init__(self,
                  device,
                  cache_file: str,
                  model_path: str,
-                 batch_size: int,
+                 batch_mul: int = 0,
                  flat_loader: FlatLoader = None):
         self.flat_loader = None
         self.embed = None
@@ -154,8 +157,9 @@ class CachedEmbedLoader:
         self.cache = []
         self.dataset = None
         self.device = device
-        self.batch_size = batch_size
+        self.batch_mul = batch_mul
         self.stop_flag = False
+        self.second_half = None
         if os.path.exists(self.cache_file):
             logging.info(f'Loading cache from {self.cache_file}')
             self._load_cache()
@@ -171,31 +175,40 @@ class CachedEmbedLoader:
 
     def _load_cache(self):
         self.npz_file = np.load(self.cache_file)
-    #     arrays, i = [], 0
-    #     while True:
-    #         try:
-    #             arrays.append(self.npz_file[f'arr_{i}'])
-    #         except KeyError:
-    #             break
-    #     self.dataset = np.stack(arrays)
 
     def __iter__(self):
         self.offset = 0
-        # self.stop_flag = False
         return self
 
     def __next__(self):
-        # if self.stop_flag:
-        #     raise StopIteration
         try:
             batch = self.npz_file[f'arr_{self.offset}'] if len(self.cache) == 0 else self.cache[self.offset]
-            # batch = self.dataset[self.offset*self.batch_size: (self.offset+1)*self.batch_size]
-            self.offset += 1
-            return torch.tensor(batch).to(self.device)
+            if self.batch_mul == self.HALF:
+                if self.second_half is None:
+                    batch = batch[:len(batch)//2]
+                    self.second_half = batch[len(batch)//2:]
+                    return torch.tensor(batch).to(self.device)
+                else:
+                    second_half = self.second_half
+                    self.second_half = None
+                    self.offset += 1
+                    return torch.tensor(second_half).to(self.device)
+            if self.batch_mul > self.SINGLE:
+                batch_a = self.npz_file[f'arr_{self.offset}'] if len(self.cache) == 0 else self.cache[self.offset]
+                batches = [batch_a]
+                for i in range(self.batch_mul - 1):
+                    try:
+                        self.offset += 1
+                        batch_b = self.npz_file[f'arr_{self.offset}'] if len(self.cache) == 0 else self.cache[self.offset]
+                    except (KeyError, IndexError):
+                        raise StopIteration
+                batch = np.stack(batches)
+                return torch.tensor(batch).to(self.device)
+            else:
+                self.offset += 1
+                return torch.tensor(batch).to(self.device)
         except (KeyError, IndexError):
             raise StopIteration
-            # self.stop_flag = True
-            # return self.dataset[self.offset*self.batch_size:]
 
 
 if __name__ == '__main__':

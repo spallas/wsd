@@ -31,7 +31,7 @@ warnings.filterwarnings("ignore", category=UndefinedMetricWarning)
 torch.manual_seed(42)
 np.random.seed(42)
 TELEGRAM = True
-START_EVAL_EPOCH = 15
+START_EVAL_EPOCH = 20
 
 
 class BaseTrainer:
@@ -92,7 +92,7 @@ class BaseTrainer:
         self.secret = False
         semcor_train, semcor_tags = 'res/wsd-train/semcor_data.xml', 'res/wsd-train/semcor_tags.txt'
         if os.path.exists(semcor_train) and os.path.exists(semcor_tags):
-            secret_dataset, self.secret = FlatSemCorDataset(semcor_train, semcor_tags), False
+            secret_dataset, self.secret = FlatSemCorDataset(semcor_train, semcor_tags), True
         self.train_sense_map = dataset.train_sense_map
         self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
         logging.info(f'Device is {self.device}')
@@ -110,13 +110,13 @@ class BaseTrainer:
             self.data_loader = FlatLoader(dataset, batch_size=self.batch_size, win_size=self.window_size,
                                           pad_symbol=self.pad_symbol, overlap=0)
             self.cached_data_loader = CachedEmbedLoader(self.device, f'{self.cache_path}_{self.batch_size}.npz',
-                                                        self.embed_model_path, self.batch_size, self.data_loader) \
+                                                        self.embed_model_path, 0, self.data_loader) \
                 if self.cache_embeddings else count()
             if self.secret:
                 self.secret_loader = FlatLoader(secret_dataset, self.batch_size, self.window_size,
                                                 self.pad_symbol, False)
                 self.cached_secret_loader = CachedEmbedLoader(self.device, f'{self.cache_path}_secret_{batch_size}.npz',
-                                                              self.embed_model_path, self.batch_size, self.secret_loader) \
+                                                              self.embed_model_path, 0, self.secret_loader) \
                     if self.cache_embeddings else count()
             self._setup_training(eval_data, eval_tags)
         else:
@@ -130,7 +130,7 @@ class BaseTrainer:
         self.eval_loader = FlatLoader(eval_dataset, batch_size=self.batch_size, win_size=self.window_size,
                                       pad_symbol=self.pad_symbol)
         self.cached_eval_loader = CachedEmbedLoader(self.device, f'{self.cache_path}_eval_{self.batch_size}.npz',
-                                                    self.embed_model_path, self.batch_size, self.eval_loader) \
+                                                    self.embed_model_path, 0, self.eval_loader) \
             if self.cache_embeddings else count()
         if torch.cuda.device_count() > 1 and self.multi_gpu:
             self.model = nn.DataParallel(self.model)
@@ -148,7 +148,7 @@ class BaseTrainer:
         self.test_loader = FlatLoader(test_dataset, batch_size=self.batch_size, win_size=self.window_size,
                                       pad_symbol=self.pad_symbol)
         self.cached_test_loader = CachedEmbedLoader(self.device, f'{self.cache_path}_test_{self.batch_size}.npz',
-                                                    self.embed_model_path, self.batch_size, self.test_loader) \
+                                                    self.embed_model_path, 0, self.test_loader) \
             if self.cache_embeddings else count()
         self._load_best()
         self.model.eval()
