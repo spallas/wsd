@@ -93,7 +93,7 @@ class BaseTrainer:
         self.secret = False
         semcor_train, semcor_tags = 'res/wsd-train/semcor_data.xml', 'res/wsd-train/semcor_tags.txt'
         if os.path.exists(semcor_train) and os.path.exists(semcor_tags):
-            secret_dataset, self.secret = FlatSemCorDataset(semcor_train, semcor_tags), True
+            secret_dataset, self.secret = FlatSemCorDataset(semcor_train, semcor_tags), False
         self.train_sense_map = dataset.train_sense_map
         self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
         logging.info(f'Device is {self.device}')
