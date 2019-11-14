@@ -115,8 +115,8 @@ class BaseTrainer:
             if self.secret:
                 self.secret_loader = FlatLoader(secret_dataset, self.batch_size, self.window_size,
                                                 self.pad_symbol, False)
-                self.cached_data_loader = CachedEmbedLoader(self.device, f'{self.cache_path}_secret_{batch_size}.npz',
-                                                            self.embed_model_path, self.batch_size, self.data_loader) \
+                self.cached_secret_loader = CachedEmbedLoader(self.device, f'{self.cache_path}_secret_{batch_size}.npz',
+                                                              self.embed_model_path, self.batch_size, self.secret_loader) \
                     if self.cache_embeddings else count()
             self._setup_training(eval_data, eval_tags)
         else:
@@ -130,7 +130,7 @@ class BaseTrainer:
         self.eval_loader = FlatLoader(eval_dataset, batch_size=self.batch_size, win_size=self.window_size,
                                       pad_symbol=self.pad_symbol)
         self.cached_eval_loader = CachedEmbedLoader(self.device, f'{self.cache_path}_eval_{self.batch_size}.npz',
-                                                    self.embed_model_path, self.batch_size, self.data_loader) \
+                                                    self.embed_model_path, self.batch_size, self.eval_loader) \
             if self.cache_embeddings else count()
         if torch.cuda.device_count() > 1 and self.multi_gpu:
             self.model = nn.DataParallel(self.model)
@@ -147,8 +147,8 @@ class BaseTrainer:
         test_dataset = FlatSemCorDataset(data_path=test_data, tags_path=test_tags)
         self.test_loader = FlatLoader(test_dataset, batch_size=self.batch_size, win_size=self.window_size,
                                       pad_symbol=self.pad_symbol)
-        self.cached_data_loader = CachedEmbedLoader(self.device, f'{self.cache_path}_test_{self.batch_size}.npz',
-                                                    self.embed_model_path, self.batch_size, self.data_loader) \
+        self.cached_test_loader = CachedEmbedLoader(self.device, f'{self.cache_path}_test_{self.batch_size}.npz',
+                                                    self.embed_model_path, self.batch_size, self.test_loader) \
             if self.cache_embeddings else count()
         self._load_best()
         self.model.eval()
