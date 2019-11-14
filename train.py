@@ -192,6 +192,7 @@ class BaseTrainer:
                 telegram_send(f'Epoch: {epoch}')
             if epoch > START_EVAL_EPOCH and self.secret:
                 self.data_loader = self.secret_loader
+                self.cached_data_loader = self.cached_secret_loader
             self.train_epoch(epoch, pre_train)
 
     def _log(self, step, loss, epoch_i):
