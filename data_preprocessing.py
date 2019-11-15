@@ -191,6 +191,8 @@ class CachedEmbedLoader:
                 if self.second_half is None:
                     if self.batch_size == 0:
                         self.batch_size = len(batch)//2
+                    if len(batch) < self.batch_size:
+                        return torch.tensor(batch).to(self.device)
                     batch_ = batch[:self.batch_size]
                     self.second_half = batch[self.batch_size:]
                     return torch.tensor(batch_).to(self.device)
