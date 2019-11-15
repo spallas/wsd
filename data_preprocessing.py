@@ -183,9 +183,9 @@ class CachedEmbedLoader:
             batch = self.npz_file[f'arr_{self.offset}'] if len(self.cache) == 0 else self.cache[self.offset]
             if self.batch_mul == self.HALF:
                 if self.second_half is None:
-                    batch = batch[:len(batch)//2]
+                    batch_ = batch[:len(batch)//2]
                     self.second_half = batch[len(batch)//2:]
-                    return torch.tensor(batch).to(self.device)
+                    return torch.tensor(batch_).to(self.device)
                 else:
                     second_half = self.second_half
                     self.second_half = None
