@@ -145,7 +145,7 @@ class CachedEmbedLoader:
                  device,
                  cache_file: str,
                  model_path: str,
-                 batch_mul: int = 0,
+                 batch_mul: int = 1,
                  flat_loader: FlatLoader = None):
         self.flat_loader = None
         self.embed = None

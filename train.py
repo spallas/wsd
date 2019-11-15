@@ -83,7 +83,8 @@ class BaseTrainer:
         self.cache_embeddings = cache_embeddings
         self.cache_path = cache_path
         self.embed_model_path = embed_model_path
-
+        self.cache_batch_size = self.batch_size * 2 if BATCH_MUL == CachedEmbedLoader.HALF \
+            else self.batch_size // BATCH_MUL
         self.best_model_path = self.checkpoint_path + '.best'
         self.sense2id = load_sense2id(sense_dict, train_tags, test_tags)
         logging.debug('Loaded sense2id vocab')
@@ -110,13 +111,13 @@ class BaseTrainer:
         if is_training:
             self.data_loader = FlatLoader(dataset, batch_size=self.batch_size, win_size=self.window_size,
                                           pad_symbol=self.pad_symbol, overlap=0)
-            self.cached_data_loader = CachedEmbedLoader(self.device, f'{self.cache_path}_{self.batch_size}.npz',
+            self.cached_data_loader = CachedEmbedLoader(self.device, f'{self.cache_path}_{self.cache_batch_size}.npz',
                                                         self.embed_model_path, BATCH_MUL, self.data_loader) \
                 if self.cache_embeddings else count()
             if self.secret:
                 self.secret_loader = FlatLoader(secret_dataset, self.batch_size, self.window_size,
                                                 self.pad_symbol, False)
-                self.cached_secret_loader = CachedEmbedLoader(self.device, f'{self.cache_path}_secret_{batch_size}.npz',
+                self.cached_secret_loader = CachedEmbedLoader(self.device, f'{self.cache_path}_secret_{self.cache_batch_size}.npz',
                                                               self.embed_model_path, BATCH_MUL, self.secret_loader) \
                     if self.cache_embeddings else count()
             self._setup_training(eval_data, eval_tags)
@@ -130,7 +131,7 @@ class BaseTrainer:
         eval_dataset = FlatSemCorDataset(data_path=eval_data, tags_path=eval_tags)
         self.eval_loader = FlatLoader(eval_dataset, batch_size=self.batch_size, win_size=self.window_size,
                                       pad_symbol=self.pad_symbol)
-        self.cached_eval_loader = CachedEmbedLoader(self.device, f'{self.cache_path}_eval_{self.batch_size}.npz',
+        self.cached_eval_loader = CachedEmbedLoader(self.device, f'{self.cache_path}_eval_{self.cache_batch_size}.npz',
                                                     self.embed_model_path, BATCH_MUL, self.eval_loader) \
             if self.cache_embeddings else count()
         if torch.cuda.device_count() > 1 and self.multi_gpu:
@@ -148,7 +149,7 @@ class BaseTrainer:
         test_dataset = FlatSemCorDataset(data_path=test_data, tags_path=test_tags)
         self.test_loader = FlatLoader(test_dataset, batch_size=self.batch_size, win_size=self.window_size,
                                       pad_symbol=self.pad_symbol)
-        self.cached_test_loader = CachedEmbedLoader(self.device, f'{self.cache_path}_test_{self.batch_size}.npz',
+        self.cached_test_loader = CachedEmbedLoader(self.device, f'{self.cache_path}_test_{self.cache_batch_size}.npz',
                                                     self.embed_model_path, BATCH_MUL, self.test_loader) \
             if self.cache_embeddings else count()
         self._load_best()
