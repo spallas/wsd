@@ -3,17 +3,15 @@ Load data from SemCor files and SemEval/SensEval files.
 """
 import logging
 import os
-import time
 import xml.etree.ElementTree as Et
 from collections import Counter, defaultdict
 from typing import List, Dict
 
+import numpy as np
 import torch
-from transformers import BertTokenizer
 from torch import nn
 from torch.utils.data import Dataset
 from tqdm import tqdm
-import numpy as np
 
 from models import RobertaAlignedEmbed
 from utils import util

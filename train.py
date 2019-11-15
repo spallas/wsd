@@ -31,7 +31,7 @@ warnings.filterwarnings("ignore", category=UndefinedMetricWarning)
 torch.manual_seed(42)
 np.random.seed(42)
 TELEGRAM = True
-START_EVAL_EPOCH = 20
+START_EVAL_EPOCH = 10
 BATCH_MUL = CachedEmbedLoader.SINGLE
 
 
