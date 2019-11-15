@@ -186,9 +186,9 @@ class CachedEmbedLoader:
         if self.stop_flag:
             raise StopIteration
         try:
-            batch = self.npz_file[f'arr_{self.offset}'] if len(self.cache) == 0 else self.cache[self.offset]
             if self.batch_mul == self.HALF:
                 if self.second_half is None:
+                    batch = self.npz_file[f'arr_{self.offset}'] if len(self.cache) == 0 else self.cache[self.offset]
                     if self.batch_size == 0:
                         self.batch_size = len(batch)//2
                     if len(batch) < self.batch_size:
@@ -218,6 +218,7 @@ class CachedEmbedLoader:
                 batch = np.stack(batches)
                 return torch.tensor(batch).to(self.device)
             else:
+                batch = self.npz_file[f'arr_{self.offset}'] if len(self.cache) == 0 else self.cache[self.offset]
                 self.offset += 1
                 return torch.tensor(batch).to(self.device)
         except (KeyError, IndexError):
