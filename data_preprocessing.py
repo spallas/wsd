@@ -158,6 +158,8 @@ class CachedEmbedLoader:
         self.batch_mul = batch_mul
         self.stop_flag = False
         self.second_half = None
+        self.batch_size = 0
+        self.stop_flag = False
         if os.path.exists(self.cache_file):
             logging.info(f'Loading cache from {self.cache_file}')
             self._load_cache()
@@ -176,15 +178,20 @@ class CachedEmbedLoader:
 
     def __iter__(self):
         self.offset = 0
+        self.stop_flag = False
         return self
 
     def __next__(self):
+        if self.stop_flag:
+            raise StopIteration
         try:
             batch = self.npz_file[f'arr_{self.offset}'] if len(self.cache) == 0 else self.cache[self.offset]
             if self.batch_mul == self.HALF:
                 if self.second_half is None:
-                    batch_ = batch[:len(batch)//2]
-                    self.second_half = batch[len(batch)//2:]
+                    if self.batch_size == 0:
+                        self.batch_size = len(batch)//2
+                    batch_ = batch[:self.batch_size]
+                    self.second_half = batch[self.batch_size:]
                     return torch.tensor(batch_).to(self.device)
                 else:
                     second_half = self.second_half
@@ -198,8 +205,10 @@ class CachedEmbedLoader:
                     try:
                         self.offset += 1
                         batch_b = self.npz_file[f'arr_{self.offset}'] if len(self.cache) == 0 else self.cache[self.offset]
+                        batches.append(batch_b)
                     except (KeyError, IndexError):
-                        raise StopIteration
+                        self.stop_flag = True
+                        break
                 batch = np.stack(batches)
                 return torch.tensor(batch).to(self.device)
             else:
