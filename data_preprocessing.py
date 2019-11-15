@@ -179,6 +179,7 @@ class CachedEmbedLoader:
     def __iter__(self):
         self.offset = 0
         self.stop_flag = False
+        self.second_half = None
         return self
 
     def __next__(self):
@@ -197,7 +198,10 @@ class CachedEmbedLoader:
                     second_half = self.second_half
                     self.second_half = None
                     self.offset += 1
-                    return torch.tensor(second_half).to(self.device)
+                    if len(second_half) > 0:
+                        return torch.tensor(second_half).to(self.device)
+                    else:
+                        raise StopIteration
             if self.batch_mul > self.SINGLE:
                 batch_a = self.npz_file[f'arr_{self.offset}'] if len(self.cache) == 0 else self.cache[self.offset]
                 batches = [batch_a]
