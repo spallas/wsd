@@ -174,7 +174,7 @@ class BaseTrainer:
             else:
                 loss.backward()
             parameters = self.model.parameters() if not self.has_master_params else amp.master_params(self.optimizer)
-            clip_grad_norm_(parameters=parameters, max_norm=5.0)
+            clip_grad_norm_(parameters=parameters, max_norm=1.0)
 
             if (step + 1) % self.accumulation_steps == 0:
                 local_step += 1
