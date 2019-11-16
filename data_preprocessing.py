@@ -146,6 +146,7 @@ class CachedEmbedLoader:
                  cache_file: str,
                  model_path: str,
                  batch_mul: int = 1,
+                 batch_size: int = 1,
                  flat_loader: FlatLoader = None):
         self.flat_loader = None
         self.embed = None
@@ -158,7 +159,7 @@ class CachedEmbedLoader:
         self.batch_mul = batch_mul
         self.stop_flag = False
         self.second_half = None
-        self.batch_size = 0
+        self.batch_size = batch_size
         self.stop_flag = False
         if os.path.exists(self.cache_file):
             logging.info(f'Loading cache from {self.cache_file}')
@@ -189,8 +190,6 @@ class CachedEmbedLoader:
             if self.batch_mul == self.HALF:
                 if self.second_half is None:
                     batch = self.npz_file[f'arr_{self.offset}'] if len(self.cache) == 0 else self.cache[self.offset]
-                    if self.batch_size == 0:
-                        self.batch_size = len(batch)//2
                     if len(batch) < self.batch_size:
                         return torch.tensor(batch).to(self.device)
                     batch_ = batch[:self.batch_size]
