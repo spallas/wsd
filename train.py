@@ -543,7 +543,7 @@ if __name__ == '__main__':
     else:
         logging.basicConfig(level=log_level, format='%(asctime)s: %(levelname)s: %(message)s')
     logging.info(f'Initializing... model = {args.model}')
-    if args.conf.endswith('_half.json'):
+    if args.config.endswith('_half.json'):
         BATCH_MUL = CachedEmbedLoader.HALF
     c, t = None, None
     if args.model == 'roberta':
