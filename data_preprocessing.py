@@ -3,6 +3,7 @@ Load data from SemCor files and SemEval/SensEval files.
 """
 import logging
 import os
+import random
 import xml.etree.ElementTree as Et
 from collections import Counter, defaultdict
 from typing import List, Dict
@@ -94,24 +95,30 @@ class FlatLoader:
                  batch_size: int,
                  win_size: int,
                  pad_symbol: str,
-                 overlap: int = 0):
+                 overlap: int = 0,
+                 randomize: bool = False):
         self.dataset = dataset
         self.batch_size = batch_size
         self.win_size = win_size
         self.pad_symbol = pad_symbol
-        self.overlap = overlap
+        self.randomize = randomize
+        self.overlap = overlap if not randomize else 0
 
     def __iter__(self):
-        self.last_offset = 0
-        self.stop_flag = False
+        self.offset = 0
+        self.index_list = list(range((len(self.dataset) // self.batch_size)+1, self.batch_size))
+        if self.randomize:
+            random.shuffle(self.index_list)
         return self
 
     def __next__(self):
-        if self.stop_flag:
-            raise StopIteration
         b_t, b_x, b_l, b_p, b_y, b_s, b_z = [], [], [], [], [], [], []
+        try:
+            self.offset = self.index_list.pop()
+        except IndexError:
+            raise StopIteration
         for i in range(self.batch_size):
-            n = max(self.last_offset + (i * self.win_size) - self.overlap, 0)
+            n = max(self.offset + (i * self.win_size), 0)
             m = n + self.win_size
             if m > len(self.dataset):
                 self.stop_flag = True
@@ -131,7 +138,6 @@ class FlatLoader:
             b_z.append(all_senses)
             if self.stop_flag:
                 break
-        self.last_offset = m
         b_y = nn.utils.rnn.pad_sequence(b_y, batch_first=True, padding_value=NOT_AMB_SYMBOL)
         return b_x, b_p, b_y, b_z
 
@@ -161,6 +167,7 @@ class CachedEmbedLoader:
         self.second_half = None
         self.batch_size = batch_size
         self.stop_flag = False
+        self.index_list = None
         if os.path.exists(self.cache_file):
             logging.info(f'Loading cache from {self.cache_file}')
             self._load_cache()
@@ -179,49 +186,53 @@ class CachedEmbedLoader:
 
     def __iter__(self):
         self.offset = 0
-        self.stop_flag = False
         self.second_half = None
         return self
 
     def __next__(self):
-        if self.stop_flag:
-            raise StopIteration
-        try:
-            if self.batch_mul == self.HALF:
-                if self.second_half is None:
-                    batch = self.npz_file[f'arr_{self.offset}'] if len(self.cache) == 0 else self.cache[self.offset]
-                    if len(batch) < self.batch_size:
-                        return torch.tensor(batch).to(self.device)
-                    batch_ = batch[:self.batch_size]
-                    self.second_half = batch[self.batch_size:]
-                    return torch.tensor(batch_).to(self.device)
-                else:
-                    second_half = self.second_half
-                    self.second_half = None
-                    self.offset += 1
-                    if len(second_half) > 0:
-                        return torch.tensor(second_half).to(self.device)
-                    else:
-                        raise StopIteration
-            elif self.batch_mul > self.SINGLE:
-                batch_a = self.npz_file[f'arr_{self.offset}'] if len(self.cache) == 0 else self.cache[self.offset]
-                batches = [batch_a]
-                for i in range(self.batch_mul - 1):
-                    try:
-                        self.offset += 1
-                        batch_b = self.npz_file[f'arr_{self.offset}'] if len(self.cache) == 0 else self.cache[self.offset]
-                        batches.append(batch_b)
-                    except (KeyError, IndexError):
-                        self.stop_flag = True
-                        break
-                batch = np.stack(batches)
-                return torch.tensor(batch).to(self.device)
-            else:
+        if self.batch_mul == self.HALF:
+            if self.second_half is None:
+                try:
+                    self.offset = self.index_list.pop()
+                except IndexError:
+                    raise StopIteration
                 batch = self.npz_file[f'arr_{self.offset}'] if len(self.cache) == 0 else self.cache[self.offset]
-                self.offset += 1
-                return torch.tensor(batch).to(self.device)
-        except (KeyError, IndexError):
-            raise StopIteration
+                if len(batch) < self.batch_size:
+                    return torch.tensor(batch).to(self.device)
+                batch_ = batch[:self.batch_size]
+                self.second_half = batch[self.batch_size:]
+                return torch.tensor(batch_).to(self.device)
+            else:
+                second_half = self.second_half
+                self.second_half = None
+                if len(second_half) > 0:
+                    return torch.tensor(second_half).to(self.device)
+                else:
+                    raise StopIteration
+        elif self.batch_mul > self.SINGLE:
+            try:
+                self.offset = self.index_list.pop()
+            except IndexError:
+                raise StopIteration
+            batch_a = self.npz_file[f'arr_{self.offset}'] if len(self.cache) == 0 else self.cache[self.offset]
+            batches = [batch_a]
+            for i in range(self.batch_mul - 1):
+                try:
+                    self.offset += 1
+                    batch_b = self.npz_file[f'arr_{self.offset}'] if len(self.cache) == 0 else self.cache[self.offset]
+                    batches.append(batch_b)
+                except (KeyError, IndexError):
+                    break
+            batch = np.stack(batches)
+            return torch.tensor(batch).to(self.device)
+        else:
+            try:
+                self.offset = self.index_list.pop()
+            except IndexError:
+                raise StopIteration
+            batch = self.npz_file[f'arr_{self.offset}'] if len(self.cache) == 0 else self.cache[self.offset]
+            self.offset += 1
+            return torch.tensor(batch).to(self.device)
 
 
 if __name__ == '__main__':
