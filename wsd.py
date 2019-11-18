@@ -152,7 +152,7 @@ class WSDNet(RobertaTransformerWSD):
         self.slm_scale = 1000
         logging.info('WSDNet: dictionaries loaded.')
         self.slm_output_size = len(self.out_vocab)
-        self.output_slm = nn.Linear(self.transformer.d_model, self.slm_output_size)
+        self.output_slm = nn.Linear(self.transformer.d_model, len(self.out_vocab))
         self.pre_training = False
         self.x_slm = None
 
@@ -208,18 +208,17 @@ class WSDNetX(WSDNet):
                 sparse_coord.append([syn, i])
         keys = torch.LongTensor(sparse_coord)
         vals = torch.ones(keys.shape[0])
-        print(keys)
-        print(vals)
         self.sv_matrix = torch.sparse.FloatTensor(keys.t(), vals, torch.Size(sv_size)).to(self.device)
 
     def forward(self, seq_list, lengths=None, cached_embeddings=None):
         x = self.embedding(seq_list) if cached_embeddings is None else cached_embeddings
         mask = get_transformer_mask(lengths, self.win_size, self.device)
         y, h = self.transformer(x, mask)
-        v = self.output_slm(h).transpose(1, 2)
-        # slm_logits = torch.sparse.mm(self.sv_matrix, v).transpose(2, 1)
-        # slm_logits = torch.matmul(self.sv_matrix.to_dense(), v).transpose(2, 1)
-        slm_logits = torch.stack([torch.sparse.mm(self.sv_matrix, v[i, :]) for i in range(v.shape[0])]).transpose(2, 1)
+        v_t = self.output_slm(h).transpose(1, 2)  # shape: |B| * |V| * Time steps
+        # slm_logits_t = torch.sparse.mm(self.sv_matrix, v_t).transpose(2, 1)
+        slm_logits_t = torch.matmul(self.sv_matrix.to_dense(), v_t).transpose(2, 1)
+        # slm_logits_t = torch.stack([torch.sparse.mm(self.sv_matrix, v_t[i, :]) for i in range(v_t.shape[0])])
+        slm_logits = slm_logits_t.transpose(2, 1)  # shape: |B| * T * |S|
         return y + slm_logits
 
 
