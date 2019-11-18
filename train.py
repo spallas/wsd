@@ -168,7 +168,7 @@ class BaseTrainer:
             except TypeError:  # model doesn't support embeddings caching
                 scores = self.model(b_x)
             loss = self.model.loss(scores, b_y.to(self.device), pre_train)
-            loss = loss / self.accumulation_steps
+            # loss = loss / self.accumulation_steps
             if AMP:
                 with amp.scale_loss(loss, self.optimizer) as scaled_loss:
                     scaled_loss.backward()
