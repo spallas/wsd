@@ -116,6 +116,24 @@ class RobertaTransformerConfig(Config):
 
 @dataclass_json
 @dataclass
+class RDenseConfig(Config):
+
+    checkpoint_path: str = 'saved_weights/r_dense_checkpoint.pt'
+    report_path: str = 'logs/r_dense_report.txt'
+    model_path: str = 'res/roberta.large'
+    learning_rate: float = 0.0001
+    d_embeddings: int = 1024
+
+    hidden_dims: List[int] = [512, 512]
+
+    @staticmethod
+    def from_json_file(file_name, **kwargs):
+        with open(file_name) as f:
+            return RDenseConfig.from_json(f.read(), **kwargs)
+
+
+@dataclass_json
+@dataclass
 class WSDNetConfig(RobertaTransformerConfig):
 
     output_vocab: str = 'res/dictionaries/syn_lemma_vocab.txt'

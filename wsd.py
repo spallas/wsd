@@ -11,7 +11,7 @@ except ImportError:
     SPARSE = False
 
 from models import ElmoEmbeddings, WSDTransformerEncoder, \
-    RobertaAlignedEmbed, get_transformer_mask, BertEmbeddings, LSTMEncoder
+    RobertaAlignedEmbed, get_transformer_mask, BertEmbeddings, LSTMEncoder, DenseEncoder
 from utils.util import NOT_AMB_SYMBOL
 
 
@@ -234,13 +234,21 @@ class RobertaDenseWSD(BaseWSD):
                  max_len,
                  model_path,
                  d_embedding: int = 1024,
-                 d_model: int = 512,
-                 num_layers: int = 4):
+                 hidden_dim: int = 512,
+                 num_layers: int = 4,
+                 cached_embeddings: bool = False):
         super().__init__(device, num_senses, max_len)
-        pass
+        self.d_embedding = d_embedding
+        self.hidden_dim = hidden_dim
+        self.num_layers = num_layers
+        self.embedding = RobertaAlignedEmbed(device, model_path) if not cached_embeddings else None
+        self.dense = DenseEncoder(self.d_embedding, self.tagset_size,
+                                  self.num_layers, self.hidden_dim)
 
-    def forward(self, *inputs):
-        pass
+    def forward(self, seq_list, lengths=None, cached_embeddings=None):
+        x = self.embedding(seq_list) if cached_embeddings is None else cached_embeddings
+        y, h = self.dense(x)
+        return y
 
 
 class BertTransformerWSD(BaseWSD):
