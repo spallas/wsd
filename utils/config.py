@@ -123,8 +123,7 @@ class RDenseConfig(Config):
     model_path: str = 'res/roberta.large'
     learning_rate: float = 0.0001
     d_embeddings: int = 1024
-
-    hidden_dims: List[int] = [512, 512]
+    hidden_dim: int = 512
 
     @staticmethod
     def from_json_file(file_name, **kwargs):
