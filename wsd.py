@@ -207,7 +207,7 @@ class WSDNetX(WSDNet):
                          d_embedding, d_model, num_heads, num_layers,
                          output_vocab, sense_lemmas, cached_embeddings)
         # build |S| x |V| matrix
-        sv_size = (len(self.sense_lemmas) + 1, len(self.out_vocab))
+        self.sv_size = (len(self.sense_lemmas) + 1, len(self.out_vocab))
         sparse_coord = []
         for syn in self.sense_lemmas:
             for i in self.sense_lemmas[syn]:
