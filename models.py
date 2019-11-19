@@ -168,7 +168,6 @@ class DenseEncoder(nn.Module):
         super().__init__()
         self.d_input = d_input
         self.d_output = d_output
-        self.num_layers = num_layers
         self.hidden_dim = hidden_dim
         self.project_layer = nn.Linear(self.d_input, self.hidden_dim)
         self.output_dense = nn.Linear(self.hidden_dim, self.d_output)
