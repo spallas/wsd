@@ -4,8 +4,14 @@ from collections import OrderedDict
 import torch
 from torch import nn
 
+try:
+    import torch_sparse
+    SPARSE = True
+except ImportError:
+    SPARSE = False
+
 from models import ElmoEmbeddings, WSDTransformerEncoder, \
-    RobertaAlignedEmbed, get_transformer_mask, BertEmbeddings, LSTMEncoder
+    RobertaAlignedEmbed, get_transformer_mask, BertEmbeddings, LSTMEncoder, DenseEncoder
 from utils.util import NOT_AMB_SYMBOL
 
 
@@ -201,23 +207,22 @@ class WSDNetX(WSDNet):
                          d_embedding, d_model, num_heads, num_layers,
                          output_vocab, sense_lemmas, cached_embeddings)
         # build |S| x |V| matrix
-        sv_size = (len(self.sense_lemmas) + 1, len(self.out_vocab))
+        self.sv_size = (len(self.sense_lemmas) + 1, len(self.out_vocab))
         sparse_coord = []
         for syn in self.sense_lemmas:
             for i in self.sense_lemmas[syn]:
                 sparse_coord.append([syn, i])
-        keys = torch.LongTensor(sparse_coord)
-        vals = torch.ones(keys.shape[0])
-        self.sv_matrix = torch.sparse.FloatTensor(keys.t(), vals, torch.Size(sv_size)).to(self.device)
+        self.keys = torch.LongTensor(sparse_coord)
+        self.vals = torch.ones(self.keys.shape[0])
+        self.sv_matrix = torch.sparse.FloatTensor(self.keys.t(), self.vals, torch.Size(self.sv_size)).to(self.device)
 
     def forward(self, seq_list, lengths=None, cached_embeddings=None):
         x = self.embedding(seq_list) if cached_embeddings is None else cached_embeddings
         mask = get_transformer_mask(lengths, self.win_size, self.device)
         y, h = self.transformer(x, mask)
-        v_t = self.output_slm(h).transpose(1, 2)  # shape: |B| * |V| * Time steps
-        # slm_logits_t = torch.matmul(self.sv_matrix.to_dense(), v_t)  # memory explosion
-        slm_logits_t = torch.stack([torch.sparse.mm(self.sv_matrix, v_t[i, :]) for i in range(v_t.shape[0])])
-        slm_logits = slm_logits_t.transpose(2, 1)  # shape: |B| * T * |S|
+        v = self.output_slm(h)  # shape: |B| x Time steps x |V|
+        slm_logits_t = torch.sparse.mm(self.sv_matrix, v.view(-1, v.size(-1)).t())   # shape: |S| x T * |B|
+        slm_logits = slm_logits_t.t().view(v.size(0), v.size(1), -1)
         return y + slm_logits
 
 
@@ -229,13 +234,21 @@ class RobertaDenseWSD(BaseWSD):
                  max_len,
                  model_path,
                  d_embedding: int = 1024,
-                 d_model: int = 512,
-                 num_layers: int = 4):
+                 hidden_dim: int = 512,
+                 num_layers: int = 4,
+                 cached_embeddings: bool = False):
         super().__init__(device, num_senses, max_len)
-        pass
+        self.d_embedding = d_embedding
+        self.hidden_dim = hidden_dim
+        self.num_layers = num_layers
+        self.embedding = RobertaAlignedEmbed(device, model_path) if not cached_embeddings else None
+        self.dense = DenseEncoder(self.d_embedding, self.tagset_size,
+                                  self.num_layers, self.hidden_dim)
 
-    def forward(self, *inputs):
-        pass
+    def forward(self, seq_list, lengths=None, cached_embeddings=None):
+        x = self.embedding(seq_list) if cached_embeddings is None else cached_embeddings
+        y, h = self.dense(x)
+        return y
 
 
 class BertTransformerWSD(BaseWSD):

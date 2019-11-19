@@ -23,9 +23,10 @@ from torch.utils.tensorboard import SummaryWriter
 
 from data_preprocessing import FlatSemCorDataset, load_sense2id, FlatLoader, CachedEmbedLoader
 from utils import util
-from utils.config import RobertaTransformerConfig, WSDNetConfig, WSDNetXConfig
+from utils.config import RobertaTransformerConfig, WSDNetConfig, WSDNetXConfig, RDenseConfig
 from utils.util import NOT_AMB_SYMBOL, telegram_on_failure, telegram_send
-from wsd import ElmoTransformerWSD, RobertaTransformerWSD, BertTransformerWSD, BaselineWSD, WSDNet, WSDNetX
+from wsd import ElmoTransformerWSD, RobertaTransformerWSD, BertTransformerWSD, BaselineWSD, WSDNet, WSDNetX, \
+    RobertaDenseWSD
 
 warnings.filterwarnings("ignore", category=UndefinedMetricWarning)
 torch.manual_seed(42)
@@ -524,11 +525,31 @@ class WSDNetXTrainer(BaseTrainer):
                              self.sense_lemmas, self.cache_embeddings)
 
 
+class RDenseTrainer(BaseTrainer):
+
+    def __init__(self,
+                 num_layers=2,
+                 d_embeddings=1024,
+                 hidden_dim=512,
+                 model_path='res/roberta.large',
+                 **kwargs):
+        self.num_layers = num_layers
+        self.hidden_dim = hidden_dim
+        self.d_embeddings = d_embeddings
+        self.model_path = model_path
+        super().__init__(**kwargs)
+
+    def _build_model(self):
+        self.model = RobertaDenseWSD(self.device, len(self.sense2id) + 1, self.window_size,
+                                     self.model_path, self.d_embeddings, self.hidden_dim,
+                                     self.num_layers, self.cache_embeddings)
+
+
 if __name__ == '__main__':
 
     parser = argparse.ArgumentParser(description="Train with different models and options")
     parser.add_argument("-m", "--model", type=str, help="model name",
-                        required=True, choices=('roberta', 'wsdnet', 'wsdnetx'))
+                        required=True, choices=('roberta', 'wsdnet', 'wsdnetx', 'rdense'))
     parser.add_argument("-c", "--config", type=str, help="config JSON file path", required=True)
     parser.add_argument("-t", "--test", action='store_true', help="If test else run training")
     parser.add_argument("-p", "--pre-train", action='store_true', help="Run w/ pre-training")
@@ -536,9 +557,8 @@ if __name__ == '__main__':
     parser.add_argument("-x", "--clean", action='store_true', help="Clear old saved weights.")
     parser.add_argument("-g", "--multi-gpu", action='store_true', help="Use all available GPUs.")
     parser.add_argument("-l", "--log", type=str, help="log file name")
-    parser.add_argument("-o", "--mixed-level", type=str, help="Train with mixed precision floats: O0 for standard"
-                                                              "training, O1 for standard mixed precision, O2 for"
-                                                              "advanced mixed precision.", default='O0')
+    parser.add_argument("-o", "--mixed-level", type=str, help="Train with mixed precision floats.",
+                        default='O0', choices=('O0', 'O1', 'O2'))
     parser.add_argument("-z", "--cache", type=str, help="Embeddings cache", default='res/cache')
     args = parser.parse_args()
     log_level = logging.DEBUG if args.debug else logging.INFO
@@ -556,6 +576,8 @@ if __name__ == '__main__':
         c = WSDNetConfig.from_json_file(args.config)
     elif args.model == 'wsdnetx':
         c = WSDNetXConfig.from_json_file(args.config)
+    elif args.model == 'rdense':
+        c = RDenseConfig.from_json_file(args.config)
     cd = c.__dict__
     cd['is_training'] = not args.test
     cd['mixed_precision'] = args.mixed_level
@@ -563,7 +585,8 @@ if __name__ == '__main__':
     cd['cache_path'] = args.cache
     if args.clean and os.path.exists(cd['checkpoint_path']):
         os.remove(cd['checkpoint_path'])
-        os.remove(cd['checkpoint_path'] + '.best')
+        if os.path.exists(cd['checkpoint_path'] + '.best'):
+            os.remove(cd['checkpoint_path'] + '.best')
     if args.model == 'roberta':
         t = RobertaTrainer(**cd)
         t.pre_training = args.pre_train
@@ -571,6 +594,8 @@ if __name__ == '__main__':
         t = WSDNetTrainer(**cd)
     elif args.model == 'wsdnetx':
         t = WSDNetXTrainer(**cd)
+    elif args.model == 'rdense':
+        t = RDenseTrainer(**cd)
     if args.test:
         telegram_on_failure(t.test)
     else:

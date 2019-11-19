@@ -164,13 +164,25 @@ class DenseEncoder(nn.Module):
     def __init__(self,
                  d_input,
                  d_output,
-                 num_layers,
-                 hidden_dims):
+                 num_layers: int = 1,
+                 hidden_dim: int = 512):
         super().__init__()
-        self.layers = []
+        self.d_input = d_input
+        self.d_output = d_output
+        self.num_layers = num_layers
+        self.hidden_dim = hidden_dim
+        self.project_layer = nn.Linear(self.d_input, self.hidden_dim)
+        self.hidden_layers = []
+        for i in range(self.num_layers - 1):
+            self.hidden_layers.append(nn.Linear(self.hidden_dim, self.hidden_dim))
+        self.output_dense = nn.Linear(self.hidden_dim, self.d_output)
 
     def forward(self, x, mask=None):
-        pass
+        x = self.project_layer(x)
+        for hl in self.hidden_layers:
+            x = hl(x)
+        y = self.output_dense(x)
+        return y, x
 
 
 class BertEmbeddings(nn.Module):
