@@ -11,7 +11,6 @@
   "test_data" :"res/wsd-train/test_data.xml",
   "test_tags" :"res/wsd-train/test_tags.txt",
   "report_path": "logs/rdense_report.txt",
-  "num_layers": 1,
   "learning_rate": 0.0001,
   "hidden_dim": 512,
   "window_size": 50,

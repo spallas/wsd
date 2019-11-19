@@ -537,8 +537,7 @@ class RDenseTrainer(BaseTrainer):
 
     def _build_model(self):
         self.model = RobertaDenseWSD(self.device, len(self.sense2id) + 1, self.window_size,
-                                     self.model_path, self.d_embeddings, self.hidden_dim,
-                                     self.num_layers, self.cache_embeddings)
+                                     self.model_path, self.d_embeddings, self.hidden_dim, self.cache_embeddings)
 
 
 if __name__ == '__main__':

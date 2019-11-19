@@ -235,15 +235,12 @@ class RobertaDenseWSD(BaseWSD):
                  model_path,
                  d_embedding: int = 1024,
                  hidden_dim: int = 512,
-                 num_layers: int = 4,
                  cached_embeddings: bool = False):
         super().__init__(device, num_senses, max_len)
         self.d_embedding = d_embedding
         self.hidden_dim = hidden_dim
-        self.num_layers = num_layers
         self.embedding = RobertaAlignedEmbed(device, model_path) if not cached_embeddings else None
-        self.dense = DenseEncoder(self.d_embedding, self.tagset_size,
-                                  self.num_layers, self.hidden_dim)
+        self.dense = DenseEncoder(self.d_embedding, self.tagset_size, self.hidden_dim)
 
     def forward(self, seq_list, lengths=None, cached_embeddings=None):
         x = self.embedding(seq_list) if cached_embeddings is None else cached_embeddings
