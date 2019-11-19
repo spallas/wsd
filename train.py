@@ -590,6 +590,8 @@ if __name__ == '__main__':
         t = WSDNetTrainer(**cd)
     elif args.model == 'wsdnetx':
         t = WSDNetXTrainer(**cd)
+    elif args.model == 'rdense':
+        t = RDenseTrainer(**cd)
     if args.test:
         telegram_on_failure(t.test)
     else:
