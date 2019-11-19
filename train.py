@@ -161,9 +161,7 @@ class BaseTrainer:
         step = 0
         self.model.zero_grad()
         local_step = 0
-        loader = iter(self.data_loader)
-        self.cached_data_loader.index_list = [i for i in loader.index_list]
-        for step, ((b_x, b_p, b_y, b_z), b_x_e) in enumerate(zip(loader, self.cached_data_loader),
+        for step, ((b_x, b_p, b_y, b_z), b_x_e) in enumerate(zip(self.data_loader, self.cached_data_loader),
                                                              self.last_step):
             try:
                 b_x_e = b_x_e if self.cache_embeddings else None
@@ -222,8 +220,6 @@ class BaseTrainer:
             cache_loader = self.cached_eval_loader
         with torch.no_grad():
             pred, true, z = [], [], []
-            loader = iter(loader)
-            cache_loader.index_list = [i for i in loader.index_list]
             for step, ((b_x, b_p, b_y, b_z), b_x_e) in enumerate(zip(loader, cache_loader)):
                 try:
                     b_x_e = b_x_e if self.cache_embeddings else None
