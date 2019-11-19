@@ -198,6 +198,7 @@ class CachedEmbedLoader:
                 else:
                     second_half = self.second_half
                     self.second_half = None
+                    self.offset += 1
                     if len(second_half) > 0:
                         return torch.tensor(second_half).to(self.device)
                     else:
