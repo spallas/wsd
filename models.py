@@ -170,10 +170,14 @@ class DenseEncoder(nn.Module):
         self.d_output = d_output
         self.hidden_dim = hidden_dim
         self.project_layer = nn.Linear(self.d_input, self.hidden_dim)
+        self.h1 = nn.Linear(self.hidden_dim, self.hidden_dim)
+        self.h2 = nn.Linear(self.hidden_dim, self.hidden_dim)
         self.output_dense = nn.Linear(self.hidden_dim, self.d_output)
 
     def forward(self, x, mask=None):
         x = self.project_layer(x)
+        x = self.h1(x)
+        x = self.h2(x)
         y = self.output_dense(x)
         return y, x
 

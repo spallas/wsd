@@ -10,7 +10,6 @@ import torch
 
 try:
     from apex import amp
-
     AMP = True
 except ImportError:
     AMP = False
@@ -416,15 +415,6 @@ class ElmoTransformerTrainer(BaseTrainer):
                                         self.num_heads, self.num_layers)
 
 
-class RobertaDenseTrainer(BaseTrainer):
-
-    def __init__(self, **kwargs):
-        super().__init__(**kwargs)
-
-    def _build_model(self):
-        pass
-
-
 class RobertaTrainer(BaseTrainer):
 
     def __init__(self,
@@ -547,7 +537,7 @@ if __name__ == '__main__':
                         required=True, choices=('roberta', 'wsdnet', 'wsdnetx', 'rdense'))
     parser.add_argument("-c", "--config", type=str, help="config JSON file path", required=True)
     parser.add_argument("-t", "--test", action='store_true', help="If test else run training")
-    parser.add_argument("-p", "--pre-train", action='store_true', help="Run w/ pre-training")
+    parser.add_argument("-p", "--double-loss", action='store_true', help="Run w/ double loss")
     parser.add_argument("-d", "--debug", action='store_true', help="Print debug information")
     parser.add_argument("-x", "--clean", action='store_true', help="Clear old saved weights.")
     parser.add_argument("-g", "--multi-gpu", action='store_true', help="Use all available GPUs.")
@@ -584,11 +574,12 @@ if __name__ == '__main__':
             os.remove(cd['checkpoint_path'] + '.best')
     if args.model == 'roberta':
         t = RobertaTrainer(**cd)
-        t.pre_training = args.pre_train
     elif args.model == 'wsdnet':
         t = WSDNetTrainer(**cd)
+        t.double_loss = args.double_loss
     elif args.model == 'wsdnetx':
         t = WSDNetXTrainer(**cd)
+        t.double_loss = args.double_loss
     elif args.model == 'rdense':
         t = RDenseTrainer(**cd)
     if args.test:

@@ -155,26 +155,26 @@ class WSDNet(RobertaTransformerWSD):
                 sid = int(line.strip().split('\t')[0])
                 lemma_list = eval(line.strip().split('\t')[1])
                 self.sense_lemmas[sid] = lemma_list
-        self.slm_scale = 1000
+        self.slm_scale = 64
         logging.info('WSDNet: dictionaries loaded.')
         self.slm_output_size = len(self.out_vocab)
         self.output_slm = nn.Linear(self.transformer.d_model, len(self.out_vocab))
-        self.pre_training = False
+        self.double_loss = False
         self.x_slm = None
 
     def forward(self, seq_list, lengths=None, cached_embeddings=None):
         x = self.embedding(seq_list) if cached_embeddings is None else cached_embeddings
         mask = get_transformer_mask(lengths, self.win_size, self.device)
         y, h = self.transformer(x, mask)
-        if self.pre_training:
+        if self.double_loss:
             self.x_slm = self.output_slm(h)
         return y
 
-    def loss(self, scores, tags, combined=False):
+    def loss(self, scores, tags, opt1=False):
         y_true = tags.view(-1)
         scores = scores.view(-1, self.tagset_size)
         wsd_loss = self.ce_loss(scores, y_true)
-        if self.pre_training:
+        if self.double_loss:
             slm_scores = self.x_slm.view(-1, self.slm_output_size)
             y_slm = torch.zeros_like(slm_scores).to(self.device)
             assert y_true.size(0) == y_slm.size(0)
@@ -182,10 +182,7 @@ class WSDNet(RobertaTransformerWSD):
                 if y != NOT_AMB_SYMBOL:
                     y_slm[y_i][self.sense_lemmas[y.item()], ] = 1
             slm_loss = self.bce_loss(slm_scores, y_slm)
-            if combined:
-                wsd_loss += slm_loss * self.slm_scale
-            else:
-                return slm_loss
+            wsd_loss += slm_loss * self.slm_scale
         return wsd_loss
 
 
@@ -207,19 +204,22 @@ class WSDNetX(WSDNet):
                          d_embedding, d_model, num_heads, num_layers,
                          output_vocab, sense_lemmas, cached_embeddings)
         # build |S| x |V| matrix
-        self.sv_size = (len(self.sense_lemmas) + 1, len(self.out_vocab))
-        sparse_coord = []
+        self.sv_size = torch.Size((len(self.sense_lemmas) + 1, len(self.out_vocab)))
+        sparse_coord, values = [], []
         for syn in self.sense_lemmas:
             for i in self.sense_lemmas[syn]:
                 sparse_coord.append([syn, i])
-        self.keys = torch.LongTensor(sparse_coord)
-        self.vals = torch.ones(self.keys.shape[0])
-        self.sv_matrix = torch.sparse.FloatTensor(self.keys.t(), self.vals, torch.Size(self.sv_size)).to(self.device)
+                values.append(1 / len(self.sense_lemmas[syn]))
+        keys = torch.LongTensor(sparse_coord)
+        vals = torch.FloatTensor(values)
+        self.sv_matrix = torch.sparse.FloatTensor(keys.t(), vals, self.sv_size).to(self.device)
 
     def forward(self, seq_list, lengths=None, cached_embeddings=None):
         x = self.embedding(seq_list) if cached_embeddings is None else cached_embeddings
         mask = get_transformer_mask(lengths, self.win_size, self.device)
         y, h = self.transformer(x, mask)
+        if self.double_loss:
+            self.x_slm = self.output_slm(h)
         v = self.output_slm(h)  # shape: |B| x Time steps x |V|
         slm_logits_t = torch.sparse.mm(self.sv_matrix, v.view(-1, v.size(-1)).t())   # shape: |S| x T * |B|
         slm_logits = slm_logits_t.t().view(v.size(0), v.size(1), -1)
