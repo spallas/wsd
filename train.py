@@ -156,7 +156,7 @@ class BaseTrainer:
         self.model.eval()
         self.model.to(self.device)
 
-    def train_epoch(self, epoch_i, pre_train=True):
+    def train_epoch(self, epoch_i):
         step = 0
         self.model.zero_grad()
         local_step = 0
@@ -167,7 +167,7 @@ class BaseTrainer:
                 scores = self.model(b_x, cached_embeddings=b_x_e)
             except TypeError:  # model doesn't support embeddings caching
                 scores = self.model(b_x)
-            loss = self.model.loss(scores, b_y.to(self.device), pre_train)
+            loss = self.model.loss(scores, b_y.to(self.device))
             # loss = loss / self.accumulation_steps
             if AMP:
                 with amp.scale_loss(loss, self.optimizer) as scaled_loss:
@@ -184,7 +184,7 @@ class BaseTrainer:
                 self.model.zero_grad()
         self.last_step += step
 
-    def train(self, pre_train=True):
+    def train(self):
         print(self.model)
         self.model.train()
         for epoch in range(self.last_epoch + 1, self.num_epochs + 1):
@@ -194,7 +194,7 @@ class BaseTrainer:
             if epoch > START_EVAL_EPOCH and self.secret:
                 self.data_loader = self.secret_loader
                 self.cached_data_loader = self.cached_secret_loader
-            self.train_epoch(epoch, pre_train)
+            self.train_epoch(epoch)
 
     def _log(self, step, loss, epoch_i):
         if step % self.log_interval == 0:
@@ -585,4 +585,4 @@ if __name__ == '__main__':
     if args.test:
         telegram_on_failure(t.test)
     else:
-        telegram_on_failure(t.train, args.pre_train)
+        telegram_on_failure(t.train)
