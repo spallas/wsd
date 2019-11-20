@@ -157,9 +157,8 @@ class BaseTrainer:
         self.model.to(self.device)
 
     def train_epoch(self, epoch_i):
-        step = 0
+        step, local_step, flag = 0, 0, False
         self.model.zero_grad()
-        local_step = 0
         for step, ((b_x, b_p, b_y, b_z), b_x_e) in enumerate(zip(self.data_loader, self.cached_data_loader),
                                                              self.last_step):
             try:
@@ -168,7 +167,6 @@ class BaseTrainer:
             except TypeError:  # model doesn't support embeddings caching
                 scores = self.model(b_x)
             loss = self.model.loss(scores, b_y.to(self.device))
-            # loss = loss / self.accumulation_steps
             if AMP:
                 with amp.scale_loss(loss, self.optimizer) as scaled_loss:
                     scaled_loss.backward()
@@ -182,6 +180,12 @@ class BaseTrainer:
                 self._log(local_step, loss, epoch_i)
                 self.optimizer.step()  # update the weights
                 self.model.zero_grad()
+                flag = False
+            else:
+                flag = True
+        if flag:
+            self._log(local_step + 1, loss, epoch_i)
+            self.optimizer.step()  # update the weights
         self.last_step += step
 
     def train(self):
