@@ -1,3 +1,4 @@
+import random
 from collections import defaultdict
 from typing import List
 
@@ -40,6 +41,14 @@ UNK_SENSE = -2
 PAD_SYMBOL = 'PAD'  # '<pad>'
 
 #######################################
+
+
+def randomized(iterable):
+    cache = [i for i in iterable]
+    rand_indices = list(range(len(cache)))
+    random.shuffle(rand_indices)
+    for i in rand_indices:
+        yield cache[i]
 
 
 def telegram_on_failure(function, *args, **kwargs):

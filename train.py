@@ -24,7 +24,7 @@ from torch.utils.tensorboard import SummaryWriter
 from data_preprocessing import FlatSemCorDataset, load_sense2id, FlatLoader, CachedEmbedLoader
 from utils import util
 from utils.config import RobertaTransformerConfig, WSDNetConfig, WSDNetXConfig, RDenseConfig, WSDDenseConfig
-from utils.util import NOT_AMB_SYMBOL, telegram_on_failure, telegram_send
+from utils.util import NOT_AMB_SYMBOL, telegram_on_failure, telegram_send, randomized
 from wsd import ElmoTransformerWSD, RobertaTransformerWSD, BertTransformerWSD, BaselineWSD, WSDNet, WSDNetX, \
     RobertaDenseWSD, WSDNetDense
 
@@ -92,10 +92,7 @@ class BaseTrainer:
         self.pad_symbol = pad_symbol
 
         dataset = FlatSemCorDataset(train_data, train_tags)
-        self.secret = False
-        semcor_train, semcor_tags = 'res/wsd-train/semcor_data.xml', 'res/wsd-train/semcor_tags.txt'
-        if os.path.exists(semcor_train) and os.path.exists(semcor_tags):
-            secret_dataset, self.secret = FlatSemCorDataset(semcor_train, semcor_tags), False
+
         self.train_sense_map = dataset.train_sense_map
         self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
         logging.info(f'Device is {self.device}')
@@ -115,12 +112,6 @@ class BaseTrainer:
             self.cached_data_loader = CachedEmbedLoader(self.device, f'{self.cache_path}_{self.cache_batch_size}.npz',
                                                         self.embed_model_path, BATCH_MUL, self.batch_size, self.data_loader) \
                 if self.cache_embeddings else count()
-            if self.secret:
-                self.secret_loader = FlatLoader(secret_dataset, self.batch_size, self.window_size,
-                                                self.pad_symbol, False)
-                self.cached_secret_loader = CachedEmbedLoader(self.device, f'{self.cache_path}_secret_{self.cache_batch_size}.npz',
-                                                              self.embed_model_path, BATCH_MUL, self.batch_size, self.secret_loader) \
-                    if self.cache_embeddings else count()
             self._setup_training(eval_data, eval_tags)
         else:
             self._setup_testing(test_data, test_tags)
@@ -160,7 +151,7 @@ class BaseTrainer:
     def train_epoch(self, epoch_i):
         step, local_step, flag = 0, 0, False
         self.model.zero_grad()
-        for step, ((b_x, b_p, b_y, b_z), b_x_e) in enumerate(zip(self.data_loader, self.cached_data_loader),
+        for step, ((b_x, b_p, b_y, b_z), b_x_e) in enumerate(randomized(zip(self.data_loader, self.cached_data_loader)),
                                                              self.last_step):
             try:
                 b_x_e = b_x_e if self.cache_embeddings else None
@@ -195,13 +186,10 @@ class BaseTrainer:
         start = datetime.datetime.now()
         for epoch in range(self.last_epoch + 1, self.num_epochs + 1):
             end = datetime.datetime.now()
-            logging.info(f'Epoch: {epoch} - Last epoch ran in {end - start}')
+            logging.info(f'Epoch: {epoch} - time: {end - start}')
             start = end
             if TELEGRAM:
                 telegram_send(f'Epoch: {epoch}')
-            if epoch > START_EVAL_EPOCH and self.secret:
-                self.data_loader = self.secret_loader
-                self.cached_data_loader = self.cached_secret_loader
             self.train_epoch(epoch)
 
     def _log(self, step, loss, epoch_i):
@@ -222,7 +210,8 @@ class BaseTrainer:
     def test(self, loader=None):
         """
         """
-        if not loader:
+        test = loader is None
+        if test:
             loader = self.test_loader
             cache_loader = self.cached_test_loader
         else:
@@ -239,8 +228,10 @@ class BaseTrainer:
                 pred += [item for seq in self._select_senses(scores, b_x, b_p, b_y) for item in seq]
                 z += [item for seq in b_z for item in seq]
             metrics = self._get_metrics(true, pred, z)
-            if TELEGRAM:
-                telegram_send(f'F1: {metrics:.6f}')
+            if test:
+                if TELEGRAM:
+                    telegram_send(f'F1: {metrics:.6f}')
+                logging.info(f'F1: {metrics:.6f}')
             return metrics
 
     def _evaluate(self, num_epoch):
@@ -577,6 +568,7 @@ if __name__ == '__main__':
     parser.add_argument("-o", "--mixed-level", type=str, help="Train with mixed precision floats.",
                         default='O0', choices=('O0', 'O1', 'O2'))
     parser.add_argument("-z", "--cache", type=str, help="Embeddings cache", default='res/cache')
+    parser.add_argument("-r", "--randomize", action='store_true', help="Randomize data each epoch.")
     args = parser.parse_args()
     log_level = logging.DEBUG if args.debug else logging.INFO
     if args.log:
