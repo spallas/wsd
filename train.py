@@ -602,10 +602,9 @@ if __name__ == '__main__':
         t = RobertaTrainer(**cd)
     elif args.model == 'wsdnet':
         t = WSDNetTrainer(**cd)
-        t.double_loss = args.double_loss
+        t.model.double_loss = args.double_loss
     elif args.model == 'wsdnetx':
         t = WSDNetXTrainer(**cd)
-        t.double_loss = args.double_loss
     elif args.model == 'rdense':
         t = RDenseTrainer(**cd)
     elif args.model == 'wsddense':

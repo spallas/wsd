@@ -204,6 +204,7 @@ class WSDNetX(WSDNet):
                          d_embedding, d_model, num_heads, num_layers,
                          output_vocab, sense_lemmas, cached_embeddings)
         # build |S| x |V| matrix
+        self.double_loss = True
         self.sv_size = torch.Size((len(self.sense_lemmas) + 1, len(self.out_vocab)))
         sparse_coord, values = [], []
         for syn in self.sense_lemmas:
@@ -218,8 +219,7 @@ class WSDNetX(WSDNet):
         x = self.embedding(seq_list) if cached_embeddings is None else cached_embeddings
         mask = get_transformer_mask(lengths, self.win_size, self.device)
         y, h = self.transformer(x, mask)
-        if self.double_loss:
-            self.x_slm = self.output_slm(h)
+        self.x_slm = self.output_slm(h)
         v = self.output_slm(h)  # shape: |B| x Time steps x |V|
         slm_logits_t = torch.sparse.mm(self.sv_matrix, v.view(-1, v.size(-1)).t())   # shape: |S| x T * |B|
         slm_logits = slm_logits_t.t().view(v.size(0), v.size(1), -1)
