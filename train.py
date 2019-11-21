@@ -22,10 +22,10 @@ from torch.utils.tensorboard import SummaryWriter
 
 from data_preprocessing import FlatSemCorDataset, load_sense2id, FlatLoader, CachedEmbedLoader
 from utils import util
-from utils.config import RobertaTransformerConfig, WSDNetConfig, WSDNetXConfig, RDenseConfig
+from utils.config import RobertaTransformerConfig, WSDNetConfig, WSDNetXConfig, RDenseConfig, WSDDenseConfig
 from utils.util import NOT_AMB_SYMBOL, telegram_on_failure, telegram_send
 from wsd import ElmoTransformerWSD, RobertaTransformerWSD, BertTransformerWSD, BaselineWSD, WSDNet, WSDNetX, \
-    RobertaDenseWSD
+    RobertaDenseWSD, WSDNetDense
 
 warnings.filterwarnings("ignore", category=UndefinedMetricWarning)
 torch.manual_seed(42)
@@ -238,7 +238,6 @@ class BaseTrainer:
             return metrics
 
     def _evaluate(self, num_epoch):
-        logging.info("Evaluating...")
         self.model.eval()
         f1 = self.test(self.eval_loader)
         self._save_best(f1, num_epoch)
@@ -367,8 +366,8 @@ class BaseTrainer:
     @staticmethod
     def _gpu_mem_info():
         if torch.cuda.is_available():  # check if memory is leaking
-            logging.info(f'Allocated GPU memory: '
-                         f'{torch.cuda.memory_allocated() / 1_000_000} MB')
+            logging.debug(f'Allocated GPU memory: '
+                          f'{torch.cuda.memory_allocated() / 1_000_000} MB')
 
 
 class ElmoLSTMTrainer(BaseTrainer):
@@ -534,11 +533,35 @@ class RDenseTrainer(BaseTrainer):
                                      self.model_path, self.d_embeddings, self.hidden_dim, self.cache_embeddings)
 
 
+class WSDDenseTrainer(BaseTrainer):
+
+    def __init__(self,
+                 num_layers=2,
+                 d_embeddings=1024,
+                 hidden_dim=512,
+                 model_path='res/roberta.large',
+                 output_vocab='res/dictionaries/syn_lemma_vocab.txt',
+                 sense_lemmas='res/dictionaries/sense_lemmas.txt',
+                 **kwargs):
+        self.num_layers = num_layers
+        self.hidden_dim = hidden_dim
+        self.d_embeddings = d_embeddings
+        self.model_path = model_path
+        self.output_vocab = output_vocab
+        self.sense_lemmas = sense_lemmas
+        super().__init__(**kwargs)
+
+    def _build_model(self):
+        self.model = WSDNetDense(self.device, len(self.sense2id) + 1, self.window_size,
+                                 self.model_path, self.d_embeddings, self.hidden_dim, self.cache_embeddings,
+                                 self.output_vocab, self.sense_lemmas)
+
+
 if __name__ == '__main__':
 
     parser = argparse.ArgumentParser(description="Train with different models and options")
     parser.add_argument("-m", "--model", type=str, help="model name",
-                        required=True, choices=('roberta', 'wsdnet', 'wsdnetx', 'rdense'))
+                        required=True, choices=('roberta', 'wsdnet', 'wsdnetx', 'rdense', 'wsddense'))
     parser.add_argument("-c", "--config", type=str, help="config JSON file path", required=True)
     parser.add_argument("-t", "--test", action='store_true', help="If test else run training")
     parser.add_argument("-p", "--double-loss", action='store_true', help="Run w/ double loss")
@@ -567,6 +590,8 @@ if __name__ == '__main__':
         c = WSDNetXConfig.from_json_file(args.config)
     elif args.model == 'rdense':
         c = RDenseConfig.from_json_file(args.config)
+    elif args.model == 'wsddense':
+        c = WSDDenseConfig.from_json_file(args.config)
     cd = c.__dict__
     cd['is_training'] = not args.test
     cd['mixed_precision'] = args.mixed_level
@@ -586,6 +611,8 @@ if __name__ == '__main__':
         t.double_loss = args.double_loss
     elif args.model == 'rdense':
         t = RDenseTrainer(**cd)
+    elif args.model == 'wsddense':
+        t = WSDDenseTrainer(**cd)
     if args.test:
         telegram_on_failure(t.test)
     else:

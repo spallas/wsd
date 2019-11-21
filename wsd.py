@@ -248,6 +248,69 @@ class RobertaDenseWSD(BaseWSD):
         return y
 
 
+class WSDNetDense(RobertaDenseWSD):
+
+    def __init__(self,
+                 device,
+                 num_senses,
+                 max_len,
+                 model_path,
+                 d_embedding: int = 1024,
+                 hidden_dim: int = 512,
+                 cached_embeddings: bool = False,
+                 output_vocab: str = 'res/dictionaries/syn_lemma_vocab.txt',
+                 sense_lemmas: str = 'res/dictionaries/sense_lemmas.txt'):
+        super().__init__(device, num_senses, max_len, model_path,
+                         d_embedding, hidden_dim, cached_embeddings)
+        self.out_vocab = OrderedDict()
+        with open(output_vocab) as f:
+            for i, line in enumerate(f):
+                self.out_vocab[line.strip()] = i
+        self.sense_lemmas = OrderedDict()
+        with open(sense_lemmas) as f:
+            for line in f:
+                sid = int(line.strip().split('\t')[0])
+                lemma_list = eval(line.strip().split('\t')[1])
+                self.sense_lemmas[sid] = lemma_list
+        self.slm_scale = 64
+        logging.info('WSDNet: dictionaries loaded.')
+        self.slm_output_size = len(self.out_vocab)
+        self.output_slm = nn.Linear(self.hidden_dim, len(self.out_vocab))
+        self.double_loss = False
+        self.x_slm = None
+        # build |S| x |V| matrix
+        self.sv_size = torch.Size((len(self.sense_lemmas) + 1, len(self.out_vocab)))
+        sparse_coord, values = [], []
+        for syn in self.sense_lemmas:
+            for i in self.sense_lemmas[syn]:
+                sparse_coord.append([syn, i])
+                values.append(1 / len(self.sense_lemmas[syn]))
+        keys = torch.LongTensor(sparse_coord)
+        vals = torch.FloatTensor(values)
+        self.sv_matrix = torch.sparse.FloatTensor(keys.t(), vals, self.sv_size).to(self.device)
+
+    def forward(self, seq_list, lengths=None, cached_embeddings=None):
+        x = self.embedding(seq_list) if cached_embeddings is None else cached_embeddings
+        y, h = self.dense(x)
+        self.x_slm = self.output_slm(h)
+        return y
+
+    def loss(self, scores, tags, opt1=False):
+        y_true = tags.view(-1)
+        scores = scores.view(-1, self.tagset_size)
+        wsd_loss = self.ce_loss(scores, y_true)
+        # second part
+        slm_scores = self.x_slm.view(-1, self.slm_output_size)
+        y_slm = torch.zeros_like(slm_scores).to(self.device)
+        assert y_true.size(0) == y_slm.size(0)
+        for y_i, y in enumerate(y_true):
+            if y != NOT_AMB_SYMBOL:
+                y_slm[y_i][self.sense_lemmas[y.item()], ] = 1
+        slm_loss = self.bce_loss(slm_scores, y_slm)
+        wsd_loss += slm_loss * self.slm_scale
+        return wsd_loss
+
+
 class BertTransformerWSD(BaseWSD):
 
     def __init__(self,
