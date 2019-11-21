@@ -1,4 +1,5 @@
 import argparse
+import datetime
 import logging
 import os
 import warnings
@@ -191,8 +192,11 @@ class BaseTrainer:
     def train(self):
         print(self.model)
         self.model.train()
+        start = datetime.datetime.now()
         for epoch in range(self.last_epoch + 1, self.num_epochs + 1):
-            logging.info(f'Epoch: {epoch}')
+            end = datetime.datetime.now()
+            logging.info(f'Epoch: {epoch} - Last epoch ran in {end - start}')
+            start = end
             if TELEGRAM:
                 telegram_send(f'Epoch: {epoch}')
             if epoch > START_EVAL_EPOCH and self.secret:
@@ -202,7 +206,7 @@ class BaseTrainer:
 
     def _log(self, step, loss, epoch_i):
         if step % self.log_interval == 0:
-            logging.info(f'Loss: {loss.item():.4f} ')
+            log_str = f'Loss: {loss.item():.4f}'
             self._plot('Train_loss', loss.item(), step)
             self._gpu_mem_info()
             self._maybe_checkpoint(loss, epoch_i)
@@ -210,8 +214,10 @@ class BaseTrainer:
                 f1 = self._evaluate(epoch_i)
                 self._plot('Dev_F1', f1, step)
                 self.model.train()  # return to train mode after evaluation
+                log_str += f'\t\t\tF1: {f1:.5f}'
+            logging.info(log_str)
             if TELEGRAM:
-                telegram_send(f'Loss: {loss.item():.7f} ')
+                telegram_send(log_str)
 
     def test(self, loader=None):
         """
@@ -286,7 +292,6 @@ class BaseTrainer:
                 digits=3),
                 file=fo)
         f1 = f1_score(true_eval, pred_eval, average='micro')
-        logging.info(f"F1 = {f1}")
         return f1
 
     def _get_metrics(self, true, pred, alternatives=None):
