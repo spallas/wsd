@@ -34,6 +34,7 @@ np.random.seed(42)
 TELEGRAM = True
 START_EVAL_EPOCH = 10
 BATCH_MUL = CachedEmbedLoader.SINGLE
+RANDOMIZE = True
 
 
 class BaseTrainer:
@@ -151,8 +152,10 @@ class BaseTrainer:
     def train_epoch(self, epoch_i):
         step, local_step, flag = 0, 0, False
         self.model.zero_grad()
-        for step, ((b_x, b_p, b_y, b_z), b_x_e) in enumerate(randomized(zip(self.data_loader, self.cached_data_loader)),
-                                                             self.last_step):
+        loader = zip(self.data_loader, self.cached_data_loader)
+        if RANDOMIZE:
+            loader = randomized(loader)
+        for step, ((b_x, b_p, b_y, b_z), b_x_e) in enumerate(loader, self.last_step):
             try:
                 b_x_e = b_x_e if self.cache_embeddings else None
                 scores = self.model(b_x, cached_embeddings=b_x_e)
@@ -568,7 +571,7 @@ if __name__ == '__main__':
     parser.add_argument("-o", "--mixed-level", type=str, help="Train with mixed precision floats.",
                         default='O0', choices=('O0', 'O1', 'O2'))
     parser.add_argument("-z", "--cache", type=str, help="Embeddings cache", default='res/cache')
-    parser.add_argument("-r", "--randomize", action='store_true', help="Randomize data each epoch.")
+    parser.add_argument("-s", "--sequential", action='store_true', help="Feed batches as read sequentially.")
     args = parser.parse_args()
     log_level = logging.DEBUG if args.debug else logging.INFO
     if args.log:
@@ -578,6 +581,7 @@ if __name__ == '__main__':
     logging.info(f'Initializing... model = {args.model}')
     if args.config.endswith('_half.json'):
         BATCH_MUL = CachedEmbedLoader.HALF
+    RANDOMIZE = not args.sequential
     c, t = None, None
     if args.model == 'roberta':
         c = RobertaTransformerConfig.from_json_file(args.config)

@@ -155,7 +155,7 @@ class WSDNet(RobertaTransformerWSD):
                 sid = int(line.strip().split('\t')[0])
                 lemma_list = eval(line.strip().split('\t')[1])
                 self.sense_lemmas[sid] = lemma_list
-        self.slm_scale = 64
+        self.slm_scale = 0.0001
         logging.info('WSDNet: dictionaries loaded.')
         self.slm_output_size = len(self.out_vocab)
         self.output_slm = nn.Linear(self.transformer.d_model, len(self.out_vocab))
