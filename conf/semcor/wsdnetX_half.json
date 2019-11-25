@@ -13,7 +13,7 @@
   "report_path": "logs/wsdnetX_half_report.txt",
   "num_layers": 2,
   "num_heads": 4,
-  "learning_rate": 0.0005,
+  "learning_rate": 0.0003,
   "window_size": 50,
   "model_path": "res/roberta.large",
   "output_vocab": "res/dictionaries/syn_lemma_vocab.txt",
