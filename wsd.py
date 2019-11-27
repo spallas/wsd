@@ -160,14 +160,14 @@ class WSDNet(RobertaTransformerWSD):
         self.slm_output_size = len(self.out_vocab)
         self.output_slm = nn.Linear(self.transformer.d_model, len(self.out_vocab))
         self.double_loss = False
-        self.x_slm = None
+        self.v = None
 
     def forward(self, seq_list, lengths=None, cached_embeddings=None):
         x = self.embedding(seq_list) if cached_embeddings is None else cached_embeddings
         mask = get_transformer_mask(lengths, self.win_size, self.device)
         y, h = self.transformer(x, mask)
         if self.double_loss:
-            self.x_slm = self.output_slm(h)
+            self.v = self.output_slm(h)
         return y
 
     def loss(self, scores, tags, opt1=False):
@@ -175,7 +175,7 @@ class WSDNet(RobertaTransformerWSD):
         scores = scores.view(-1, self.tagset_size)
         wsd_loss = self.ce_loss(scores, y_true)
         if self.double_loss:
-            slm_scores = self.x_slm.view(-1, self.slm_output_size)
+            slm_scores = self.v.view(-1, self.slm_output_size)
             y_slm = torch.zeros_like(slm_scores).to(self.device)
             assert y_true.size(0) == y_slm.size(0)
             for y_i, y in enumerate(y_true):
@@ -219,10 +219,9 @@ class WSDNetX(WSDNet):
         x = self.embedding(seq_list) if cached_embeddings is None else cached_embeddings
         mask = get_transformer_mask(lengths, self.win_size, self.device)
         y, h = self.transformer(x, mask)
-        self.x_slm = self.output_slm(h)
-        v = self.output_slm(h)  # shape: |B| x Time steps x |V|
-        slm_logits_t = torch.sparse.mm(self.sv_matrix, v.view(-1, v.size(-1)).t())   # shape: |S| x T * |B|
-        slm_logits = slm_logits_t.t().view(v.size(0), v.size(1), -1)
+        self.v = self.output_slm(h)  # shape: |B| x Time steps x |V|
+        slm_logits = torch.sparse.mm(self.sv_matrix, self.v.view(-1, self.v.size(-1)).t())   # shape: |S| x T * |B|
+        slm_logits = slm_logits.t().view(self.v.size(0), self.v.size(1), -1)
         return y + slm_logits
 
 
@@ -276,7 +275,7 @@ class WSDNetDense(RobertaDenseWSD):
         logging.info('WSDNet: dictionaries loaded.')
         self.slm_output_size = len(self.out_vocab)
         self.output_slm = nn.Linear(self.hidden_dim, len(self.out_vocab))
-        self.double_loss = False
+        self.double_loss = True
         self.x_slm = None
         # build |S| x |V| matrix
         self.sv_size = torch.Size((len(self.sense_lemmas) + 1, len(self.out_vocab)))
@@ -292,8 +291,10 @@ class WSDNetDense(RobertaDenseWSD):
     def forward(self, seq_list, lengths=None, cached_embeddings=None):
         x = self.embedding(seq_list) if cached_embeddings is None else cached_embeddings
         y, h = self.dense(x)
-        self.x_slm = self.output_slm(h)
-        return y
+        self.v = self.output_slm(h)  # shape: |B| x Time steps x |V|
+        slm_logits = torch.sparse.mm(self.sv_matrix, self.v.view(-1, self.v.size(-1)).t())  # shape: |S| x T * |B|
+        slm_logits = slm_logits.t().view(self.v.size(0), self.v.size(1), -1)
+        return y + slm_logits
 
     def loss(self, scores, tags, opt1=False):
         y_true = tags.view(-1)
