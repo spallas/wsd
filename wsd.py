@@ -301,7 +301,7 @@ class WSDNetDense(RobertaDenseWSD):
         scores = scores.view(-1, self.tagset_size)
         wsd_loss = self.ce_loss(scores, y_true)
         # second part
-        slm_scores = self.x_slm.view(-1, self.slm_output_size)
+        slm_scores = self.v.view(-1, self.slm_output_size)
         y_slm = torch.zeros_like(slm_scores).to(self.device)
         assert y_true.size(0) == y_slm.size(0)
         for y_i, y in enumerate(y_true):
