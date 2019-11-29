@@ -2,6 +2,7 @@ import argparse
 import datetime
 import logging
 import os
+import random
 import warnings
 from itertools import count
 from typing import Set
@@ -31,6 +32,7 @@ from wsd import ElmoTransformerWSD, RobertaTransformerWSD, BertTransformerWSD, B
 warnings.filterwarnings("ignore", category=UndefinedMetricWarning)
 torch.manual_seed(42)
 np.random.seed(42)
+random.seed(42)
 TELEGRAM = True
 START_EVAL_EPOCH = 16
 BATCH_MUL = CachedEmbedLoader.SINGLE
