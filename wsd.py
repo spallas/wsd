@@ -100,6 +100,28 @@ class ElmoTransformerWSD(BaseWSD):
         return x
 
 
+class RobertaDenseWSD(BaseWSD):
+
+    def __init__(self,
+                 device,
+                 num_senses,
+                 max_len,
+                 model_path,
+                 d_embedding: int = 1024,
+                 hidden_dim: int = 512,
+                 cached_embeddings: bool = False):
+        super().__init__(device, num_senses, max_len)
+        self.d_embedding = d_embedding
+        self.hidden_dim = hidden_dim
+        self.embedding = RobertaAlignedEmbed(device, model_path) if not cached_embeddings else None
+        self.dense = DenseEncoder(self.d_embedding, self.tagset_size, self.hidden_dim)
+
+    def forward(self, seq_list, lengths=None, cached_embeddings=None):
+        x = self.embedding(seq_list) if cached_embeddings is None else cached_embeddings
+        y, h = self.dense(x)
+        return y
+
+
 class RobertaTransformerWSD(BaseWSD):
 
     def __init__(self,
@@ -131,6 +153,9 @@ class RobertaTransformerWSD(BaseWSD):
 
 class WSDNet(RobertaTransformerWSD):
 
+    SLM_SCALE = 0.00001
+    FINAL_HIDDEN_SIZE = 128
+
     def __init__(self,
                  device,
                  num_senses,
@@ -155,10 +180,10 @@ class WSDNet(RobertaTransformerWSD):
                 sid = int(line.strip().split('\t')[0])
                 lemma_list = eval(line.strip().split('\t')[1])
                 self.sense_lemmas[sid] = lemma_list
-        self.slm_scale = 0.00001
-        logging.info('WSDNet: dictionaries loaded.')
+        logging.info('WSDNet dictionaries loaded.')
         self.slm_output_size = len(self.out_vocab)
-        self.output_slm = nn.Linear(self.transformer.d_model, len(self.out_vocab))
+        self.reduce_project = nn.Linear(self.transformer.d_model, self.FINAL_HIDDEN_SIZE)
+        self.output_slm = nn.Linear(self.FINAL_HIDDEN_SIZE, len(self.out_vocab))
         self.double_loss = False
         self.v = None
 
@@ -166,6 +191,7 @@ class WSDNet(RobertaTransformerWSD):
         x = self.embedding(seq_list) if cached_embeddings is None else cached_embeddings
         mask = get_transformer_mask(lengths, self.win_size, self.device)
         y, h = self.transformer(x, mask)
+        h = self.reduce_project(h)
         if self.double_loss:
             self.v = self.output_slm(h)
         return y
@@ -182,11 +208,13 @@ class WSDNet(RobertaTransformerWSD):
                 if y != NOT_AMB_SYMBOL:
                     y_slm[y_i][self.sense_lemmas[y.item()], ] = 1
             slm_loss = self.bce_loss(slm_scores, y_slm)
-            wsd_loss += slm_loss * self.slm_scale
+            wsd_loss += slm_loss * self.SLM_SCALE
         return wsd_loss
 
 
 class WSDNetX(WSDNet):
+
+    SLM_LOGITS_SCALE = 0.1
 
     def __init__(self,
                  device,
@@ -219,35 +247,18 @@ class WSDNetX(WSDNet):
         x = self.embedding(seq_list) if cached_embeddings is None else cached_embeddings
         mask = get_transformer_mask(lengths, self.win_size, self.device)
         y, h = self.transformer(x, mask)
+        h = self.reduce_project(h)
         self.v = self.output_slm(h)  # shape: |B| x Time steps x |V|
         slm_logits = torch.sparse.mm(self.sv_matrix, self.v.view(-1, self.v.size(-1)).t())   # shape: |S| x T * |B|
         slm_logits = slm_logits.t().view(self.v.size(0), self.v.size(1), -1)
-        return y + slm_logits
-
-
-class RobertaDenseWSD(BaseWSD):
-
-    def __init__(self,
-                 device,
-                 num_senses,
-                 max_len,
-                 model_path,
-                 d_embedding: int = 1024,
-                 hidden_dim: int = 512,
-                 cached_embeddings: bool = False):
-        super().__init__(device, num_senses, max_len)
-        self.d_embedding = d_embedding
-        self.hidden_dim = hidden_dim
-        self.embedding = RobertaAlignedEmbed(device, model_path) if not cached_embeddings else None
-        self.dense = DenseEncoder(self.d_embedding, self.tagset_size, self.hidden_dim)
-
-    def forward(self, seq_list, lengths=None, cached_embeddings=None):
-        x = self.embedding(seq_list) if cached_embeddings is None else cached_embeddings
-        y, h = self.dense(x)
-        return y
+        return y + slm_logits * self.SLM_LOGITS_SCALE
 
 
 class WSDNetDense(RobertaDenseWSD):
+
+    SLM_SCALE = 0.00001
+    SLM_LOGITS_SCALE = 0.1
+    FINAL_HIDDEN_SIZE = 128
 
     def __init__(self,
                  device,
@@ -271,12 +282,12 @@ class WSDNetDense(RobertaDenseWSD):
                 sid = int(line.strip().split('\t')[0])
                 lemma_list = eval(line.strip().split('\t')[1])
                 self.sense_lemmas[sid] = lemma_list
-        self.slm_scale = 0.00001
-        logging.info('WSDNet: dictionaries loaded.')
+        logging.info('WSDNetDense: dictionaries loaded.')
         self.slm_output_size = len(self.out_vocab)
-        self.output_slm = nn.Linear(self.hidden_dim, len(self.out_vocab))
+        self.reduce_project = nn.Linear(self.hidden_dim, self.FINAL_HIDDEN_SIZE)
+        self.output_slm = nn.Linear(self.FINAL_HIDDEN_SIZE, len(self.out_vocab))
         self.double_loss = True
-        self.x_slm = None
+        self.v = None
         # build |S| x |V| matrix
         self.sv_size = torch.Size((len(self.sense_lemmas) + 1, len(self.out_vocab)))
         sparse_coord, values = [], []
@@ -291,10 +302,11 @@ class WSDNetDense(RobertaDenseWSD):
     def forward(self, seq_list, lengths=None, cached_embeddings=None):
         x = self.embedding(seq_list) if cached_embeddings is None else cached_embeddings
         y, h = self.dense(x)
+        h = self.reduce_project(h)
         self.v = self.output_slm(h)  # shape: |B| x Time steps x |V|
         slm_logits = torch.sparse.mm(self.sv_matrix, self.v.view(-1, self.v.size(-1)).t())  # shape: |S| x T * |B|
         slm_logits = slm_logits.t().view(self.v.size(0), self.v.size(1), -1)
-        return y + slm_logits
+        return y + slm_logits * self.SLM_LOGITS_SCALE
 
     def loss(self, scores, tags, opt1=False):
         y_true = tags.view(-1)
@@ -308,7 +320,7 @@ class WSDNetDense(RobertaDenseWSD):
             if y != NOT_AMB_SYMBOL:
                 y_slm[y_i][self.sense_lemmas[y.item()], ] = 1
         slm_loss = self.bce_loss(slm_scores, y_slm)
-        wsd_loss += slm_loss * self.slm_scale
+        wsd_loss += slm_loss * self.SLM_SCALE
         return wsd_loss
 
 
