@@ -258,7 +258,7 @@ class WSDNetDense(RobertaDenseWSD):
 
     SLM_SCALE = 0.00001
     SLM_LOGITS_SCALE = 0.1
-    FINAL_HIDDEN_SIZE = 128
+    FINAL_HIDDEN_SIZE = 64
 
     def __init__(self,
                  device,
