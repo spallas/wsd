@@ -114,7 +114,7 @@ class RobertaDenseWSD(BaseWSD):
         self.d_embedding = d_embedding
         self.hidden_dim = hidden_dim
         self.embedding = RobertaAlignedEmbed(device, model_path) if not cached_embeddings else None
-        self.dense = DenseEncoder(self.d_embedding, self.tagset_size, self.hidden_dim)
+        self.dense = DenseEncoder(self.d_embedding, self.tagset_size, self.hidden_dim, small_dim=64)
 
     def forward(self, seq_list, lengths=None, cached_embeddings=None):
         x = self.embedding(seq_list) if cached_embeddings is None else cached_embeddings
@@ -235,10 +235,13 @@ class WSDNetX(WSDNet):
         self.double_loss = True
         self.sv_size = torch.Size((len(self.sense_lemmas) + 1, len(self.out_vocab)))
         sparse_coord, values = [], []
+        k = 8
         for syn in self.sense_lemmas:
-            for i in self.sense_lemmas[syn]:
+            for j, i in enumerate(self.sense_lemmas[syn]):
+                if j > k:
+                    break
                 sparse_coord.append([syn, i])
-                values.append(1 / len(self.sense_lemmas[syn]))
+                values.append(1 / min(len(self.sense_lemmas[syn]), k))
         keys = torch.LongTensor(sparse_coord)
         vals = torch.FloatTensor(values)
         self.sv_matrix = torch.sparse.FloatTensor(keys.t(), vals, self.sv_size).to(self.device)
