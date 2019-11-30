@@ -1,9 +1,9 @@
 {
-  "num_epochs": 24,
+  "num_epochs": 30,
   "batch_size": 100,
   "accumulation_steps": 1,
   "checkpoint_path": "saved_weights/rdense_baseline.pt",
-  "log_interval": 50,
+  "log_interval": 32,
   "train_data":"res/wsd-train/semcor_data.xml",
   "train_tags":"res/wsd-train/semcor_tags.txt",
   "eval_data" :"res/wsd-test/se07/se07.xml",
