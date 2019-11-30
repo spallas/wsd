@@ -154,7 +154,7 @@ class RobertaTransformerWSD(BaseWSD):
 class WSDNet(RobertaTransformerWSD):
 
     SLM_SCALE = 0.00001
-    FINAL_HIDDEN_SIZE = 128
+    FINAL_HIDDEN_SIZE = 64
 
     def __init__(self,
                  device,
@@ -182,7 +182,7 @@ class WSDNet(RobertaTransformerWSD):
                 self.sense_lemmas[sid] = lemma_list
         logging.info('WSDNet dictionaries loaded.')
         self.slm_output_size = len(self.out_vocab)
-        self.reduce_project = nn.Linear(self.transformer.d_model, self.FINAL_HIDDEN_SIZE)
+        self.reduce_project = nn.Linear(self.transformer.small_dim, self.FINAL_HIDDEN_SIZE)
         self.output_slm = nn.Linear(self.FINAL_HIDDEN_SIZE, len(self.out_vocab))
         self.double_loss = False
         self.v = None
@@ -284,7 +284,7 @@ class WSDNetDense(RobertaDenseWSD):
                 self.sense_lemmas[sid] = lemma_list
         logging.info('WSDNetDense: dictionaries loaded.')
         self.slm_output_size = len(self.out_vocab)
-        self.reduce_project = nn.Linear(self.hidden_dim, self.FINAL_HIDDEN_SIZE)
+        self.reduce_project = nn.Linear(self.dense.small_dim, self.FINAL_HIDDEN_SIZE)
         self.output_slm = nn.Linear(self.FINAL_HIDDEN_SIZE, len(self.out_vocab))
         self.double_loss = True
         self.v = None

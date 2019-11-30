@@ -96,17 +96,20 @@ class WSDTransformerEncoder(nn.Module):
                  d_model,
                  d_output,
                  num_layers,
-                 num_heads):
+                 num_heads,
+                 small_dim: int = 128):
         super().__init__()
         self.d_input = d_input
         self.d_model = d_model
         self.d_output = d_output
         self.num_layers = num_layers
         self.num_heads = num_heads
+        self.small_dim = small_dim
         self.project_layer = nn.Linear(self.d_input, self.d_model)
         self.layer = nn.TransformerEncoderLayer(self.d_model, self.num_heads)
         self.encoder = nn.TransformerEncoder(self.layer, self.num_layers)
-        self.output_dense = nn.Linear(self.d_model, self.d_output)
+        self.h_small = nn.Linear(self.d_model, self.small_dim)
+        self.output_dense = nn.Linear(self.small_dim, self.d_output)
         self.scale = math.sqrt(self.d_input)
 
     def forward(self, x: torch.Tensor, mask=None):
@@ -118,6 +121,7 @@ class WSDTransformerEncoder(nn.Module):
         x = x.transpose(1, 0)  # make batch second dim for transformer layer
         x = self.encoder(x, src_key_padding_mask=mask)
         x = x.transpose(1, 0)  # restore batch first
+        x = self.h_small(x)
         h = x.contiguous().view(-1, x.shape[1], x.shape[2])
         y = self.output_dense(h)
         scores = y.view(-1, seq_len, self.d_output)
@@ -164,16 +168,18 @@ class DenseEncoder(nn.Module):
     def __init__(self,
                  d_input,
                  d_output,
-                 hidden_dim: int = 512):
+                 hidden_dim: int = 512,
+                 small_dim: int = 128):
         super().__init__()
         self.d_input = d_input
         self.d_output = d_output
         self.hidden_dim = hidden_dim
+        self.small_dim = small_dim
         self.project_layer = nn.Linear(self.d_input, self.hidden_dim)
         self.h1 = nn.Linear(self.hidden_dim, self.hidden_dim)
         self.h2 = nn.Linear(self.hidden_dim, self.hidden_dim)
-        self.h_small = nn.Linear(self.hidden_dim, 128)
-        self.output_dense = nn.Linear(128, self.d_output)
+        self.h_small = nn.Linear(self.hidden_dim, self.small_dim)
+        self.output_dense = nn.Linear(self.small_dim, self.d_output)
 
     def forward(self, x, mask=None):
         x = self.project_layer(x)
