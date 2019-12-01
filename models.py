@@ -97,7 +97,7 @@ class WSDTransformerEncoder(nn.Module):
                  d_output,
                  num_layers,
                  num_heads,
-                 small_dim: int = 128):
+                 small_dim: int = 512):
         super().__init__()
         self.d_input = d_input
         self.d_model = d_model
@@ -169,7 +169,7 @@ class DenseEncoder(nn.Module):
                  d_input,
                  d_output,
                  hidden_dim: int = 512,
-                 small_dim: int = 128):
+                 small_dim: int = 512):
         super().__init__()
         self.d_input = d_input
         self.d_output = d_output
