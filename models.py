@@ -97,7 +97,7 @@ class WSDTransformerEncoder(nn.Module):
                  d_output,
                  num_layers,
                  num_heads,
-                 small_dim: int = 64):
+                 small_dim: int = 128):
         super().__init__()
         self.d_input = d_input
         self.d_model = d_model
