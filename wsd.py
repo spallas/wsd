@@ -214,7 +214,7 @@ class WSDNet(RobertaTransformerWSD):
 
 class WSDNetX(WSDNet):
 
-    SLM_LOGITS_SCALE = 0.1
+    SLM_LOGITS_SCALE = 0.01
 
     def __init__(self,
                  device,
@@ -250,7 +250,7 @@ class WSDNetX(WSDNet):
         x = self.embedding(seq_list) if cached_embeddings is None else cached_embeddings
         mask = get_transformer_mask(lengths, self.win_size, self.device)
         y, h = self.transformer(x, mask)
-        h = self.reduce_project(h)
+        # h = self.reduce_project(h)
         self.v = self.output_slm(h)  # shape: |B| x Time steps x |V|
         slm_logits = torch.sparse.mm(self.sv_matrix, self.v.view(-1, self.v.size(-1)).t())   # shape: |S| x T * |B|
         slm_logits = slm_logits.t().view(self.v.size(0), self.v.size(1), -1)

@@ -1,5 +1,5 @@
 {
-  "num_epochs": 30,
+  "num_epochs": 40,
   "batch_size": 50,
   "accumulation_steps": 4,
   "checkpoint_path": "saved_weights/wsdnetX_half.pt",

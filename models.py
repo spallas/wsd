@@ -108,8 +108,8 @@ class WSDTransformerEncoder(nn.Module):
         self.project_layer = nn.Linear(self.d_input, self.d_model)
         self.layer = nn.TransformerEncoderLayer(self.d_model, self.num_heads)
         self.encoder = nn.TransformerEncoder(self.layer, self.num_layers)
-        self.h_small = nn.Linear(self.d_model, self.small_dim)
-        self.output_dense = nn.Linear(self.small_dim, self.d_output)
+        # self.h_small = nn.Linear(self.d_model, self.small_dim)
+        self.output_dense = nn.Linear(self.d_model, self.d_output)
         self.scale = math.sqrt(self.d_input)
 
     def forward(self, x: torch.Tensor, mask=None):
@@ -121,7 +121,7 @@ class WSDTransformerEncoder(nn.Module):
         x = x.transpose(1, 0)  # make batch second dim for transformer layer
         x = self.encoder(x, src_key_padding_mask=mask)
         x = x.transpose(1, 0)  # restore batch first
-        x = self.h_small(x)
+        # x = self.h_small(x)
         h = x.contiguous().view(-1, x.shape[1], x.shape[2])
         y = self.output_dense(h)
         scores = y.view(-1, seq_len, self.d_output)
