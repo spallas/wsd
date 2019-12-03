@@ -34,7 +34,7 @@ torch.manual_seed(42)
 np.random.seed(42)
 random.seed(42)
 TELEGRAM = True
-START_EVAL_EPOCH = 30
+START_EVAL_EPOCH = 18
 BATCH_MUL = CachedEmbedLoader.SINGLE
 RANDOMIZE = True
 
