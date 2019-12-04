@@ -52,6 +52,25 @@ def randomized(iterable):
         yield cache[i]
 
 
+class Randomized:
+
+    def __init__(self, iterable):
+        self.cache = [e for e in iterable]
+        self.rand_indices = list(range(len(self.cache)))
+        self.i = 0
+
+    def __iter__(self):
+        random.shuffle(self.rand_indices)
+        self.i = 0
+        return self
+
+    def __next__(self):
+        if self.i > len(self.cache):
+            raise StopIteration
+        c = self.cache[self.rand_indices[self.i]]
+        self.i += 1
+        return c
+
 def telegram_on_failure(function, *args, **kwargs):
     try:
         function(*args, **kwargs)

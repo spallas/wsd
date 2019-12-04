@@ -25,7 +25,7 @@ from torch.utils.tensorboard import SummaryWriter
 from data_preprocessing import FlatSemCorDataset, load_sense2id, FlatLoader, CachedEmbedLoader
 from utils import util
 from utils.config import RobertaTransformerConfig, WSDNetConfig, WSDNetXConfig, RDenseConfig, WSDDenseConfig
-from utils.util import NOT_AMB_SYMBOL, telegram_on_failure, telegram_send, randomized
+from utils.util import NOT_AMB_SYMBOL, telegram_on_failure, telegram_send, randomized, Randomized
 from wsd import ElmoTransformerWSD, RobertaTransformerWSD, BertTransformerWSD, BaselineWSD, WSDNet, WSDNetX, \
     RobertaDenseWSD, WSDNetDense
 
@@ -93,6 +93,9 @@ class BaseTrainer:
         self.sense2id = load_sense2id(sense_dict, train_tags, test_tags)
         logging.debug('Loaded sense2id vocab')
         self.pad_symbol = pad_symbol
+        self.rnd_loader = None
+        self.eval_rnd_loader = None
+        self.test_rnd_loader = None
 
         dataset = FlatSemCorDataset(train_data, train_tags)
 
@@ -154,10 +157,7 @@ class BaseTrainer:
     def train_epoch(self, epoch_i):
         step, local_step, flag = 0, 0, False
         self.model.zero_grad()
-        loader = zip(self.data_loader, self.cached_data_loader)
-        if RANDOMIZE:
-            loader = randomized(loader)
-        for step, ((b_x, b_p, b_y, b_z), b_x_e) in enumerate(loader, self.last_step):
+        for step, ((b_x, b_p, b_y, b_z), b_x_e) in enumerate(self.rnd_loader, self.last_step):
             try:
                 b_x_e = b_x_e if self.cache_embeddings else None
                 scores = self.model(b_x, cached_embeddings=b_x_e.to(self.device))
@@ -188,6 +188,11 @@ class BaseTrainer:
     def train(self):
         print(self.model)
         self.model.train()
+        self.rnd_loader = zip(self.data_loader, self.cached_data_loader)
+        if RANDOMIZE:
+            self.rnd_loader = Randomized(self.rnd_loader)
+            del self.data_loader
+            del self.cached_data_loader
         start = datetime.datetime.now()
         for epoch in range(self.last_epoch + 1, self.num_epochs + 1):
             end = datetime.datetime.now()
