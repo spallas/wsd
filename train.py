@@ -160,7 +160,7 @@ class BaseTrainer:
         for step, ((b_x, b_p, b_y, b_z), b_x_e) in enumerate(loader, self.last_step):
             try:
                 b_x_e = b_x_e if self.cache_embeddings else None
-                scores = self.model(b_x, cached_embeddings=b_x_e)
+                scores = self.model(b_x, cached_embeddings=b_x_e.to(self.device))
             except TypeError:  # model doesn't support embeddings caching
                 scores = self.model(b_x)
             loss = self.model.loss(scores, b_y.to(self.device))
@@ -226,7 +226,7 @@ class BaseTrainer:
             for step, ((b_x, b_p, b_y, b_z), b_x_e) in enumerate(zip(loader, cache_loader)):
                 try:
                     b_x_e = b_x_e if self.cache_embeddings else None
-                    scores = self.model(b_x, cached_embeddings=b_x_e)
+                    scores = self.model(b_x, cached_embeddings=b_x_e.to(self.device))
                 except TypeError:  # model doesn't support embeddings caching
                     scores = self.model(b_x)
                 true += [item for seq in b_y.tolist() for item in seq]
