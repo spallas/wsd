@@ -65,7 +65,7 @@ class Randomized:
         return self
 
     def __next__(self):
-        if self.i > len(self.cache):
+        if self.i >= len(self.cache):
             raise StopIteration
         c = self.cache[self.rand_indices[self.i]]
         self.i += 1
