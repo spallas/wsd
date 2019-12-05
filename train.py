@@ -130,7 +130,8 @@ class BaseTrainer:
         self.eval_loader = FlatLoader(eval_dataset, batch_size=self.batch_size, win_size=self.window_size,
                                       pad_symbol=self.pad_symbol)
         self.cached_eval_loader = CachedEmbedLoader(self.device, f'{self.cache_path}_eval_{self.cache_batch_size}.npz',
-                                                    self.embed_model_path, BATCH_MUL, self.batch_size, self.eval_loader) \
+                                                    self.embed_model_path, BATCH_MUL, self.batch_size, self.eval_loader,
+                                                    to_device=True) \
             if self.cache_embeddings else count()
         if torch.cuda.device_count() > 1 and self.multi_gpu:
             self.model = nn.DataParallel(self.model)
@@ -148,7 +149,8 @@ class BaseTrainer:
         self.test_loader = FlatLoader(test_dataset, batch_size=self.batch_size, win_size=self.window_size,
                                       pad_symbol=self.pad_symbol)
         self.cached_test_loader = CachedEmbedLoader(self.device, f'{self.cache_path}_test_{self.cache_batch_size}.npz',
-                                                    self.embed_model_path, BATCH_MUL, self.batch_size, self.test_loader) \
+                                                    self.embed_model_path, BATCH_MUL, self.batch_size, self.test_loader,
+                                                    to_device=True) \
             if self.cache_embeddings else count()
         self._load_best()
         self.model.eval()
@@ -231,7 +233,7 @@ class BaseTrainer:
             for step, ((b_x, b_p, b_y, b_z), b_x_e) in enumerate(zip(loader, cache_loader)):
                 try:
                     b_x_e = b_x_e if self.cache_embeddings else None
-                    scores = self.model(b_x, cached_embeddings=b_x_e.to(self.device))
+                    scores = self.model(b_x, cached_embeddings=b_x_e)
                 except TypeError:  # model doesn't support embeddings caching
                     scores = self.model(b_x)
                 true += [item for seq in b_y.tolist() for item in seq]
