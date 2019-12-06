@@ -8,10 +8,12 @@ mv roberta.large.tar.gz res/
 tar -xzf res/roberta.large.tar.gz -C res/
 rm res/roberta.large.tar.gz
 
-pip install -r requirements.txt
+pip install -r requirements.txt --ignore-installed
 
-git clone https://github.com/NVIDIA/apex
-cd apex || exit
-pip install -v --no-cache-dir --global-option="--cpp_ext" --global-option="--cuda_ext" ./
+# [optional]
+# git clone https://github.com/NVIDIA/apex
+# cd apex || exit
+# pip install -v --no-cache-dir --global-option="--cpp_ext" --global-option="--cuda_ext" ./
+# cd ..
 
 python -c "import nltk; nltk.download('wordnet')"
