@@ -34,7 +34,7 @@ torch.manual_seed(42)
 np.random.seed(42)
 random.seed(42)
 TELEGRAM = True
-START_EVAL_EPOCH = 18
+START_EVAL_EPOCH = 15
 BATCH_MUL = CachedEmbedLoader.SINGLE
 RANDOMIZE = True
 
@@ -136,7 +136,9 @@ class BaseTrainer:
         if torch.cuda.device_count() > 1 and self.multi_gpu:
             self.model = nn.DataParallel(self.model)
         self.model.to(self.device)
-        self.optimizer = optim.Adam(self.model.parameters(), lr=self.learning_rate)
+        # self.optimizer = optim.Adam(self.model.parameters(), lr=self.learning_rate)
+        self.optimizer = optim.AdamW(self.model.parameters(), lr=self.learning_rate, amsgrad=True)
+
         # Use apex to make model possibly faster.
         loss_scale = 1 if self.mixed == 'O0' else 'dynamic'
         (self.model, _), self.optimizer = amp.initialize(self.model, self.optimizer,
@@ -203,7 +205,7 @@ class BaseTrainer:
             if TELEGRAM:
                 telegram_send(f'Epoch: {epoch}')
             self.train_epoch(epoch)
-            if epoch > START_EVAL_EPOCH:
+            if epoch >= START_EVAL_EPOCH:
                 self._set_global_lr(self.learning_rate / 3)
 
     def _log(self, step, loss, epoch_i):
@@ -212,7 +214,7 @@ class BaseTrainer:
             self._plot('Train_loss', loss.item(), step)
             self._gpu_mem_info()
             self._maybe_checkpoint(loss, epoch_i)
-            if epoch_i > START_EVAL_EPOCH:
+            if epoch_i >= START_EVAL_EPOCH:
                 f1 = self._evaluate(epoch_i)
                 self._plot('Dev_F1', f1, step)
                 self.model.train()  # return to train mode after evaluation
