@@ -153,7 +153,7 @@ class RobertaTransformerWSD(BaseWSD):
 
 class WSDNet(RobertaTransformerWSD):
 
-    SLM_SCALE = 0.000001
+    SLM_SCALE = 0.00001
     FINAL_HIDDEN_SIZE = 512
 
     def __init__(self,
@@ -214,7 +214,7 @@ class WSDNet(RobertaTransformerWSD):
 
 class WSDNetX(WSDNet):
 
-    SLM_LOGITS_SCALE = 0.01
+    SLM_LOGITS_SCALE = 0.05
 
     def __init__(self,
                  device,
@@ -235,7 +235,7 @@ class WSDNetX(WSDNet):
         self.double_loss = True
         self.sv_size = torch.Size((len(self.sense_lemmas) + 1, len(self.out_vocab)))
         sparse_coord, values = [], []
-        k = 8
+        k = 32
         for syn in self.sense_lemmas:
             for j, i in enumerate(self.sense_lemmas[syn]):
                 if j > k:

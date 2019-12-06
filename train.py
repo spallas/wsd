@@ -203,6 +203,8 @@ class BaseTrainer:
             if TELEGRAM:
                 telegram_send(f'Epoch: {epoch}')
             self.train_epoch(epoch)
+            if epoch > START_EVAL_EPOCH:
+                self._set_global_lr(self.learning_rate / 3)
 
     def _log(self, step, loss, epoch_i):
         if step % self.log_interval == 0:
@@ -376,6 +378,10 @@ class BaseTrainer:
         if torch.cuda.is_available():  # check if memory is leaking
             logging.debug(f'Allocated GPU memory: '
                           f'{torch.cuda.memory_allocated() / 1_000_000} MB')
+
+    def _set_global_lr(self, lr: float):
+        for g in self.optimizer.param_groups:
+            g['lr'] = lr
 
 
 class ElmoLSTMTrainer(BaseTrainer):

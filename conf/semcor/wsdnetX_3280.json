@@ -1,0 +1,22 @@
+{
+  "num_epochs": 27,
+  "batch_size": 32,
+  "accumulation_steps": 4,
+  "checkpoint_path": "saved_weights/wsdnetX_3280.pt",
+  "log_interval": 12,
+  "train_data":"res/wsd-train/semcor_data.xml",
+  "train_tags":"res/wsd-train/semcor_tags.txt",
+  "eval_data" :"res/wsd-test/se07/se07.xml",
+  "eval_tags" :"res/wsd-test/se07/se07.txt",
+  "test_data" :"res/wsd-train/test_data.xml",
+  "test_tags" :"res/wsd-train/test_tags.txt",
+  "report_path": "logs/wsdnetX_half_report.txt",
+  "num_layers": 2,
+  "num_heads": 8,
+  "learning_rate": 0.0005,
+  "window_size": 80,
+  "model_path": "res/roberta.large",
+  "output_vocab": "res/dictionaries/syn_lemma_vocab.txt",
+  "sense_lemmas": "res/dictionaries/sense_lemmas_hyper.txt",
+  "cache_embeddings": true
+}
