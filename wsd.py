@@ -207,6 +207,8 @@ class WSDNet(RobertaTransformerWSD):
             for y_i, y in enumerate(y_true):
                 if y != NOT_AMB_SYMBOL:
                     y_slm[y_i][self.sense_lemmas[y.item()], ] = 1
+                else:
+                    slm_scores[y_i] = 0
             slm_loss = self.bce_loss(slm_scores, y_slm)
             wsd_loss += slm_loss * self.SLM_SCALE
         return wsd_loss
