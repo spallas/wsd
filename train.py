@@ -136,8 +136,8 @@ class BaseTrainer:
         if torch.cuda.device_count() > 1 and self.multi_gpu:
             self.model = nn.DataParallel(self.model)
         self.model.to(self.device)
-        # self.optimizer = optim.Adam(self.model.parameters(), lr=self.learning_rate)
-        self.optimizer = optim.AdamW(self.model.parameters(), lr=self.learning_rate, amsgrad=True)
+        self.optimizer = optim.Adam(self.model.parameters(), lr=self.learning_rate)
+        # self.optimizer = optim.AdamW(self.model.parameters(), lr=self.learning_rate, amsgrad=True)
 
         # Use apex to make model possibly faster.
         loss_scale = 1 if self.mixed == 'O0' else 'dynamic'
