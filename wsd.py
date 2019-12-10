@@ -3,6 +3,7 @@ from collections import OrderedDict
 
 import torch
 from torch import nn
+import torch.nn.functional as F
 
 try:
     import torch_sparse
@@ -25,7 +26,7 @@ class BaseWSD(nn.Module):
         self.win_size = max_len
         self.batch_size = batch_size
         self.ce_loss = nn.CrossEntropyLoss(ignore_index=NOT_AMB_SYMBOL)
-        self.bce_loss = nn.BCEWithLogitsLoss(reduction='sum')  # also 'sum'
+        # self.bce_loss = nn.BCEWithLogitsLoss(reduction='sum')  # also 'sum'
 
     def forward(self, *inputs):
         raise NotImplementedError("Do not use base class, use concrete classes instead.")
@@ -153,7 +154,7 @@ class RobertaTransformerWSD(BaseWSD):
 
 class WSDNet(RobertaTransformerWSD):
 
-    SLM_SCALE = 0.000001
+    SLM_SCALE = 0.00001
     FINAL_HIDDEN_SIZE = 512
 
     def __init__(self,
@@ -203,13 +204,16 @@ class WSDNet(RobertaTransformerWSD):
         if self.double_loss:
             slm_scores = self.v.view(-1, self.slm_output_size)
             y_slm = torch.zeros_like(slm_scores).to(self.device)
+            mask_weights = torch.zeros(slm_scores.size(0)).to(self.device)
             assert y_true.size(0) == y_slm.size(0)
             for y_i, y in enumerate(y_true):
                 if y != NOT_AMB_SYMBOL:
                     y_slm[y_i][self.sense_lemmas[y.item()], ] = 1
+                    mask_weights[y_i] = 1
                 else:
-                    slm_scores[y_i] = 0
-            slm_loss = self.bce_loss(slm_scores, y_slm)
+                    mask_weights[y_i] = 0
+            slm_loss = F.binary_cross_entropy_with_logits(slm_scores, y_slm, mask_weights, reduction='sum')
+            # self.bce_loss(slm_scores, y_slm)
             wsd_loss += slm_loss * self.SLM_SCALE
         return wsd_loss
 
