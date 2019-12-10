@@ -204,7 +204,7 @@ class WSDNet(RobertaTransformerWSD):
         if self.double_loss:
             slm_scores = self.v.view(-1, self.slm_output_size)
             y_slm = torch.zeros_like(slm_scores).to(self.device)
-            mask_weights = torch.zeros(slm_scores.size(0)).to(self.device)
+            mask_weights = torch.zeros_like(slm_scores).to(self.device)
             assert y_true.size(0) == y_slm.size(0)
             for y_i, y in enumerate(y_true):
                 if y != NOT_AMB_SYMBOL:
