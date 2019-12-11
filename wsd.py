@@ -294,7 +294,7 @@ class WSDNetDense(RobertaDenseWSD):
                 self.sense_lemmas[sid] = lemma_list
         logging.info('WSDNetDense: dictionaries loaded.')
         self.slm_output_size = len(self.out_vocab)
-        self.output_slm = nn.Linear(self.dense.hidden_dim, len(self.out_vocab))
+        self.output_slm = nn.Linear(self.dense.hidden_dim, len(self.out_vocab)).half()
         self.double_loss = True
         self.v = None
         # build |S| x |V| matrix
@@ -324,14 +324,17 @@ class WSDNetDense(RobertaDenseWSD):
         y_true = tags.view(-1)
         scores = scores.view(-1, self.tagset_size)
         wsd_loss = self.ce_loss(scores, y_true)
-        # second part
         slm_scores = self.v.view(-1, self.slm_output_size)
         y_slm = torch.zeros_like(slm_scores).to(self.device)
+        mask_weights = torch.zeros_like(slm_scores).to(self.device)
         assert y_true.size(0) == y_slm.size(0)
         for y_i, y in enumerate(y_true):
             if y != NOT_AMB_SYMBOL:
                 y_slm[y_i][self.sense_lemmas[y.item()], ] = 1
-        slm_loss = self.bce_loss(slm_scores, y_slm)
+                mask_weights[y_i] = 1
+            else:
+                mask_weights[y_i] = 0
+        slm_loss = F.binary_cross_entropy_with_logits(slm_scores, y_slm, mask_weights, reduction='sum')
         wsd_loss += slm_loss * self.SLM_SCALE
         return wsd_loss
 
