@@ -266,7 +266,7 @@ class WSDNetX(WSDNet):
 
 class WSDNetDense(RobertaDenseWSD):
 
-    SLM_SCALE = 0.00001
+    SLM_SCALE = 0.0001
     SLM_LOGITS_SCALE = 0.1
     FINAL_HIDDEN_SIZE = 64
 
@@ -294,25 +294,27 @@ class WSDNetDense(RobertaDenseWSD):
                 self.sense_lemmas[sid] = lemma_list
         logging.info('WSDNetDense: dictionaries loaded.')
         self.slm_output_size = len(self.out_vocab)
-        self.reduce_project = nn.Linear(self.dense.small_dim, self.FINAL_HIDDEN_SIZE)
-        self.output_slm = nn.Linear(self.FINAL_HIDDEN_SIZE, len(self.out_vocab))
+        self.output_slm = nn.Linear(self.dense.hidden_dim, len(self.out_vocab))
         self.double_loss = True
         self.v = None
         # build |S| x |V| matrix
         self.sv_size = torch.Size((len(self.sense_lemmas) + 1, len(self.out_vocab)))
         sparse_coord, values = [], []
+        k = 32
         for syn in self.sense_lemmas:
-            for i in self.sense_lemmas[syn]:
+            for j, i in enumerate(self.sense_lemmas[syn]):
+                if j > k:
+                    break
                 sparse_coord.append([syn, i])
-                values.append(1 / len(self.sense_lemmas[syn]))
+                values.append(1 / min(len(self.sense_lemmas[syn]), k))
         keys = torch.LongTensor(sparse_coord)
         vals = torch.FloatTensor(values)
         self.sv_matrix = torch.sparse.FloatTensor(keys.t(), vals, self.sv_size).to(self.device)
 
     def forward(self, seq_list, lengths=None, cached_embeddings=None):
         x = self.embedding(seq_list) if cached_embeddings is None else cached_embeddings
+        x = self.batch_norm(x)
         y, h = self.dense(x)
-        h = self.reduce_project(h)
         self.v = self.output_slm(h)  # shape: |B| x Time steps x |V|
         slm_logits = torch.sparse.mm(self.sv_matrix, self.v.view(-1, self.v.size(-1)).t())  # shape: |S| x T * |B|
         slm_logits = slm_logits.t().view(self.v.size(0), self.v.size(1), -1)
