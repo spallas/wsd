@@ -1,9 +1,9 @@
 {
   "num_epochs": 30,
   "batch_size": 50,
-  "accumulation_steps": 4,
+  "accumulation_steps": 2,
   "checkpoint_path": "saved_weights/rtransform_half.pt",
-  "log_interval": 32,
+  "log_interval": 14,
   "train_data":"res/wsd-train/semcor_data.xml",
   "train_tags":"res/wsd-train/semcor_tags.txt",
   "eval_data" :"res/wsd-test/se07/se07.xml",
@@ -13,7 +13,7 @@
   "report_path": "logs/rtransform_half_report.txt",
   "num_layers": 2,
   "num_heads": 4,
-  "learning_rate": 0.0005,
+  "learning_rate": 0.0003,
   "window_size": 50,
   "model_path": "res/roberta.large",
   "cache_embeddings": true

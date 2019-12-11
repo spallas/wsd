@@ -25,6 +25,7 @@ class BaseWSD(nn.Module):
         self.tagset_size = num_senses
         self.win_size = max_len
         self.batch_size = batch_size
+        self.batch_norm = nn.BatchNorm1d(self.win_size)
         self.ce_loss = nn.CrossEntropyLoss(ignore_index=NOT_AMB_SYMBOL)
 
     def forward(self, *inputs):
@@ -115,7 +116,6 @@ class RobertaDenseWSD(BaseWSD):
         self.hidden_dim = hidden_dim
         self.embedding = RobertaAlignedEmbed(device, model_path) if not cached_embeddings else None
         self.dense = DenseEncoder(self.d_embedding, self.tagset_size, self.hidden_dim)
-        self.batch_norm = nn.BatchNorm1d(self.win_size)
 
     def forward(self, seq_list, lengths=None, cached_embeddings=None):
         x = self.embedding(seq_list) if cached_embeddings is None else cached_embeddings
@@ -148,6 +148,7 @@ class RobertaTransformerWSD(BaseWSD):
 
     def forward(self, seq_list, lengths=None, cached_embeddings=None):
         x = self.embedding(seq_list) if cached_embeddings is None else cached_embeddings
+        x = self.batch_norm(x)
         mask = get_transformer_mask(lengths, self.win_size, self.device)
         x, h = self.transformer(x, mask)
         return x
@@ -294,7 +295,7 @@ class WSDNetDense(RobertaDenseWSD):
                 self.sense_lemmas[sid] = lemma_list
         logging.info('WSDNetDense: dictionaries loaded.')
         self.slm_output_size = len(self.out_vocab)
-        self.output_slm = nn.Linear(self.dense.hidden_dim, len(self.out_vocab)).half()
+        self.output_slm = nn.Linear(self.dense.hidden_dim, len(self.out_vocab))
         self.double_loss = True
         self.v = None
         # build |S| x |V| matrix
