@@ -115,9 +115,11 @@ class RobertaDenseWSD(BaseWSD):
         self.hidden_dim = hidden_dim
         self.embedding = RobertaAlignedEmbed(device, model_path) if not cached_embeddings else None
         self.dense = DenseEncoder(self.d_embedding, self.tagset_size, self.hidden_dim)
+        self.batch_norm = nn.BatchNorm1d(self.win_size)
 
     def forward(self, seq_list, lengths=None, cached_embeddings=None):
         x = self.embedding(seq_list) if cached_embeddings is None else cached_embeddings
+        x = self.batch_norm(x)
         y, h = self.dense(x)
         return y
 
@@ -219,7 +221,7 @@ class WSDNet(RobertaTransformerWSD):
 
 class WSDNetX(WSDNet):
 
-    SLM_LOGITS_SCALE = 0.08
+    SLM_LOGITS_SCALE = 0.1
 
     def __init__(self,
                  device,
