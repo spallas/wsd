@@ -25,7 +25,7 @@ from torch.utils.tensorboard import SummaryWriter
 from data_preprocessing import FlatSemCorDataset, load_sense2id, FlatLoader, CachedEmbedLoader
 from utils import util
 from utils.config import RobertaTransformerConfig, WSDNetConfig, WSDNetXConfig, RDenseConfig, WSDDenseConfig
-from utils.util import NOT_AMB_SYMBOL, telegram_on_failure, telegram_send, randomized, Randomized
+from utils.util import NOT_AMB_SYMBOL, telegram_on_failure, telegram_send, Randomized
 from wsd import ElmoTransformerWSD, RobertaTransformerWSD, BertTransformerWSD, BaselineWSD, WSDNet, WSDNetX, \
     RobertaDenseWSD, WSDNetDense
 
