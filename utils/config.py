@@ -20,7 +20,7 @@ class Config(object):
     test_data:  str = 'res/wsd-train/test_data.xml'
     test_tags:  str = 'res/wsd-train/test_tags.txt'
     sense_dict: str = 'res/dictionaries/senses.txt'
-    pad_symbol: str = 'PAD'  # or '<pad>'
+    pad_symbol: str = '<pad>'
 
     log_interval: int = 400
     cache_embeddings: bool = False
@@ -176,5 +176,5 @@ class WSDNetXConfig(WSDNetConfig):
 
 # Test
 if __name__ == "__main__":
-    c = ElmoConfig.from_json_file("../conf/baseline_elmo_conf.json")
+    c = WSDNetXConfig.from_json_file("../conf/wsdnetx_3280.json")
     print(c.to_json())

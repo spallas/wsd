@@ -57,7 +57,7 @@ class BaseTrainer:
                  test_tags='res/wsd-train/test_tags.txt',
                  sense_dict='res/dictionaries/senses.txt',
                  report_path='logs/baseline_elmo_report.txt',
-                 pad_symbol='PAD',
+                 pad_symbol='<pad>',
                  is_training=True,
                  mixed_precision='O0',
                  multi_gpu=False,

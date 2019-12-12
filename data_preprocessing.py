@@ -229,7 +229,7 @@ class CachedEmbedLoader:
 if __name__ == '__main__':
 
     dataset_ = FlatSemCorDataset()
-    data_loader = FlatLoader(dataset_, 100, 100, 'PAD')
+    data_loader = FlatLoader(dataset_, 100, 100, '<pad>')
 
     for bx in enumerate(data_loader):
         print(bx)

@@ -39,7 +39,7 @@ id2wnpos[4] = 'r'
 
 NOT_AMB_SYMBOL = -1
 UNK_SENSE = -2
-PAD_SYMBOL = 'PAD'  # '<pad>'
+PAD_SYMBOL = '<pad>'
 
 #######################################
 

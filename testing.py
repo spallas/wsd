@@ -84,7 +84,7 @@ class RobertaTrainerLM(RobertaTrainer, TrainerLM):
 
 
 def test0():
-    c = RobertaTransformerConfig.from_json_file('conf/roberta_tr_conf_4.json')
+    c = RobertaTransformerConfig.from_json_file('conf/old/roberta_tr_conf_4.json')
     cd = c.__dict__
     cd['is_training'] = False
     t = RobertaTrainer(**cd)
@@ -92,7 +92,7 @@ def test0():
 
 
 def test1():
-    c = RobertaTransformerConfig.from_json_file('conf/roberta_tr_conf_4.json')
+    c = RobertaTransformerConfig.from_json_file('conf/old/roberta_tr_conf_4.json')
     cd = c.__dict__
     cd['is_training'] = False
     t = RobertaTrainerLM(**cd)
