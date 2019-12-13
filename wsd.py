@@ -314,16 +314,19 @@ class WSDNetDense(RobertaDenseWSD):
         return loss
 
     def _get_slm_loss(self, y_true):
-        y_slm = torch.zeros_like(self.v).to(self.device)
-        mask_weights = torch.zeros_like(self.v).to(self.device)
-        assert y_true.size(0) == y_slm.size(0)
-        for y_i, y in enumerate(y_true):
-            if y != NOT_AMB_SYMBOL:
-                y_slm[y_i][self.sense_lemmas[y.item()], ] = 1
-                mask_weights[y_i] = 1
-            else:
-                mask_weights[y_i] = 0
-        return F.binary_cross_entropy_with_logits(self.v, y_slm, mask_weights, reduction='sum')
+        k = 10
+        slm_loss = 0
+        for i in range(0, self.v.size(0), k):
+            y_slm = torch.zeros_like(self.v[i:i+k]).to(self.device)
+            mask_weights = torch.zeros_like(self.v[i:i+k]).to(self.device)
+            for y_i, y in enumerate(y_true):
+                if y != NOT_AMB_SYMBOL:
+                    y_slm[y_i][self.sense_lemmas[y.item()], ] = 1
+                    mask_weights[y_i] = 1
+                else:
+                    mask_weights[y_i] = 0
+            slm_loss += F.binary_cross_entropy_with_logits(self.v[i:i+k], y_slm, mask_weights, reduction='sum')
+        return slm_loss
 
 
 class BertTransformerWSD(BaseWSD):
