@@ -204,9 +204,8 @@ class WSDNetX(RobertaTransformerWSD):
                     break
                 sparse_coord.append([syn, i])
                 values.append(1 / min(len(self.sense_lemmas[syn]), k))
-        keys = torch.LongTensor(sparse_coord)
-        vals = torch.FloatTensor(values)
-        self.sv_matrix = torch.sparse.FloatTensor(keys.t(), vals, self.sv_size).to(self.device)
+        self.keys = torch.LongTensor(sparse_coord)
+        self.vals = torch.FloatTensor(values)
 
     def forward(self, seq_list, lengths=None, cached_embeddings=None):
         x = self.embedding(seq_list) if cached_embeddings is None else cached_embeddings
@@ -214,7 +213,8 @@ class WSDNetX(RobertaTransformerWSD):
         y, h = self.transformer(x, mask)
         # h = self.reduce_project(h)
         self.v = self.output_slm(h)  # shape: |B| x Time steps x |V|
-        slm_logits = torch.sparse.mm(self.sv_matrix, self.v.view(-1, self.v.size(-1)).t())   # shape: |S| x T * |B|
+        sv_matrix = torch.sparse.FloatTensor(self.keys.t(), self.vals, self.sv_size).to(self.device)
+        slm_logits = torch.sparse.mm(sv_matrix, self.v.view(-1, self.v.size(-1)).t())   # shape: |S| x T * |B|
         slm_logits = slm_logits.t().view(self.v.size(0), self.v.size(1), -1)
         return y + slm_logits * self.SLM_LOGITS_SCALE
 
