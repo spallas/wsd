@@ -133,15 +133,14 @@ class RDenseConfig(Config):
 
 @dataclass_json
 @dataclass
-class WSDNetConfig(RobertaTransformerConfig):
-
+class WSDNetXConfig(RobertaTransformerConfig):
     output_vocab: str = 'res/dictionaries/syn_lemma_vocab.txt'
     sense_lemmas: str = 'res/dictionaries/sense_lemmas.txt'
 
     @staticmethod
     def from_json_file(file_name, **kwargs):
         with open(file_name) as f:
-            return WSDNetConfig.from_json(f.read(), **kwargs)
+            return WSDNetXConfig.from_json(f.read(), **kwargs)
 
 
 @dataclass_json
@@ -162,16 +161,6 @@ class WSDDenseConfig(Config):
     def from_json_file(file_name, **kwargs):
         with open(file_name) as f:
             return WSDDenseConfig.from_json(f.read(), **kwargs)
-
-
-@dataclass_json
-@dataclass
-class WSDNetXConfig(WSDNetConfig):
-
-    @staticmethod
-    def from_json_file(file_name, **kwargs):
-        with open(file_name) as f:
-            return WSDNetXConfig.from_json(f.read(), **kwargs)
 
 
 # Test

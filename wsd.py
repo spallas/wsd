@@ -154,10 +154,11 @@ class RobertaTransformerWSD(BaseWSD):
         return x
 
 
-class WSDNet(RobertaTransformerWSD):
+class WSDNetX(RobertaTransformerWSD):
 
     SLM_SCALE = 0.0001
     FINAL_HIDDEN_SIZE = 512
+    SLM_LOGITS_SCALE = 0.1
 
     def __init__(self,
                  device,
@@ -187,58 +188,7 @@ class WSDNet(RobertaTransformerWSD):
         self.slm_output_size = len(self.out_vocab)
         # self.reduce_project = nn.Linear(self.transformer.small_dim, self.FINAL_HIDDEN_SIZE)
         self.output_slm = nn.Linear(self.transformer.d_model, len(self.out_vocab))
-        self.double_loss = False
         self.v = None
-
-    def forward(self, seq_list, lengths=None, cached_embeddings=None):
-        x = self.embedding(seq_list) if cached_embeddings is None else cached_embeddings
-        mask = get_transformer_mask(lengths, self.win_size, self.device)
-        y, h = self.transformer(x, mask)
-        # h = self.reduce_project(h)
-        if self.double_loss:
-            self.v = self.output_slm(h)
-        return y
-
-    def loss(self, scores, tags, opt1=False):
-        y_true = tags.view(-1)
-        scores = scores.view(-1, self.tagset_size)
-        wsd_loss = self.ce_loss(scores, y_true)
-        if self.double_loss:
-            slm_scores = self.v.view(-1, self.slm_output_size)
-            y_slm = torch.zeros_like(slm_scores).to(self.device)
-            mask_weights = torch.zeros_like(slm_scores).to(self.device)
-            assert y_true.size(0) == y_slm.size(0)
-            for y_i, y in enumerate(y_true):
-                if y != NOT_AMB_SYMBOL:
-                    y_slm[y_i][self.sense_lemmas[y.item()], ] = 1
-                    mask_weights[y_i] = 1
-                else:
-                    mask_weights[y_i] = 0
-            slm_loss = F.binary_cross_entropy_with_logits(slm_scores, y_slm, mask_weights, reduction='sum')
-            # self.bce_loss(slm_scores, y_slm)
-            wsd_loss += slm_loss * self.SLM_SCALE
-        return wsd_loss
-
-
-class WSDNetX(WSDNet):
-
-    SLM_LOGITS_SCALE = 0.1
-
-    def __init__(self,
-                 device,
-                 num_senses,
-                 max_len,
-                 model_path,
-                 d_embedding: int = 1024,
-                 d_model: int = 512,
-                 num_heads: int = 8,
-                 num_layers: int = 4,
-                 output_vocab: str = 'res/dictionaries/syn_lemma_vocab.txt',
-                 sense_lemmas: str = 'res/dictionaries/sense_lemmas.txt',
-                 cached_embeddings: bool = False):
-        super().__init__(device, num_senses, max_len, model_path,
-                         d_embedding, d_model, num_heads, num_layers,
-                         output_vocab, sense_lemmas, cached_embeddings)
         # build |S| x |V| matrix
         self.double_loss = True
         self.sv_size = torch.Size((len(self.sense_lemmas) + 1, len(self.out_vocab)))
@@ -263,6 +213,26 @@ class WSDNetX(WSDNet):
         slm_logits = torch.sparse.mm(self.sv_matrix, self.v.view(-1, self.v.size(-1)).t())   # shape: |S| x T * |B|
         slm_logits = slm_logits.t().view(self.v.size(0), self.v.size(1), -1)
         return y + slm_logits * self.SLM_LOGITS_SCALE
+
+    def loss(self, scores, tags, opt1=False):
+        y_true = tags.view(-1)
+        scores = scores.view(-1, self.tagset_size)
+        wsd_loss = self.ce_loss(scores, y_true)
+        if self.double_loss:
+            slm_scores = self.v.view(-1, self.slm_output_size)
+            y_slm = torch.zeros_like(slm_scores).to(self.device)
+            mask_weights = torch.zeros_like(slm_scores).to(self.device)
+            assert y_true.size(0) == y_slm.size(0)
+            for y_i, y in enumerate(y_true):
+                if y != NOT_AMB_SYMBOL:
+                    y_slm[y_i][self.sense_lemmas[y.item()], ] = 1
+                    mask_weights[y_i] = 1
+                else:
+                    mask_weights[y_i] = 0
+            slm_loss = F.binary_cross_entropy_with_logits(slm_scores, y_slm, mask_weights, reduction='sum')
+            # self.bce_loss(slm_scores, y_slm)
+            wsd_loss += slm_loss * self.SLM_SCALE
+        return wsd_loss
 
 
 class WSDNetDense(RobertaDenseWSD):

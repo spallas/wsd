@@ -24,9 +24,9 @@ from torch.utils.tensorboard import SummaryWriter
 
 from data_preprocessing import FlatSemCorDataset, load_sense2id, FlatLoader, CachedEmbedLoader
 from utils import util
-from utils.config import RobertaTransformerConfig, WSDNetConfig, WSDNetXConfig, RDenseConfig, WSDDenseConfig
+from utils.config import RobertaTransformerConfig, WSDNetXConfig, RDenseConfig, WSDDenseConfig
 from utils.util import NOT_AMB_SYMBOL, telegram_on_failure, telegram_send, Randomized
-from wsd import ElmoTransformerWSD, RobertaTransformerWSD, BertTransformerWSD, BaselineWSD, WSDNet, WSDNetX, \
+from wsd import ElmoTransformerWSD, RobertaTransformerWSD, BertTransformerWSD, BaselineWSD, WSDNetX, \
     RobertaDenseWSD, WSDNetDense
 
 warnings.filterwarnings("ignore", category=UndefinedMetricWarning)
@@ -487,33 +487,6 @@ class BertTransformerTrainer(BaseTrainer):
                                         self.bert_model)
 
 
-class WSDNetTrainer(BaseTrainer):
-
-    def __init__(self,
-                 num_layers=2,
-                 d_embeddings=1024,
-                 d_model=2048,
-                 num_heads=4,
-                 model_path='res/roberta.large',
-                 output_vocab: str = 'res/dictionaries/syn_lemma_vocab.txt',
-                 sense_lemmas: str = 'res/dictionaries/sense_lemmas.txt',
-                 **kwargs):
-        self.num_layers = num_layers
-        self.d_model = d_model
-        self.d_embeddings = d_embeddings
-        self.num_heads = num_heads
-        self.model_path = model_path
-        self.output_vocab = output_vocab
-        self.sense_lemmas = sense_lemmas
-        super().__init__(**kwargs)
-
-    def _build_model(self):
-        self.model = WSDNet(self.device, len(self.sense2id) + 1, self.window_size,
-                            self.model_path, self.d_embeddings, self.d_model,
-                            self.num_heads, self.num_layers, self.output_vocab,
-                            self.sense_lemmas, self.cache_embeddings)
-
-
 class WSDNetXTrainer(BaseTrainer):
 
     def __init__(self,
@@ -591,7 +564,6 @@ if __name__ == '__main__':
                         required=True, choices=('roberta', 'wsdnet', 'wsdnetx', 'rdense', 'wsddense'))
     parser.add_argument("-c", "--config", type=str, help="config JSON file path", required=True)
     parser.add_argument("-t", "--test", action='store_true', help="If test else run training")
-    parser.add_argument("-p", "--double-loss", action='store_true', help="Run w/ double loss")
     parser.add_argument("-d", "--debug", action='store_true', help="Print debug information")
     parser.add_argument("-x", "--clean", action='store_true', help="Clear old saved weights.")
     parser.add_argument("-g", "--multi-gpu", action='store_true', help="Use all available GPUs.")
@@ -613,8 +585,6 @@ if __name__ == '__main__':
     c, t = None, None
     if args.model == 'roberta':
         c = RobertaTransformerConfig.from_json_file(args.config)
-    elif args.model == 'wsdnet':
-        c = WSDNetConfig.from_json_file(args.config)
     elif args.model == 'wsdnetx':
         c = WSDNetXConfig.from_json_file(args.config)
     elif args.model == 'rdense':
@@ -632,9 +602,6 @@ if __name__ == '__main__':
             os.remove(cd['checkpoint_path'] + '.best')
     if args.model == 'roberta':
         t = RobertaTrainer(**cd)
-    elif args.model == 'wsdnet':
-        t = WSDNetTrainer(**cd)
-        t.model.double_loss = args.double_loss
     elif args.model == 'wsdnetx':
         t = WSDNetXTrainer(**cd)
     elif args.model == 'rdense':
