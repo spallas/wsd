@@ -16,6 +16,10 @@ from models import ElmoEmbeddings, WSDTransformerEncoder, \
 from utils.util import NOT_AMB_SYMBOL
 
 
+def torch_gmean(t1, t2):
+    return torch.exp((torch.log(t1) + torch.log(t2))/2)
+
+
 class BaseWSD(nn.Module):
 
     def __init__(self, device, num_senses: int, max_len: int,
@@ -264,10 +268,15 @@ class WSDNetDense(RobertaDenseWSD):
                 lemma_list = eval(line.strip().split('\t')[1])
                 self.sense_lemmas[sid] = lemma_list
         logging.info('WSDNetDense: dictionaries loaded.')
-        self.slm_output_size = len(self.out_vocab)
-        self.output_slm = nn.Linear(self.dense.hidden_dim, len(self.out_vocab))
-        self.double_loss = True
+        self.dense = nn.Linear(self.d_embedding, self.hidden_dim)
+        self.h1 = nn.Linear(self.hidden_dim, self.hidden_dim)
+        self.relu1 = nn.ReLU()
+        self.h2 = nn.Linear(self.hidden_dim, self.hidden_dim)
+        self.output_layer = nn.AdaptiveLogSoftmaxWithLoss(self.dense.hidden_dim, self.tagset_size, [1000, 3000, 10_000])
+        self.output_slm = nn.AdaptiveLogSoftmaxWithLoss(self.dense.hidden_dim,  len(self.out_vocab), [1000, 3000, 10_000])
+        # nn.Linear(self.dense.hidden_dim, len(self.out_vocab))
         self.v = None
+        self.wsd_loss = None
         # build |S| x |V| matrix
         self.sv_size = torch.Size((len(self.sense_lemmas) + 1, len(self.out_vocab)))
         sparse_coord, values = [], []
@@ -285,19 +294,28 @@ class WSDNetDense(RobertaDenseWSD):
     def forward(self, seq_list, lengths=None, cached_embeddings=None):
         x = self.embedding(seq_list) if cached_embeddings is None else cached_embeddings
         x = self.batch_norm(x)
-        y, h = self.dense(x)
-        self.v = self.output_slm(h)  # shape: |B| x Time steps x |V|
-        slm_logits = torch.sparse.mm(self.sv_matrix, self.v.view(-1, self.v.size(-1)).t())  # shape: |S| x T * |B|
-        slm_logits = slm_logits.t().view(self.v.size(0), self.v.size(1), -1)
+        x = self.dense(x)
+        x = self.h1(x)
+        x = self.relu1(x)
+        x = self.h2(x)  # |B| x T x hidden_dim
+        h = x.view(-1, x.size(-1))  # |B| * T x hidden_dim
+        self.v = self.output_slm.log_prob(h)  # |B| * T x |V|
+        slm_logits = torch.sparse.mm(self.sv_matrix, self.v.t())  # |S| x T * |B|
+        slm_logits = slm_logits.t().view(x.size(0), x.size(1), -1)  # |B| * T x |S|
+        y = self.output_layer.log_prob(h)  # |B| * T x |S|
         return y + slm_logits * self.SLM_LOGITS_SCALE
 
     def loss(self, scores, tags, opt1=False):
         y_true = tags.view(-1)
         scores = scores.view(-1, self.tagset_size)
-        wsd_loss = self.ce_loss(scores, y_true)
-        slm_scores = self.v.view(-1, self.slm_output_size)
-        y_slm = torch.zeros_like(slm_scores).to(self.device)
-        mask_weights = torch.zeros_like(slm_scores).to(self.device)
+        wsd_loss = F.nll_loss(scores, y_true, ignore_index=NOT_AMB_SYMBOL)
+        slm_loss = self._get_slm_loss(y_true)
+        loss = torch_gmean(wsd_loss, slm_loss)  # slm_loss * self.SLM_SCALE
+        return loss
+
+    def _get_slm_loss(self, y_true):
+        y_slm = torch.zeros_like(self.v).to(self.device)
+        mask_weights = torch.zeros_like(self.v).to(self.device)
         assert y_true.size(0) == y_slm.size(0)
         for y_i, y in enumerate(y_true):
             if y != NOT_AMB_SYMBOL:
@@ -305,9 +323,7 @@ class WSDNetDense(RobertaDenseWSD):
                 mask_weights[y_i] = 1
             else:
                 mask_weights[y_i] = 0
-        slm_loss = F.binary_cross_entropy_with_logits(slm_scores, y_slm, mask_weights, reduction='sum')
-        wsd_loss += slm_loss * self.SLM_SCALE
-        return wsd_loss
+        return F.binary_cross_entropy_with_logits(self.v, y_slm, mask_weights, reduction='sum')
 
 
 class BertTransformerWSD(BaseWSD):
