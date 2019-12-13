@@ -3,7 +3,7 @@
   "batch_size": 32,
   "accumulation_steps": 3,
   "checkpoint_path": "saved_weights/wsdnetx_3280.pt",
-  "log_interval": 12,
+  "log_interval": 22,
   "train_data":"res/wsd-train/semcor_data.xml",
   "train_tags":"res/wsd-train/semcor_tags.txt",
   "eval_data" :"res/wsd-test/se07/se07.xml",

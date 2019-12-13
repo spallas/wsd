@@ -3,7 +3,7 @@
   "batch_size": 100,
   "accumulation_steps": 1,
   "checkpoint_path": "saved_weights/rdense_10050.pt",
-  "log_interval": 14,
+  "log_interval": 22,
   "train_data":"res/wsd-train/semcor_data.xml",
   "train_tags":"res/wsd-train/semcor_tags.txt",
   "eval_data" :"res/wsd-test/se07/se07.xml",
