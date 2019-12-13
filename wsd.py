@@ -272,8 +272,8 @@ class WSDNetDense(RobertaDenseWSD):
         self.h1 = nn.Linear(self.hidden_dim, self.hidden_dim)
         self.relu1 = nn.ReLU()
         self.h2 = nn.Linear(self.hidden_dim, self.hidden_dim)
-        self.output_layer = nn.AdaptiveLogSoftmaxWithLoss(self.dense.hidden_dim, self.tagset_size, [1000, 3000, 10_000])
-        self.output_slm = nn.AdaptiveLogSoftmaxWithLoss(self.dense.hidden_dim,  len(self.out_vocab), [1000, 3000, 10_000])
+        self.output_layer = nn.AdaptiveLogSoftmaxWithLoss(self.hidden_dim, self.tagset_size, [1000, 3000, 10_000])
+        self.output_slm = nn.AdaptiveLogSoftmaxWithLoss(self.hidden_dim,  len(self.out_vocab), [1000, 3000, 10_000])
         # nn.Linear(self.dense.hidden_dim, len(self.out_vocab))
         self.v = None
         self.wsd_loss = None
