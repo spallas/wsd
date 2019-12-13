@@ -32,7 +32,7 @@ class BaseWSD(nn.Module):
         self.batch_norm = nn.BatchNorm1d(self.win_size)
         self.ce_loss = nn.CrossEntropyLoss(ignore_index=NOT_AMB_SYMBOL)
 
-    def forward(self, *inputs):
+    def forward(self, *inputs, **kwargs):
         raise NotImplementedError("Do not use base class, use concrete classes instead.")
 
     def loss(self, scores, tags, pre_training=False):
@@ -207,7 +207,7 @@ class WSDNetX(RobertaTransformerWSD):
         self.keys = torch.LongTensor(sparse_coord)
         self.vals = torch.FloatTensor(values)
 
-    def forward(self, seq_list, lengths=None, cached_embeddings=None):
+    def forward(self, seq_list, lengths=None, cached_embeddings=None, tags=None):
         x = self.embedding(seq_list) if cached_embeddings is None else cached_embeddings
         mask = get_transformer_mask(lengths, self.win_size, self.device)
         y, h = self.transformer(x, mask)
@@ -216,7 +216,12 @@ class WSDNetX(RobertaTransformerWSD):
         sv_matrix = torch.sparse.FloatTensor(self.keys.t(), self.vals, self.sv_size).to(self.v.get_device())
         slm_logits = torch.sparse.mm(sv_matrix, self.v.view(-1, self.v.size(-1)).t())   # shape: |S| x T * |B|
         slm_logits = slm_logits.t().view(self.v.size(0), self.v.size(1), -1)
-        return y + slm_logits * self.SLM_LOGITS_SCALE
+        scores = y + slm_logits * self.SLM_LOGITS_SCALE
+
+        if tags is None:
+            return scores
+        else:
+            return self.loss(scores, tags)
 
     def loss(self, scores, tags, opt1=False):
         y_true = tags.view(-1)
