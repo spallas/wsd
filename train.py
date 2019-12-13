@@ -164,7 +164,7 @@ class BaseTrainer:
         for step, ((b_x, b_p, b_y, b_z), b_x_e) in enumerate(self.rnd_loader, self.last_step):
             try:
                 b_x_e = b_x_e if self.cache_embeddings else None
-                scores, loss = self.model(b_x, cached_embeddings=b_x_e.to(self.device), tags=b_y.to(self.device))
+                scores, loss = self.model(b_x, cached_embeddings=b_x_e.to(self.device), tags=b_y)
             except TypeError:  # model doesn't support embeddings caching
                 scores = self.model(b_x)
             # loss = self.model.loss(scores, b_y.to(self.device))
