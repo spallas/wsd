@@ -5,7 +5,7 @@ import os
 import random
 import warnings
 from itertools import count
-from typing import Set
+from typing import Set, Iterable, List
 
 import numpy as np
 import torch
@@ -33,7 +33,7 @@ warnings.filterwarnings("ignore", category=UndefinedMetricWarning)
 torch.manual_seed(42)
 np.random.seed(42)
 random.seed(42)
-TELEGRAM = True
+TELEGRAM = False
 START_EVAL_EPOCH = 15
 BATCH_MUL = CachedEmbedLoader.SINGLE
 RANDOMIZE = True
@@ -128,7 +128,7 @@ class BaseTrainer:
     def _setup_training(self, eval_data, eval_tags):
         eval_dataset = FlatSemCorDataset(data_path=eval_data, tags_path=eval_tags)
         self.eval_loader = FlatLoader(eval_dataset, batch_size=self.batch_size, win_size=self.window_size,
-                                      pad_symbol=self.pad_symbol)
+                                      pad_symbol=self.pad_symbol, with_word_ids=True)
         self.cached_eval_loader = CachedEmbedLoader(self.device, f'{self.cache_path}_eval_{self.cache_batch_size}.npz',
                                                     self.embed_model_path, BATCH_MUL, self.batch_size, self.eval_loader,
                                                     to_device=True) \
@@ -149,7 +149,7 @@ class BaseTrainer:
     def _setup_testing(self, test_data, test_tags):
         test_dataset = FlatSemCorDataset(data_path=test_data, tags_path=test_tags)
         self.test_loader = FlatLoader(test_dataset, batch_size=self.batch_size, win_size=self.window_size,
-                                      pad_symbol=self.pad_symbol)
+                                      pad_symbol=self.pad_symbol, with_word_ids=True)
         self.cached_test_loader = CachedEmbedLoader(self.device, f'{self.cache_path}_test_{self.cache_batch_size}.npz',
                                                     self.embed_model_path, BATCH_MUL, self.batch_size, self.test_loader,
                                                     to_device=True) \
@@ -233,8 +233,8 @@ class BaseTrainer:
         else:
             cache_loader = self.cached_eval_loader
         with torch.no_grad():
-            pred, true, z = [], [], []
-            for step, ((b_x, b_p, b_y, b_z), b_x_e) in enumerate(zip(loader, cache_loader)):
+            pred, true, z, w_ids = [], [], [], []
+            for step, ((b_x, b_p, b_y, b_z, b_ids), b_x_e) in enumerate(zip(loader, cache_loader)):
                 try:
                     b_x_e = b_x_e if self.cache_embeddings else None
                     scores = self.model(b_x, cached_embeddings=b_x_e)
@@ -243,11 +243,14 @@ class BaseTrainer:
                 true += [item for seq in b_y.tolist() for item in seq]
                 pred += [item for seq in self._select_senses(scores, b_x, b_p, b_y) for item in seq]
                 z += [item for seq in b_z for item in seq]
+                w_ids += [item for seq in b_ids for item in seq]
+
             metrics = self._get_metrics(true, pred, z)
             if test:
                 if TELEGRAM:
                     telegram_send(f'F1: {metrics:.6f}')
                 logging.info(f'F1: {metrics:.6f}')
+            self._print_predictions(pred, w_ids)
             return metrics
 
     def _evaluate(self, num_epoch):
@@ -256,7 +259,7 @@ class BaseTrainer:
         self._save_best(f1, num_epoch)
         return f1
 
-    def _select_senses(self, b_scores, b_str, b_pos, b_labels):
+    def _select_senses(self, b_scores, b_str, b_pos, b_labels) -> Iterable:
         """
         Get the max of scores only of possible senses for a given lemma+pos
         :param b_scores: shape = (batch_s x win_s x sense_vocab_s)
@@ -290,6 +293,14 @@ class BaseTrainer:
         b_impossible_senses = np.array(b_impossible_senses)
         np.put_along_axis(b_scores, b_impossible_senses, np.min(b_scores), axis=-1)
         return np.argmax(b_scores, -1).tolist()
+
+    def _print_predictions(self, pred_indices: List[int], amb_word_ids: List[str]):
+        output_path = self.report_path.replace('report', 'results')
+        id2sense = {v: k for k, v in self.sense2id.items()}
+        with open(output_path, 'w') as f:
+            for w_id, pred in zip(amb_word_ids, pred_indices):
+                if w_id != '#':
+                    print(f"{w_id} {id2sense[pred]}", file=f)
 
     def _print_metrics(self, true_eval, pred_eval):
         with open(self.report_path, 'w') as fo:

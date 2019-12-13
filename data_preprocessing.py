@@ -64,13 +64,16 @@ class FlatSemCorDataset(Dataset):
         self.first_senses = []
         self.all_senses = []
         self.pos_tags = []
+        self.amb_word_ids = []
         for text in tqdm(Et.parse(data_path).getroot(), desc=f'Loading data from {data_path}'):
             for sentence in text:
                 for word in sentence:
                     lemma = word.attrib['lemma'] if is_ascii(word.attrib['lemma']) else '#'
+                    word_senses = instance2ids[word.attrib['id']] if word.tag == 'instance' else [NOT_AMB_SYMBOL]
+                    w_id = word.attrib['id'] if word.tag == 'instance' else '#'
                     self.dataset_lemmas.append(lemma)
                     self.pos_tags.append(util.pos2id[word.attrib['pos']])
-                    word_senses = instance2ids[word.attrib['id']] if word.tag == 'instance' else [NOT_AMB_SYMBOL]
+                    self.amb_word_ids.append(w_id)
                     self.all_senses.append(word_senses)
                     self.first_senses.append(word_senses[0])
                     self.train_sense_map.setdefault(lemma, Counter()).update(word_senses)
@@ -94,12 +97,14 @@ class FlatLoader:
                  batch_size: int,
                  win_size: int,
                  pad_symbol: str,
-                 overlap: int = 0):
+                 overlap: int = 0,
+                 with_word_ids: bool = False):
         self.dataset = dataset
         self.batch_size = batch_size
         self.win_size = win_size
         self.pad_symbol = pad_symbol
         self.overlap = overlap
+        self.with_word_ids = with_word_ids
 
     def __iter__(self):
         self.last_offset = 0
@@ -109,7 +114,7 @@ class FlatLoader:
     def __next__(self):
         if self.stop_flag:
             raise StopIteration
-        b_t, b_x, b_l, b_p, b_y, b_s, b_z = [], [], [], [], [], [], []
+        b_x, b_p, b_y, b_z, b_ids = [], [], [], [], []
         for i in range(self.batch_size):
             n = max(self.last_offset + (i * self.win_size) - self.overlap, 0)
             m = n + self.win_size
@@ -118,22 +123,32 @@ class FlatLoader:
                 m = len(self.dataset)
             text_window = self.dataset.dataset_lemmas[n:m]
             text_window += [self.pad_symbol] * (self.win_size - len(text_window))
+
             pos_tags = self.dataset.pos_tags[n:m]
             pos_tags += [0] * (self.win_size - len(pos_tags))
+
             sense_labels = self.dataset.first_senses[n:m]
             sense_labels += [NOT_AMB_SYMBOL] * (self.win_size - len(sense_labels))
+
             all_senses = self.dataset.all_senses[n:m]
             all_senses += [[NOT_AMB_SYMBOL]] * (self.win_size - len(all_senses))
+
+            word_ids = self.dataset.amb_word_ids[n:m]
+            word_ids += ['#'] * (self.win_size - len(word_ids))
 
             b_x.append(text_window)
             b_p.append(pos_tags)
             b_y.append(torch.tensor(sense_labels))
             b_z.append(all_senses)
+            b_ids.append(word_ids)
             if self.stop_flag:
                 break
         self.last_offset = m
         b_y = nn.utils.rnn.pad_sequence(b_y, batch_first=True, padding_value=NOT_AMB_SYMBOL)
-        return b_x, b_p, b_y, b_z
+        if self.with_word_ids:
+            return b_x, b_p, b_y, b_z, b_ids
+        else:
+            return b_x, b_p, b_y, b_z
 
 
 class CachedEmbedLoader:
