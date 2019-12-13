@@ -205,7 +205,7 @@ class BaseTrainer:
             if TELEGRAM:
                 telegram_send(f'Epoch: {epoch}')
             self.train_epoch(epoch)
-            if epoch >= START_EVAL_EPOCH:
+            if epoch >= START_EVAL_EPOCH and BATCH_MUL == CachedEmbedLoader.HALF:
                 self._set_global_lr(self.learning_rate / 3)
 
     def _log(self, step, loss, epoch_i):
@@ -383,7 +383,7 @@ class BaseTrainer:
 
     def _set_global_lr(self, lr: float):
         for g in self.optimizer.param_groups:
-            g['lr'] = lr
+            g['lr'] = max(lr, 0.0001)
 
 
 class ElmoLSTMTrainer(BaseTrainer):
