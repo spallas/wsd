@@ -301,7 +301,7 @@ class WSDNetDense(RobertaDenseWSD):
         h = x.view(-1, x.size(-1))  # |B| * T x hidden_dim
         self.v = self.output_slm.log_prob(h)  # |B| * T x |V|
         slm_logits = torch.sparse.mm(self.sv_matrix, self.v.t())  # |S| x T * |B|
-        slm_logits = slm_logits.t().view(x.size(0), x.size(1), -1)  # |B| * T x |S|
+        slm_logits = slm_logits.t()  # |B| * T x |S|
         y = self.output_layer.log_prob(h)  # |B| * T x |S|
         return y + slm_logits * self.SLM_LOGITS_SCALE
 
