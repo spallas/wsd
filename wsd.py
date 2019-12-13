@@ -272,6 +272,100 @@ class WSDNetDense(RobertaDenseWSD):
         self.h1 = nn.Linear(self.hidden_dim, self.hidden_dim)
         self.relu1 = nn.ReLU()
         self.h2 = nn.Linear(self.hidden_dim, self.hidden_dim)
+        self.output_layer = nn.Linear(self.hidden_dim, self.tagset_size)
+        self.output_slm = nn.Linear(self.hidden_dim,  len(self.out_vocab))
+        # self.output_layer = nn.AdaptiveLogSoftmaxWithLoss(self.hidden_dim, self.tagset_size, [1000, 3000, 10_000])
+        # self.output_slm = nn.AdaptiveLogSoftmaxWithLoss(self.hidden_dim,  len(self.out_vocab), [1000, 3000, 10_000])
+        # # nn.Linear(self.dense.hidden_dim, len(self.out_vocab))
+        self.v = None
+        self.wsd_loss = None
+        # build |S| x |V| matrix
+        self.sv_size = torch.Size((len(self.sense_lemmas) + 1, len(self.out_vocab)))
+        sparse_coord, values = [], []
+        k = 32
+        for syn in self.sense_lemmas:
+            for j, i in enumerate(self.sense_lemmas[syn]):
+                if j > k:
+                    break
+                sparse_coord.append([syn, i])
+                values.append(1 / min(len(self.sense_lemmas[syn]), k))
+        keys = torch.LongTensor(sparse_coord)
+        vals = torch.FloatTensor(values)
+        self.sv_matrix = torch.sparse.FloatTensor(keys.t(), vals, self.sv_size).to(self.device)
+
+    def forward(self, seq_list, lengths=None, cached_embeddings=None):
+        x = self.embedding(seq_list) if cached_embeddings is None else cached_embeddings
+        x = self.batch_norm(x)
+        x = self.dense(x)
+        x = self.h1(x)
+        x = self.relu1(x)
+        x = self.h2(x)  # |B| x T x hidden_dim
+        h = x.view(-1, x.size(-1))  # |B| * T x hidden_dim
+        # self.v = self.output_slm.log_prob(h)  # |B| * T x |V|
+        self.v = self.output_slm(h)
+        slm_logits = torch.sparse.mm(self.sv_matrix, self.v.t())  # |S| x T * |B|
+        slm_logits = slm_logits.t()  # |B| * T x |S|
+        # y = self.output_layer.log_prob(h)  # |B| * T x |S|
+        y = self.output_layer(h)
+        return y + slm_logits * self.SLM_LOGITS_SCALE
+
+    def loss(self, scores, tags, opt1=False):
+        y_true = tags.view(-1)
+        scores = scores.view(-1, self.tagset_size)
+        wsd_loss = F.nll_loss(scores, y_true, ignore_index=NOT_AMB_SYMBOL)
+        slm_loss = self._get_slm_loss(y_true)
+        loss = wsd_loss + slm_loss * self.SLM_SCALE
+        return loss
+
+    def _get_slm_loss(self, y_true):
+        k = 500
+        slm_loss = 0
+        for i in range(0, self.v.size(0), k):
+            y_slm = torch.zeros_like(self.v[i:i+k]).to(self.device)
+            mask_weights = torch.zeros_like(self.v[i:i+k]).to(self.device)
+            for y_i, y in enumerate(y_true[i:i+k]):
+                if y != NOT_AMB_SYMBOL:
+                    y_slm[y_i][self.sense_lemmas[y.item()], ] = 1
+                    mask_weights[y_i] = 1
+                else:
+                    mask_weights[y_i] = 0
+            slm_loss += F.binary_cross_entropy_with_logits(self.v[i:i+k], y_slm, mask_weights, reduction='sum')
+        return slm_loss
+
+
+class WSDNetDenseAdasoft(RobertaDenseWSD):
+
+    SLM_SCALE = 0.0001
+    SLM_LOGITS_SCALE = 0.1
+    FINAL_HIDDEN_SIZE = 64
+
+    def __init__(self,
+                 device,
+                 num_senses,
+                 max_len,
+                 model_path,
+                 d_embedding: int = 1024,
+                 hidden_dim: int = 512,
+                 cached_embeddings: bool = False,
+                 output_vocab: str = 'res/dictionaries/syn_lemma_vocab.txt',
+                 sense_lemmas: str = 'res/dictionaries/sense_lemmas.txt'):
+        super().__init__(device, num_senses, max_len, model_path,
+                         d_embedding, hidden_dim, cached_embeddings)
+        self.out_vocab = OrderedDict()
+        with open(output_vocab) as f:
+            for i, line in enumerate(f):
+                self.out_vocab[line.strip()] = i
+        self.sense_lemmas = OrderedDict()
+        with open(sense_lemmas) as f:
+            for line in f:
+                sid = int(line.strip().split('\t')[0])
+                lemma_list = eval(line.strip().split('\t')[1])
+                self.sense_lemmas[sid] = lemma_list
+        logging.info('WSDNetDense: dictionaries loaded.')
+        self.dense = nn.Linear(self.d_embedding, self.hidden_dim)
+        self.h1 = nn.Linear(self.hidden_dim, self.hidden_dim)
+        self.relu1 = nn.ReLU()
+        self.h2 = nn.Linear(self.hidden_dim, self.hidden_dim)
         self.output_layer = nn.AdaptiveLogSoftmaxWithLoss(self.hidden_dim, self.tagset_size, [1000, 3000, 10_000])
         self.output_slm = nn.AdaptiveLogSoftmaxWithLoss(self.hidden_dim,  len(self.out_vocab), [1000, 3000, 10_000])
         # nn.Linear(self.dense.hidden_dim, len(self.out_vocab))
@@ -319,7 +413,7 @@ class WSDNetDense(RobertaDenseWSD):
         for i in range(0, self.v.size(0), k):
             y_slm = torch.zeros_like(self.v[i:i+k]).to(self.device)
             mask_weights = torch.zeros_like(self.v[i:i+k]).to(self.device)
-            for y_i, y in enumerate(y_true):
+            for y_i, y in enumerate(y_true[i:i+k]):
                 if y != NOT_AMB_SYMBOL:
                     y_slm[y_i][self.sense_lemmas[y.item()], ] = 1
                     mask_weights[y_i] = 1
