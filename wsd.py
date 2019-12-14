@@ -152,7 +152,7 @@ class RobertaTransformerWSD(BaseWSD):
 
     def forward(self, seq_list, lengths=None, cached_embeddings=None):
         x = self.embedding(seq_list) if cached_embeddings is None else cached_embeddings
-        x = self.batch_norm(x)
+        # x = self.batch_norm(x)
         mask = get_transformer_mask(lengths, self.win_size, self.device)
         x, h = self.transformer(x, mask)
         return x
