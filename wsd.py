@@ -317,7 +317,7 @@ class WSDNetDense(RobertaDenseWSD):
         if tags is None:
             return scores
         else:
-            return self.loss(scores, tags.to(scores.get_device()))
+            return scores, self.loss(scores, tags.to(scores.get_device()))
 
     def loss(self, scores, tags, opt1=False):
         y_true = tags.view(-1)
