@@ -111,6 +111,8 @@ class BaseTrainer:
         logging.info(f'Number of parameters: {sum([p.numel() for p in self.model.parameters()])}')
         logging.info(f'Number of trainable parameters: '
                      f'{sum([p.numel() for p in self.model.parameters() if p.requires_grad])}')
+        if torch.cuda.device_count() > 1 and self.multi_gpu:
+            self.model = nn.DataParallel(self.model)
 
         if is_training:
             self.data_loader = FlatLoader(dataset, batch_size=self.batch_size, win_size=self.window_size,
@@ -133,8 +135,6 @@ class BaseTrainer:
                                                     self.embed_model_path, BATCH_MUL, self.batch_size, self.eval_loader,
                                                     to_device=True) \
             if self.cache_embeddings else count()
-        if torch.cuda.device_count() > 1 and self.multi_gpu:
-            self.model = nn.DataParallel(self.model)
         self.model.to(self.device)
         self.optimizer = optim.Adam(self.model.parameters(), lr=self.learning_rate)
         # self.optimizer = optim.AdamW(self.model.parameters(), lr=self.learning_rate, amsgrad=True)
