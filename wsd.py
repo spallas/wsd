@@ -312,7 +312,8 @@ class WSDNetDense(RobertaDenseWSD):
         slm_logits = slm_logits.t()  # |B| * T x |S|
         # y = self.output_layer.log_prob(h)  # |B| * T x |S|
         y = self.output_layer(h)
-        return y + slm_logits * self.SLM_LOGITS_SCALE
+        scores = y + slm_logits * self.SLM_LOGITS_SCALE
+        return scores.view(x.size(0), x.size(1), -1)
 
     def loss(self, scores, tags, opt1=False):
         y_true = tags.view(-1)
