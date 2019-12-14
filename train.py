@@ -172,7 +172,7 @@ class BaseTrainer:
                 with amp.scale_loss(loss, self.optimizer) as scaled_loss:
                     scaled_loss.backward()
             else:
-                loss.backward()
+                loss.sum().backward()
             parameters = self.model.parameters() if not self.has_master_params else amp.master_params(self.optimizer)
             clip_grad_norm_(parameters=parameters, max_norm=1.0)
 
