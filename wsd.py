@@ -150,12 +150,15 @@ class RobertaTransformerWSD(BaseWSD):
                                                  self.tagset_size, self.num_layers,
                                                  self.num_heads)
 
-    def forward(self, seq_list, lengths=None, cached_embeddings=None):
+    def forward(self, seq_list, lengths=None, cached_embeddings=None, tags=None):
         x = self.embedding(seq_list) if cached_embeddings is None else cached_embeddings
         # x = self.batch_norm(x)
         mask = get_transformer_mask(lengths, self.win_size, self.device)
         x, h = self.transformer(x, mask)
-        return x
+        if tags is None:
+            return x
+        else:
+            return x, self.loss(x, tags.to(x.get_device()))
 
 
 class WSDNetX(RobertaTransformerWSD):
@@ -221,7 +224,7 @@ class WSDNetX(RobertaTransformerWSD):
         if tags is None:
             return scores
         else:
-            return self.loss(scores, tags.to(scores.get_device()))
+            return scores, self.loss(scores, tags.to(scores.get_device()))
 
     def loss(self, scores, tags, opt1=False):
         y_true = tags.view(-1)
