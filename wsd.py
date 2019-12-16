@@ -161,8 +161,10 @@ class RobertaTransformerWSD(BaseWSD):
             return x, self.loss(x, tags.to(x.get_device()))
 
     def loss(self, scores, tags, pre_training=False):
-        return F.cross_entropy(scores.view(-1, self.tagset_size), tags.view(-1),
-                               ignore_index=NOT_AMB_SYMBOL)
+        y_true = tags.view(-1)
+        scores = scores.view(-1, self.tagset_size)
+        wsd_loss = self.ce_loss(scores, y_true)
+        return wsd_loss
 
 
 class WSDNetX(RobertaTransformerWSD):
