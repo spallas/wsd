@@ -217,6 +217,13 @@ class WSDNetX(RobertaTransformerWSD):
         self.vals = torch.FloatTensor(values)
 
     def forward(self, seq_list, lengths=None, cached_embeddings=None, tags=None):
+        scores = self._get_scores(seq_list, lengths, cached_embeddings)
+        if tags is None:
+            return scores
+        else:
+            return scores, self.loss(scores, tags.to(scores.get_device()))
+
+    def _get_scores(self, seq_list, lengths=None, cached_embeddings=None):
         x = self.embedding(seq_list) if cached_embeddings is None else cached_embeddings
         mask = get_transformer_mask(lengths, self.win_size, self.device)
         y, h = self.transformer(x, mask)
@@ -226,11 +233,7 @@ class WSDNetX(RobertaTransformerWSD):
         slm_logits = torch.sparse.mm(sv_matrix, self.v.view(-1, self.v.size(-1)).t())   # shape: |S| x T * |B|
         slm_logits = slm_logits.t().view(self.v.size(0), self.v.size(1), -1)
         scores = y + slm_logits * self.SLM_LOGITS_SCALE
-
-        if tags is None:
-            return scores
-        else:
-            return scores, self.loss(scores, tags.to(scores.get_device()))
+        return scores
 
     def loss(self, scores, tags, opt1=False):
         y_true = tags.view(-1)
