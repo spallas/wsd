@@ -340,16 +340,16 @@ class WSDNetDense(RobertaDenseWSD):
         scores = scores.view(-1, self.tagset_size)
         # wsd_loss = F.nll_loss(scores, y_true, ignore_index=NOT_AMB_SYMBOL)
         wsd_loss = F.cross_entropy(scores, y_true, ignore_index=NOT_AMB_SYMBOL)
-        slm_loss = self._get_slm_loss(y_true)
+        slm_loss = self._get_slm_loss(scores, y_true)
         loss = wsd_loss + slm_loss * self.SLM_SCALE
         return loss
 
-    def _get_slm_loss(self, y_true):
+    def _get_slm_loss(self, scores, y_true):
         k = 500
         slm_loss = 0
         for i in range(0, self.v.size(0), k):
-            y_slm = torch.zeros_like(self.v[i:i+k]).to(self.device)
-            mask_weights = torch.zeros_like(self.v[i:i+k]).to(self.device)
+            y_slm = torch.zeros_like(self.v[i:i+k]).to(scores.get_device())
+            mask_weights = torch.zeros_like(self.v[i:i+k]).to(scores.get_device())
             for y_i, y in enumerate(y_true[i:i+k]):
                 if y != NOT_AMB_SYMBOL:
                     y_slm[y_i][self.sense_lemmas[y.item()], ] = 1
