@@ -333,6 +333,7 @@ class WSDNetDense(RobertaDenseWSD):
         y = self.output_layer(h)
         scores = y + slm_logits * self.SLM_LOGITS_SCALE
         scores = scores.view(x.size(0), x.size(1), -1)
+        return scores
 
     def loss(self, scores, tags, opt1=False):
         y_true = tags.view(-1)
