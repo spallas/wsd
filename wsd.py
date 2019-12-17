@@ -327,7 +327,7 @@ class WSDNetDense(RobertaDenseWSD):
         # self.v = self.output_slm.log_prob(h)  # |B| * T x |V|
         self.v = self.output_slm(h)
         sv_matrix = torch.sparse.FloatTensor(self.keys.t(), self.vals, self.sv_size).to(self.v.get_device())
-        slm_logits = torch.sparse.mm(self.sv_matrix, self.v.t())  # |S| x T * |B|
+        slm_logits = torch.sparse.mm(sv_matrix, self.v.t())  # |S| x T * |B|
         slm_logits = slm_logits.t()  # |B| * T x |S|
         # y = self.output_layer.log_prob(h)  # |B| * T x |S|
         y = self.output_layer(h)
