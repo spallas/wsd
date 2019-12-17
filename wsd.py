@@ -258,8 +258,8 @@ class WSDNetX(RobertaTransformerWSD):
 
 class WSDNetDense(RobertaDenseWSD):
 
-    SLM_SCALE = 0.01
-    SLM_LOGITS_SCALE = 0.7
+    SLM_SCALE = 0.00005
+    SLM_LOGITS_SCALE = 0.8
     FINAL_HIDDEN_SIZE = 64
 
     def __init__(self,
@@ -318,7 +318,7 @@ class WSDNetDense(RobertaDenseWSD):
 
     def _get_scores(self, seq_list, cached_embeddings=None):
         x = self.embedding(seq_list) if cached_embeddings is None else cached_embeddings
-        x = self.batch_norm(x)
+        # x = self.batch_norm(x)
         x = self.dense(x)
         x = self.h1(x)
         x = self.relu1(x)
