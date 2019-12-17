@@ -258,8 +258,8 @@ class WSDNetX(RobertaTransformerWSD):
 
 class WSDNetDense(RobertaDenseWSD):
 
-    SLM_SCALE = 0.0001
-    SLM_LOGITS_SCALE = 0.1
+    SLM_SCALE = 0.01
+    SLM_LOGITS_SCALE = 0.7
     FINAL_HIDDEN_SIZE = 64
 
     def __init__(self,
@@ -311,6 +311,13 @@ class WSDNetDense(RobertaDenseWSD):
         self.sv_matrix = torch.sparse.FloatTensor(keys.t(), vals, self.sv_size).to(self.device)
 
     def forward(self, seq_list, lengths=None, cached_embeddings=None, tags=None):
+        scores = self._get_scores(seq_list, lengths, cached_embeddings)
+        if tags is None:
+            return scores
+        else:
+            return scores, self.loss(scores, tags.to(scores.get_device()))
+
+    def _get_scores(self, seq_list, lengths=None, cached_embeddings=None):
         x = self.embedding(seq_list) if cached_embeddings is None else cached_embeddings
         x = self.batch_norm(x)
         x = self.dense(x)
@@ -326,10 +333,6 @@ class WSDNetDense(RobertaDenseWSD):
         y = self.output_layer(h)
         scores = y + slm_logits * self.SLM_LOGITS_SCALE
         scores = scores.view(x.size(0), x.size(1), -1)
-        if tags is None:
-            return scores
-        else:
-            return scores, self.loss(scores, tags.to(scores.get_device()))
 
     def loss(self, scores, tags, opt1=False):
         y_true = tags.view(-1)
