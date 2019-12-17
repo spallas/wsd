@@ -306,18 +306,17 @@ class WSDNetDense(RobertaDenseWSD):
                     break
                 sparse_coord.append([syn, i])
                 values.append(1 / min(len(self.sense_lemmas[syn]), k))
-        keys = torch.LongTensor(sparse_coord)
-        vals = torch.FloatTensor(values)
-        self.sv_matrix = torch.sparse.FloatTensor(keys.t(), vals, self.sv_size).to(self.device)
+        self.keys = torch.LongTensor(sparse_coord)
+        self.vals = torch.FloatTensor(values)
 
     def forward(self, seq_list, lengths=None, cached_embeddings=None, tags=None):
-        scores = self._get_scores(seq_list, lengths, cached_embeddings)
+        scores = self._get_scores(seq_list, cached_embeddings)
         if tags is None:
             return scores
         else:
             return scores, self.loss(scores, tags.to(scores.get_device()))
 
-    def _get_scores(self, seq_list, lengths=None, cached_embeddings=None):
+    def _get_scores(self, seq_list, cached_embeddings=None):
         x = self.embedding(seq_list) if cached_embeddings is None else cached_embeddings
         x = self.batch_norm(x)
         x = self.dense(x)
@@ -327,7 +326,8 @@ class WSDNetDense(RobertaDenseWSD):
         h = x.view(-1, x.size(-1))  # |B| * T x hidden_dim
         # self.v = self.output_slm.log_prob(h)  # |B| * T x |V|
         self.v = self.output_slm(h)
-        slm_logits = torch.sparse.mm(self.sv_matrix, self.v.t()).to(self.v.get_device())  # |S| x T * |B|
+        sv_matrix = torch.sparse.FloatTensor(self.keys.t(), self.vals, self.sv_size).to(self.v.get_device())
+        slm_logits = torch.sparse.mm(self.sv_matrix, self.v.t())  # |S| x T * |B|
         slm_logits = slm_logits.t()  # |B| * T x |S|
         # y = self.output_layer.log_prob(h)  # |B| * T x |S|
         y = self.output_layer(h)
