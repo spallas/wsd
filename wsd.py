@@ -324,7 +324,8 @@ class WSDNetDense(RobertaDenseWSD):
         x = self.h2(x)  # |B| x T x hidden_dim
         h = x.view(-1, x.size(-1))  # |B| * T x hidden_dim
         self.v = self.output_slm(h)  # |B| * T x |V|
-        slm_logits = torch_sparse.spmm(self.keys.t(), self.vals, self.sv_size[0], self.sv_size[1], self.v.t())
+        slm_logits = torch_sparse.spmm(self.keys.t().to(self.v.get_device()),
+                                       self.vals, self.sv_size[0], self.sv_size[1], self.v.t())
         # sv_matrix = torch.sparse.FloatTensor(self.keys.t(), self.vals, self.sv_size).to(self.v.get_device())
         # slm_logits = torch.sparse.mm(sv_matrix, self.v.t())  # |S| x T * |B|
         slm_logits = slm_logits.t()  # |B| * T x |S|
