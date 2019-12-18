@@ -204,6 +204,8 @@ class BaseTrainer:
             self.train_epoch(epoch)
             if epoch >= START_EVAL_EPOCH and BATCH_MUL == CachedEmbedLoader.HALF:
                 self._set_global_lr(self.learning_rate / 3)
+            if not RANDOMIZE:  # reinitialize iterators
+                self.rnd_loader = zip(self.data_loader, self.cached_data_loader)
 
     def _log(self, step, loss, epoch_i):
         if step % self.log_interval == 0:
@@ -211,7 +213,7 @@ class BaseTrainer:
             self._plot('Train_loss', loss.item(), step)
             self._gpu_mem_info()
             self._maybe_checkpoint(loss, epoch_i)
-            if epoch_i >= START_EVAL_EPOCH:
+            if epoch_i >= START_EVAL_EPOCH or epoch_i == 1:
                 f1 = self._evaluate(epoch_i)
                 self._plot('Dev_F1', f1, step)
                 self.model.train()  # return to train mode after evaluation
