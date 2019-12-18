@@ -321,8 +321,8 @@ class WSDNetDense(RobertaDenseWSD):
         # x = self.batch_norm(x)
         x = self.dense(x)
         x = self.h1(x)
-        x = self.relu1(x)
-        x = self.h2(x)  # |B| x T x hidden_dim
+        # x = self.relu1(x)
+        # x = self.h2(x)  # |B| x T x hidden_dim
         h = x.view(-1, x.size(-1))  # |B| * T x hidden_dim
         # self.v = self.output_slm.log_prob(h)  # |B| * T x |V|
         self.v = self.output_slm(h)
