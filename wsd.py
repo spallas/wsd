@@ -273,6 +273,7 @@ class WSDNetDense(RobertaDenseWSD):
                  cached_embeddings: bool = False,
                  output_vocab: str = 'res/dictionaries/syn_lemma_vocab.txt',
                  sense_lemmas: str = 'res/dictionaries/sense_lemmas.txt'):
+        assert SPARSE
         super().__init__(device, num_senses, max_len, model_path,
                          d_embedding, hidden_dim, cached_embeddings)
         self.out_vocab = OrderedDict()
@@ -292,9 +293,6 @@ class WSDNetDense(RobertaDenseWSD):
         self.h2 = nn.Linear(self.hidden_dim, self.hidden_dim)
         self.output_layer = nn.Linear(self.hidden_dim, self.tagset_size)
         self.output_slm = nn.Linear(self.hidden_dim,  len(self.out_vocab))
-        # self.output_layer = nn.AdaptiveLogSoftmaxWithLoss(self.hidden_dim, self.tagset_size, [1000, 3000, 10_000])
-        # self.output_slm = nn.AdaptiveLogSoftmaxWithLoss(self.hidden_dim,  len(self.out_vocab), [1000, 3000, 10_000])
-        # # nn.Linear(self.dense.hidden_dim, len(self.out_vocab))
         self.v = None
         self.wsd_loss = None
         # build |S| x |V| matrix
@@ -308,7 +306,7 @@ class WSDNetDense(RobertaDenseWSD):
                 sparse_coord.append([syn, i])
                 values.append(1 / min(len(self.sense_lemmas[syn]), k))
         self.keys = torch.LongTensor(sparse_coord)
-        self.vals = torch.FloatTensor(values)
+        self.vals = nn.Parameter(torch.FloatTensor(values))
 
     def forward(self, seq_list, lengths=None, cached_embeddings=None, tags=None):
         scores = self._get_scores(seq_list, cached_embeddings)
@@ -319,18 +317,17 @@ class WSDNetDense(RobertaDenseWSD):
 
     def _get_scores(self, seq_list, cached_embeddings=None):
         x = self.embedding(seq_list) if cached_embeddings is None else cached_embeddings
-        # x = self.batch_norm(x)
+        x = self.batch_norm(x)
         x = self.dense(x)
         x = self.h1(x)
-        # x = self.relu1(x)
-        # x = self.h2(x)  # |B| x T x hidden_dim
+        x = self.relu1(x)
+        x = self.h2(x)  # |B| x T x hidden_dim
         h = x.view(-1, x.size(-1))  # |B| * T x hidden_dim
-        # self.v = self.output_slm.log_prob(h)  # |B| * T x |V|
-        self.v = self.output_slm(h)
-        sv_matrix = torch.sparse.FloatTensor(self.keys.t(), self.vals, self.sv_size).to(self.v.get_device())
-        slm_logits = torch.sparse.mm(sv_matrix, self.v.t())  # |S| x T * |B|
+        self.v = self.output_slm(h)  # |B| * T x |V|
+        slm_logits = torch_sparse.spmm(self.keys.t(), self.vals, self.sv_size[0], self.sv_size[1], self.v.t())
+        # sv_matrix = torch.sparse.FloatTensor(self.keys.t(), self.vals, self.sv_size).to(self.v.get_device())
+        # slm_logits = torch.sparse.mm(sv_matrix, self.v.t())  # |S| x T * |B|
         slm_logits = slm_logits.t()  # |B| * T x |S|
-        # y = self.output_layer.log_prob(h)  # |B| * T x |S|
         y = self.output_layer(h)
         scores = y + slm_logits * self.SLM_LOGITS_SCALE
         scores = scores.view(x.size(0), x.size(1), -1)
