@@ -169,9 +169,9 @@ class RobertaTransformerWSD(BaseWSD):
 
 class WSDNetX(RobertaTransformerWSD):
 
-    SLM_SCALE = 0.0001
+    SLM_SCALE = 0.00005
     FINAL_HIDDEN_SIZE = 512
-    SLM_LOGITS_SCALE = 0.1
+    SLM_LOGITS_SCALE = 0.05
 
     def __init__(self,
                  device,
@@ -225,6 +225,7 @@ class WSDNetX(RobertaTransformerWSD):
 
     def _get_scores(self, seq_list, lengths=None, cached_embeddings=None):
         x = self.embedding(seq_list) if cached_embeddings is None else cached_embeddings
+        x = self.batch_norm(x)
         mask = get_transformer_mask(lengths, self.win_size, self.device)
         y, h = self.transformer(x, mask)
         # h = self.reduce_project(h)
