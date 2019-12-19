@@ -199,7 +199,6 @@ class WSDNetX(RobertaTransformerWSD):
                 self.sense_lemmas[sid] = lemma_list
         logging.info('WSDNet dictionaries loaded.')
         self.slm_output_size = len(self.out_vocab)
-        # self.reduce_project = nn.Linear(self.transformer.small_dim, self.FINAL_HIDDEN_SIZE)
         self.output_slm = nn.Linear(self.transformer.d_model, len(self.out_vocab))
         self.v = None
         # build |S| x |V| matrix
@@ -228,7 +227,6 @@ class WSDNetX(RobertaTransformerWSD):
         x = self.batch_norm(x)
         mask = get_transformer_mask(lengths, self.win_size, self.device)
         y, h = self.transformer(x, mask)
-        # h = self.reduce_project(h)
         self.v = self.output_slm(h)  # shape: |B| x Time steps x |V|
         sv_matrix = torch.sparse.FloatTensor(self.keys.t(), self.vals, self.sv_size).to(self.v.get_device())
         slm_logits = torch.sparse.mm(sv_matrix, self.v.view(-1, self.v.size(-1)).t())   # shape: |S| x T * |B|
@@ -252,15 +250,14 @@ class WSDNetX(RobertaTransformerWSD):
                 else:
                     mask_weights[y_i] = 0
             slm_loss = F.binary_cross_entropy_with_logits(slm_scores, y_slm, mask_weights, reduction='sum')
-            # self.bce_loss(slm_scores, y_slm)
             wsd_loss += slm_loss * self.SLM_SCALE
         return wsd_loss
 
 
 class WSDNetDense(RobertaDenseWSD):
 
-    SLM_SCALE = 0.00005
-    SLM_LOGITS_SCALE = 0.08
+    SLM_SCALE = 0.0001
+    SLM_LOGITS_SCALE = 0.1
     FINAL_HIDDEN_SIZE = 64
 
     def __init__(self,
@@ -272,8 +269,9 @@ class WSDNetDense(RobertaDenseWSD):
                  hidden_dim: int = 512,
                  cached_embeddings: bool = False,
                  output_vocab: str = 'res/dictionaries/syn_lemma_vocab.txt',
-                 sense_lemmas: str = 'res/dictionaries/sense_lemmas.txt'):
-        assert SPARSE
+                 sense_lemmas: str = 'res/dictionaries/sense_lemmas.txt',
+                 sv_trainable: bool = False):
+        assert not sv_trainable or SPARSE
         super().__init__(device, num_senses, max_len, model_path,
                          d_embedding, hidden_dim, cached_embeddings)
         self.out_vocab = OrderedDict()
@@ -297,6 +295,7 @@ class WSDNetDense(RobertaDenseWSD):
         self.wsd_loss = None
         # build |S| x |V| matrix
         self.sv_size = torch.Size((len(self.sense_lemmas) + 1, len(self.out_vocab)))
+        self.sv_trainable = sv_trainable
         sparse_coord, values = [], []
         k = 32
         for syn in self.sense_lemmas:
@@ -307,7 +306,7 @@ class WSDNetDense(RobertaDenseWSD):
                 values.append(1 / min(len(self.sense_lemmas[syn]), k))
         logging.info(f"Number of elements in SV matrix: {len(values)}")
         self.keys = torch.LongTensor(sparse_coord)
-        self.vals = nn.Parameter(torch.FloatTensor(values))
+        self.vals = nn.Parameter(torch.FloatTensor(values)) if self.sv_trainable else torch.FloatTensor(values)
 
     def forward(self, seq_list, lengths=None, cached_embeddings=None, tags=None):
         scores = self._get_scores(seq_list, cached_embeddings)
@@ -325,10 +324,12 @@ class WSDNetDense(RobertaDenseWSD):
         x = self.h2(x)  # |B| x T x hidden_dim
         h = x.view(-1, x.size(-1))  # |B| * T x hidden_dim
         self.v = self.output_slm(h)  # |B| * T x |V|
-        slm_logits = torch_sparse.spmm(self.keys.t().to(self.v.get_device()),
-                                       self.vals, self.sv_size[0], self.sv_size[1], self.v.t())
-        # sv_matrix = torch.sparse.FloatTensor(self.keys.t(), self.vals, self.sv_size).to(self.v.get_device())
-        # slm_logits = torch.sparse.mm(sv_matrix, self.v.t())  # |S| x T * |B|
+        if self.sv_trainable:
+            slm_logits = torch_sparse.spmm(self.keys.t().to(self.v.get_device()),
+                                           self.vals, self.sv_size[0], self.sv_size[1], self.v.t())
+        else:
+            sv_matrix = torch.sparse.FloatTensor(self.keys.t(), self.vals, self.sv_size).to(self.v.get_device())
+            slm_logits = torch.sparse.mm(sv_matrix, self.v.t())  # |S| x T * |B|
         slm_logits = slm_logits.t()  # |B| * T x |S|
         y = self.output_layer(h)
         scores = y + slm_logits * self.SLM_LOGITS_SCALE
