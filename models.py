@@ -186,7 +186,6 @@ class DenseEncoder(nn.Module):
         x = self.h1(x)
         x = F.relu(x)
         x = self.h2(x)
-        x = F.relu(x)
         y = self.output_dense(x)
         return y, x
 
