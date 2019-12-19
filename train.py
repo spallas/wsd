@@ -280,6 +280,7 @@ class BaseTrainer:
             return np.pad(arr, (0, b_scores.shape[-1] - len(s)), 'edge')
 
         b_impossible_senses = []
+        all_sense_ids = set(range(b_scores.shape[-1]))
         # we will set to 0 senses not in WordNet for given lemma.
         for i, sent in enumerate(b_str):
             impossible_senses = []
@@ -288,15 +289,13 @@ class BaseTrainer:
                     sense_ids = set()
                 else:
                     sense_ids = to_ids(wn.synsets(lemma, pos=util.id2wnpos[b_pos[i][j]]))
-                # if lemma in self.train_sense_map:
-                #     sense_ids &= set(self.train_sense_map[lemma])
-                padded = set2padded(set(range(b_scores.shape[-1])) - sense_ids)
+                padded = set2padded(all_sense_ids - sense_ids)
                 impossible_senses.append(padded)
             b_impossible_senses.append(impossible_senses)
-        b_scores = b_scores.cpu().numpy()
-        b_impossible_senses = np.array(b_impossible_senses)
-        np.put_along_axis(b_scores, b_impossible_senses, np.min(b_scores), axis=-1)
-        return np.argmax(b_scores, -1).tolist()
+        # b_scores = b_scores.cpu().numpy()
+        b_impossible_senses = torch.tensor(b_impossible_senses).to(b_scores.get_device())
+        b_scores.masked_fill_(b_impossible_senses, torch.min(b_scores))
+        return torch.argmax(b_scores, -1).cpu().tolist()
 
     def _print_predictions(self, pred_indices: List[int], amb_word_ids: List[str]):
         output_path = self.report_path.replace('report', 'results')
