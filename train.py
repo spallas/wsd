@@ -294,7 +294,7 @@ class BaseTrainer:
             b_impossible_senses.append(impossible_senses)
         # b_scores = b_scores.cpu().numpy()
         b_impossible_senses = torch.tensor(b_impossible_senses).to(b_scores.get_device())
-        b_scores.masked_fill_(b_impossible_senses, torch.min(b_scores))
+        b_scores.scatter_(-1, b_impossible_senses, torch.min(b_scores))
         return torch.argmax(b_scores, -1).cpu().tolist()
 
     def _print_predictions(self, pred_indices: List[int], amb_word_ids: List[str]):
