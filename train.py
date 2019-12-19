@@ -206,7 +206,7 @@ class BaseTrainer:
                 self._set_global_lr(self.learning_rate / 3)
             if not RANDOMIZE:  # reinitialize iterators
                 self.rnd_loader = zip(self.data_loader, self.cached_data_loader)
-            if epoch >= 10:
+            if epoch > 1:
                 try:  # make sparse sv matrix non trainable
                     self.model.vals.requires_grad = False
                 except AttributeError:
