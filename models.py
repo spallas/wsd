@@ -8,6 +8,7 @@ from allennlp.modules.elmo import batch_to_ids
 from fairseq.models.roberta import RobertaModel, alignment_utils
 from transformers import BertConfig, BertModel, BertTokenizer
 from torch import nn
+import torch.nn.functional as F
 
 
 def str_to_token_ids(batch: List[List[str]], tokenizer):
@@ -178,14 +179,14 @@ class DenseEncoder(nn.Module):
         self.project_layer = nn.Linear(self.d_input, self.hidden_dim)
         self.h1 = nn.Linear(self.hidden_dim, self.hidden_dim)
         self.h2 = nn.Linear(self.hidden_dim, self.hidden_dim)
-        # self.h_small = nn.Linear(self.hidden_dim, self.small_dim)
         self.output_dense = nn.Linear(self.hidden_dim, self.d_output)
 
     def forward(self, x, mask=None):
         x = self.project_layer(x)
         x = self.h1(x)
+        x = F.relu(x)
         x = self.h2(x)
-        # x = self.h_small(x)
+        x = F.relu(x)
         y = self.output_dense(x)
         return y, x
 
