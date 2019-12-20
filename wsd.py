@@ -123,7 +123,7 @@ class RobertaDenseWSD(BaseWSD):
 
     def forward(self, seq_list, lengths=None, cached_embeddings=None, tags=None):
         x = self.embedding(seq_list) if cached_embeddings is None else cached_embeddings
-        x = self.batch_norm(x)
+        # x = self.batch_norm(x)
         y, h = self.dense(x)
         if tags is None:
             return y

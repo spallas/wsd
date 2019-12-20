@@ -11,7 +11,7 @@
   "test_data" :"res/wsd-train/test_data.xml",
   "test_tags" :"res/wsd-train/test_tags.txt",
   "report_path": "logs/rdense_10050_report.txt",
-  "learning_rate": 0.0001,
+  "learning_rate": 0.0003,
   "hidden_dim": 512,
   "window_size": 50,
   "model_path": "res/roberta.large",
