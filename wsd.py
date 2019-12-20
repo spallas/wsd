@@ -172,9 +172,9 @@ class RobertaTransformerWSD(BaseWSD):
 
 class WSDNetX(RobertaTransformerWSD):
 
-    SLM_SCALE = 0.00005
+    SLM_SCALE = 0.0001
     FINAL_HIDDEN_SIZE = 512
-    SLM_LOGITS_SCALE = 0.05
+    SLM_LOGITS_SCALE = 0.1
 
     def __init__(self,
                  device,
@@ -227,7 +227,7 @@ class WSDNetX(RobertaTransformerWSD):
 
     def _get_scores(self, seq_list, lengths=None, cached_embeddings=None):
         x = self.embedding(seq_list) if cached_embeddings is None else cached_embeddings
-        x = self.batch_norm(x)
+        # x = self.batch_norm(x)
         mask = get_transformer_mask(lengths, self.win_size, self.device)
         y, h = self.transformer(x, mask)
         self.v = self.output_slm(h)  # shape: |B| x Time steps x |V|
@@ -260,7 +260,7 @@ class WSDNetX(RobertaTransformerWSD):
 class WSDNetDense(RobertaDenseWSD):
 
     SLM_SCALE = 0.0001
-    SLM_LOGITS_SCALE = 0.1
+    SLM_LOGITS_SCALE = 1
     FINAL_HIDDEN_SIZE = 64
 
     def __init__(self,
@@ -273,7 +273,7 @@ class WSDNetDense(RobertaDenseWSD):
                  cached_embeddings: bool = False,
                  output_vocab: str = 'res/dictionaries/syn_lemma_vocab.txt',
                  sense_lemmas: str = 'res/dictionaries/sense_lemmas.txt',
-                 sv_trainable: bool = False):
+                 sv_trainable: bool = True):
         assert not sv_trainable or SPARSE
         super().__init__(device, num_senses, max_len, model_path,
                          d_embedding, hidden_dim, cached_embeddings)
@@ -309,7 +309,7 @@ class WSDNetDense(RobertaDenseWSD):
                 values.append(1 / min(len(self.sense_lemmas[syn]), k))
         logging.info(f"Number of elements in SV matrix: {len(values)}")
         self.keys = torch.LongTensor(sparse_coord)
-        self.vals = nn.Parameter(torch.FloatTensor(values)) if self.sv_trainable else torch.FloatTensor(values)
+        self.vals = nn.Parameter(torch.FloatTensor(values))  # if self.sv_trainable else torch.FloatTensor(values)
 
     def forward(self, seq_list, lengths=None, cached_embeddings=None, tags=None):
         scores = self._get_scores(seq_list, cached_embeddings)
@@ -320,14 +320,14 @@ class WSDNetDense(RobertaDenseWSD):
 
     def _get_scores(self, seq_list, cached_embeddings=None):
         x = self.embedding(seq_list) if cached_embeddings is None else cached_embeddings
-        x = self.batch_norm(x)
+        # x = self.batch_norm(x)
         x = self.dense(x)
         x = self.h1(x)
         x = self.relu1(x)
         x = self.h2(x)  # |B| x T x hidden_dim
         h = x.view(-1, x.size(-1))  # |B| * T x hidden_dim
         self.v = self.output_slm(h)  # |B| * T x |V|
-        if self.sv_trainable:
+        if self.sv_trainable and False:
             slm_logits = torch_sparse.spmm(self.keys.t().to(self.v.get_device()),
                                            self.vals, self.sv_size[0], self.sv_size[1], self.v.t())
         else:
