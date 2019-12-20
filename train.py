@@ -98,6 +98,7 @@ class BaseTrainer:
         self.eval_rnd_loader = None
         self.test_rnd_loader = None
         self.impossible_senses_map = {}
+        self.na_padded = None
 
         dataset = FlatSemCorDataset(train_data, train_tags)
 
@@ -281,7 +282,7 @@ class BaseTrainer:
             impossible_senses = []
             for j in range(len(b_str[i])):
                 if b_labels[i, j] == NOT_AMB_SYMBOL:
-                    impossible_senses.append(self._set2padded(self.all_sense_ids))
+                    impossible_senses.append(self.na_padded)
                 else:
                     impossible_senses.append(self.impossible_senses_map[(b_str[i][j], b_pos[i][j])])
             b_impossible_senses.append(impossible_senses)
@@ -299,7 +300,7 @@ class BaseTrainer:
             return set([self.sense2id.get(x.name(), 0) for x in synsets]) - {0}
 
         logging.info("Warming up lemma+pos to synsets map...")
-
+        self.na_padded = self._set2padded(self.all_sense_ids)
         for b_x, b_p, b_y, b_z, b_ids in loader:
             for i, sent in enumerate(b_x):
                 for j, lemma in enumerate(sent):
