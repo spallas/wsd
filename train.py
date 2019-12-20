@@ -91,11 +91,13 @@ class BaseTrainer:
             else self.batch_size // BATCH_MUL
         self.best_model_path = self.checkpoint_path + '.best'
         self.sense2id = load_sense2id(sense_dict, train_tags, test_tags)
+        self.all_sense_ids = set(range(len(self.sense2id) + 1))
         logging.debug('Loaded sense2id vocab')
         self.pad_symbol = pad_symbol
         self.rnd_loader = None
         self.eval_rnd_loader = None
         self.test_rnd_loader = None
+        self.impossible_senses_map = {}
 
         dataset = FlatSemCorDataset(train_data, train_tags)
 
@@ -135,6 +137,7 @@ class BaseTrainer:
                                                     self.embed_model_path, BATCH_MUL, self.batch_size, self.eval_loader,
                                                     to_device=True) \
             if self.cache_embeddings else count()
+        self._warm_up_sense_ids(self.eval_loader)
         self.model.to(self.device)
         self.optimizer = optim.Adam(self.model.parameters(), lr=self.learning_rate)
         # self.optimizer = optim.AdamW(self.model.parameters(), lr=self.learning_rate, amsgrad=True)
@@ -154,6 +157,7 @@ class BaseTrainer:
                                                     self.embed_model_path, BATCH_MUL, self.batch_size, self.test_loader,
                                                     to_device=True) \
             if self.cache_embeddings else count()
+        self._warm_up_sense_ids(self.test_loader)
         self._load_best()
         self.model.eval()
         self.model.to(self.device)
@@ -271,31 +275,39 @@ class BaseTrainer:
         :param b_pos:
         :return:
         """
+        b_impossible_senses = []
+        # we will set to 0 senses not in WordNet for given lemma.
+        for i in range(len(b_str)):
+            impossible_senses = []
+            for j in range(len(b_str[i])):
+                if b_labels[i, j] == NOT_AMB_SYMBOL:
+                    impossible_senses.append(self._set2padded(self.all_sense_ids))
+                else:
+                    impossible_senses.append(self.impossible_senses_map[(b_str[i][j], b_pos[i][j])])
+            b_impossible_senses.append(impossible_senses)
+        b_impossible_senses = torch.tensor(b_impossible_senses).to(b_scores.get_device())
+        b_scores.scatter_(-1, b_impossible_senses, torch.min(b_scores))
+        return torch.argmax(b_scores, -1).cpu().tolist()
+
+    def _set2padded(self, s: Set[int]):
+        arr = np.array(list(s))
+        return np.pad(arr, (0, len(self.sense2id) + 1 - len(s)), 'edge')
+
+    def _warm_up_sense_ids(self, loader: FlatLoader):
 
         def to_ids(synsets):
             return set([self.sense2id.get(x.name(), 0) for x in synsets]) - {0}
 
-        def set2padded(s: Set[int]):
-            arr = np.array(list(s))
-            return np.pad(arr, (0, b_scores.shape[-1] - len(s)), 'edge')
+        logging.info("Warming up lemma+pos to synsets map...")
 
-        b_impossible_senses = []
-        all_sense_ids = set(range(b_scores.shape[-1]))
-        # we will set to 0 senses not in WordNet for given lemma.
-        for i, sent in enumerate(b_str):
-            impossible_senses = []
-            for j, lemma in enumerate(sent):
-                if b_labels[i, j] == NOT_AMB_SYMBOL:
-                    sense_ids = set()
-                else:
-                    sense_ids = to_ids(wn.synsets(lemma, pos=util.id2wnpos[b_pos[i][j]]))
-                padded = set2padded(all_sense_ids - sense_ids)
-                impossible_senses.append(padded)
-            b_impossible_senses.append(impossible_senses)
-        # b_scores = b_scores.cpu().numpy()
-        b_impossible_senses = torch.tensor(b_impossible_senses).to(b_scores.get_device())
-        b_scores.scatter_(-1, b_impossible_senses, torch.min(b_scores))
-        return torch.argmax(b_scores, -1).cpu().tolist()
+        for b_x, b_p, b_y, b_z, b_ids in loader:
+            for i, sent in enumerate(b_x):
+                for j, lemma in enumerate(sent):
+                    if b_y[i, j] != NOT_AMB_SYMBOL:
+                        if (lemma, b_p[i][j]) not in self.impossible_senses_map:
+                            sense_ids = to_ids(wn.synsets(lemma, pos=util.id2wnpos[b_p[i][j]]))
+                            padded = self._set2padded(self.all_sense_ids - sense_ids)
+                            self.impossible_senses_map[(lemma, b_p[i][j])] = padded
 
     def _print_predictions(self, pred_indices: List[int], amb_word_ids: List[str]):
         output_path = self.report_path.replace('report', 'results')
