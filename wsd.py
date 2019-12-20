@@ -309,7 +309,7 @@ class WSDNetDense(RobertaDenseWSD):
                 values.append(1 / min(len(self.sense_lemmas[syn]), k))
         logging.info(f"Number of elements in SV matrix: {len(values)}")
         self.keys = torch.LongTensor(sparse_coord)
-        self.vals = nn.Parameter(torch.FloatTensor(values))  # if self.sv_trainable else torch.FloatTensor(values)
+        self.vals = nn.Parameter(torch.FloatTensor(values)) if self.sv_trainable else torch.FloatTensor(values)
 
     def forward(self, seq_list, lengths=None, cached_embeddings=None, tags=None):
         scores = self._get_scores(seq_list, cached_embeddings)
@@ -327,7 +327,7 @@ class WSDNetDense(RobertaDenseWSD):
         x = self.h2(x)  # |B| x T x hidden_dim
         h = x.view(-1, x.size(-1))  # |B| * T x hidden_dim
         self.v = self.output_slm(h)  # |B| * T x |V|
-        if self.sv_trainable and False:
+        if self.sv_trainable:
             slm_logits = torch_sparse.spmm(self.keys.t().to(self.v.get_device()),
                                            self.vals, self.sv_size[0], self.sv_size[1], self.v.t())
         else:
