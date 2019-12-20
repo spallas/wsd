@@ -11,7 +11,7 @@
   "test_data" :"res/wsd-train/test_data.xml",
   "test_tags" :"res/wsd-train/test_tags.txt",
   "report_path": "logs/wsddense_5050_half_report.txt",
-  "hidden_dim": 1024,
+  "hidden_dim": 512,
   "learning_rate": 0.0001,
   "window_size": 50,
   "model_path": "res/roberta.large",

@@ -184,7 +184,7 @@ class DenseEncoder(nn.Module):
     def forward(self, x, mask=None):
         x = self.project_layer(x)
         x = self.h1(x)
-        # x = F.relu(x)
+        x = F.relu(x)
         x = self.h2(x)
         y = self.output_dense(x)
         return y, x
