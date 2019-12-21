@@ -269,8 +269,9 @@ class BaseTrainer:
                             true_.append(true[i])
                             pred_.append(pred[i])
                             also_true_.append(also_true[i])
-                    f1 = self._get_metrics(true_, pred_, also_true_)
-                    logging.info(f'F1 on {pos}: {f1:.6f}')
+                    if len(true_) > 0:
+                        f1 = self._get_metrics(true_, pred_, also_true_)
+                        logging.info(f'F1 on {pos}: {f1:.6f}')
             return metrics
 
     def _evaluate(self, num_epoch):
