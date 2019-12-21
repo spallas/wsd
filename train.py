@@ -384,17 +384,19 @@ class BaseTrainer:
     def _load_best(self):
         if os.path.exists(self.best_model_path):
             checkpoint = torch.load(self.best_model_path, map_location=str(self.device))
+            logging.info(f"Loading best model achieving {checkpoint['f1']:.5f} on validation set.")
             self.model.load_state_dict(checkpoint['model_state_dict'])
         else:
             raise ValueError(f"Could not find any best model checkpoint: {self.best_model_path}")
 
     def _save_best(self, f1, epoch_i):
-        if f1 > self.best_f1_micro:
-            self.best_f1_micro = f1
+        approximate_f1 = round(f1, 2)
+        if approximate_f1 >= self.best_f1_micro:
+            self.best_f1_micro = approximate_f1
             torch.save({
                 'epoch': epoch_i,
                 'model_state_dict': self.model.state_dict(),
-                'f1': self.best_f1_micro
+                'f1': f1
             }, self.best_model_path)
 
     def _plot(self, name, value, step):
