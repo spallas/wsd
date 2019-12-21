@@ -242,7 +242,7 @@ class BaseTrainer:
         else:
             cache_loader = self.cached_eval_loader
         with torch.no_grad():
-            pred, true, z, w_ids = [], [], [], []
+            pred, true, also_true, w_ids, pos_tags = [], [], [], [], []
             for step, ((b_x, b_p, b_y, b_z, b_ids), b_x_e) in enumerate(zip(loader, cache_loader)):
                 try:
                     b_x_e = b_x_e if self.cache_embeddings else None
@@ -251,15 +251,25 @@ class BaseTrainer:
                     scores = self.model(b_x)
                 true += [item for seq in b_y.tolist() for item in seq]
                 pred += [item for seq in self._select_senses(scores, b_x, b_p, b_y) for item in seq]
-                z += [item for seq in b_z for item in seq]
+                also_true += [item for seq in b_z for item in seq]
                 w_ids += [item for seq in b_ids for item in seq]
+                pos_tags += [util.id2wnpos[item] for seq in b_p for item in seq]
 
-            metrics = self._get_metrics(true, pred, z)
+            metrics = self._get_metrics(true, pred, also_true)
             if test:
                 if TELEGRAM:
                     telegram_send(f'F1: {metrics:.6f}')
                 logging.info(f'F1: {metrics:.6f}')
-            self._print_predictions(pred, w_ids)
+            self._print_predictions(pred, w_ids)  # save in Raganato's scorer format.
+            for pos in util.id2wnpos.values():
+                true_, pred_, also_true_ = [], [], []
+                for i in range(len(true)):
+                    if pos_tags[i] == pos:
+                        true_.append(true[i])
+                        pred_.append(pred[i])
+                        also_true_.append(also_true[i])
+                f1 = self._get_metrics(true_, pred_, also_true_)
+                logging.info(f'F1 on {pos}: {f1:.6f}')
             return metrics
 
     def _evaluate(self, num_epoch):
@@ -270,7 +280,6 @@ class BaseTrainer:
 
     def _select_senses(self, b_scores, b_str, b_pos, b_labels) -> Iterable:
         """
-        Get the max of scores only of possible senses for a given lemma+pos
         :param b_scores: shape = (batch_s x win_s x sense_vocab_s)
         :param b_str:
         :param b_pos:
