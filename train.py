@@ -261,15 +261,16 @@ class BaseTrainer:
                     telegram_send(f'F1: {metrics:.6f}')
                 logging.info(f'F1: {metrics:.6f}')
             self._print_predictions(pred, w_ids)  # save in Raganato's scorer format.
-            for pos in util.id2wnpos.values():
-                true_, pred_, also_true_ = [], [], []
-                for i in range(len(true)):
-                    if pos_tags[i] == pos:
-                        true_.append(true[i])
-                        pred_.append(pred[i])
-                        also_true_.append(also_true[i])
-                f1 = self._get_metrics(true_, pred_, also_true_)
-                logging.info(f'F1 on {pos}: {f1:.6f}')
+            if test:
+                for pos in set(util.id2wnpos.values()):
+                    true_, pred_, also_true_ = [], [], []
+                    for i in range(len(true)):
+                        if pos_tags[i] == pos:
+                            true_.append(true[i])
+                            pred_.append(pred[i])
+                            also_true_.append(also_true[i])
+                    f1 = self._get_metrics(true_, pred_, also_true_)
+                    logging.info(f'F1 on {pos}: {f1:.6f}')
             return metrics
 
     def _evaluate(self, num_epoch):
