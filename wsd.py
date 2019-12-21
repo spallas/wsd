@@ -174,7 +174,7 @@ class WSDNetX(RobertaTransformerWSD):
 
     SLM_SCALE = 0.0001
     FINAL_HIDDEN_SIZE = 512
-    SLM_LOGITS_SCALE = 0.1
+    SLM_LOGITS_SCALE = 1
 
     def __init__(self,
                  device,
@@ -187,7 +187,8 @@ class WSDNetX(RobertaTransformerWSD):
                  num_layers: int = 4,
                  output_vocab: str = 'res/dictionaries/syn_lemma_vocab.txt',
                  sense_lemmas: str = 'res/dictionaries/sense_lemmas.txt',
-                 cached_embeddings: bool = False):
+                 cached_embeddings: bool = False,
+                 sv_trainable: bool = True):
         super().__init__(device, num_senses, max_len, model_path, d_embedding,
                          d_model, num_heads, num_layers, cached_embeddings)
         self.out_vocab = OrderedDict()
@@ -204,19 +205,17 @@ class WSDNetX(RobertaTransformerWSD):
         self.slm_output_size = len(self.out_vocab)
         self.output_slm = nn.Linear(self.transformer.d_model, len(self.out_vocab))
         self.v = None
+        self.sv_trainable = sv_trainable
         # build |S| x |V| matrix
         self.double_loss = True
         self.sv_size = torch.Size((len(self.sense_lemmas) + 1, len(self.out_vocab)))
         sparse_coord, values = [], []
-        k = 32
         for syn in self.sense_lemmas:
             for j, i in enumerate(self.sense_lemmas[syn]):
-                if j > k:
-                    break
                 sparse_coord.append([syn, i])
-                values.append(1 / min(len(self.sense_lemmas[syn]), k))
+                values.append(1 / len(self.sense_lemmas[syn]))
         self.keys = torch.LongTensor(sparse_coord)
-        self.vals = torch.FloatTensor(values)
+        self.vals = nn.Parameter(torch.FloatTensor(values)) if self.sv_trainable else torch.FloatTensor(values)
 
     def forward(self, seq_list, lengths=None, cached_embeddings=None, tags=None):
         scores = self._get_scores(seq_list, lengths, cached_embeddings)
@@ -231,8 +230,12 @@ class WSDNetX(RobertaTransformerWSD):
         mask = get_transformer_mask(lengths, self.win_size, self.device)
         y, h = self.transformer(x, mask)
         self.v = self.output_slm(h)  # shape: |B| x Time steps x |V|
-        sv_matrix = torch.sparse.FloatTensor(self.keys.t(), self.vals, self.sv_size).to(self.v.get_device())
-        slm_logits = torch.sparse.mm(sv_matrix, self.v.view(-1, self.v.size(-1)).t())   # shape: |S| x T * |B|
+        if self.sv_trainable:
+            slm_logits = torch_sparse.spmm(self.keys.t().to(self.v.get_device()),
+                                           self.vals, self.sv_size[0], self.sv_size[1], self.v.t())
+        else:
+            sv_matrix = torch.sparse.FloatTensor(self.keys.t(), self.vals, self.sv_size).to(self.v.get_device())
+            slm_logits = torch.sparse.mm(sv_matrix, self.v.t())  # |S| x T * |B|
         slm_logits = slm_logits.t().view(self.v.size(0), self.v.size(1), -1)
         scores = y + slm_logits * self.SLM_LOGITS_SCALE
         return scores
