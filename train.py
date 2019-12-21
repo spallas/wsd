@@ -260,8 +260,7 @@ class BaseTrainer:
                 if TELEGRAM:
                     telegram_send(f'F1: {metrics:.6f}')
                 logging.info(f'F1: {metrics:.6f}')
-            self._print_predictions(pred, w_ids)  # save in Raganato's scorer format.
-            if test:
+                self._print_predictions(pred, w_ids)  # save in Raganato's scorer format.
                 for pos in set(util.id2wnpos.values()):
                     true_, pred_, also_true_ = [], [], []
                     for i in range(len(true)):
