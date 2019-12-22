@@ -174,7 +174,7 @@ class WSDNetX(RobertaTransformerWSD):
 
     SLM_SCALE = 0.0001
     FINAL_HIDDEN_SIZE = 512
-    SLM_LOGITS_SCALE = 1
+    SLM_LOGITS_SCALE = 0.1
 
     def __init__(self,
                  device,
