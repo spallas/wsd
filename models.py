@@ -289,13 +289,13 @@ class LabelSmoothingLoss(nn.Module):
     KL-divergence between q_{smoothed ground truth prob.}(w)
     and p_{prob. computed by model}(w) is minimized.
     """
-    def __init__(self, label_smoothing, tgt_vocab_size, ignore_index=-100):
+    def __init__(self, label_smoothing, tgt_vocab_size, ignore_index=-100, device=None):
         assert 0.0 < label_smoothing <= 1.0
         self.ignore_index = ignore_index
         super(LabelSmoothingLoss, self).__init__()
 
         smoothing_value = label_smoothing / (tgt_vocab_size - 2)
-        one_hot = torch.full((tgt_vocab_size,), smoothing_value)
+        one_hot = torch.full((tgt_vocab_size,), smoothing_value, device=device)
         one_hot[self.ignore_index] = 0
         self.register_buffer('one_hot', one_hot.unsqueeze(0))
 
