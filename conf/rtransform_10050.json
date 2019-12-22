@@ -1,5 +1,5 @@
 {
-  "num_epochs": 26,
+  "num_epochs": 25,
   "batch_size": 100,
   "accumulation_steps": 1,
   "checkpoint_path": "saved_weights/rtransform_g_10050.pt",
@@ -13,7 +13,7 @@
   "report_path": "logs/rtransform_g_10050_report.txt",
   "num_layers": 2,
   "num_heads": 4,
-  "learning_rate": 0.0001,
+  "learning_rate": 0.0003,
   "window_size": 50,
   "model_path": "res/roberta.large",
   "cache_embeddings": true
