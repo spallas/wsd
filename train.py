@@ -33,8 +33,8 @@ warnings.filterwarnings("ignore", category=UndefinedMetricWarning)
 torch.manual_seed(42)
 np.random.seed(42)
 random.seed(42)
-TELEGRAM = False
-START_EVAL_EPOCH = 15
+TELEGRAM = True
+START_EVAL_EPOCH = 17
 BATCH_MUL = CachedEmbedLoader.SINGLE
 RANDOMIZE = True
 
