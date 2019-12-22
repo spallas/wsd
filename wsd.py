@@ -12,7 +12,7 @@ except ImportError:
     SPARSE = False
 
 from models import ElmoEmbeddings, WSDTransformerEncoder, \
-    RobertaAlignedEmbed, get_transformer_mask, BertEmbeddings, LSTMEncoder, DenseEncoder
+    RobertaAlignedEmbed, get_transformer_mask, BertEmbeddings, LSTMEncoder, DenseEncoder, LabelSmoothingLoss
 from utils.util import NOT_AMB_SYMBOL
 
 
@@ -31,6 +31,7 @@ class BaseWSD(nn.Module):
         self.batch_size = batch_size
         self.batch_norm = nn.BatchNorm1d(self.win_size)
         self.ce_loss = nn.CrossEntropyLoss(ignore_index=NOT_AMB_SYMBOL)
+        self.smooth_loss = LabelSmoothingLoss(0.1, self.tagset_size, NOT_AMB_SYMBOL)
 
     def forward(self, *inputs, **kwargs):
         raise NotImplementedError("Do not use base class, use concrete classes instead.")
@@ -129,6 +130,11 @@ class RobertaDenseWSD(BaseWSD):
             return y
         else:
             return y, self.loss(y, tags.to(y.get_device()))
+
+    def loss(self, scores, tags, pre_training=False):
+        y_true = tags.view(-1)
+        scores = scores.view(-1, self.tagset_size)
+        return self.smooth_loss(scores, y_true)
 
 
 class RobertaTransformerWSD(BaseWSD):
