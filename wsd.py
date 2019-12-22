@@ -31,7 +31,6 @@ class BaseWSD(nn.Module):
         self.batch_size = batch_size
         self.batch_norm = nn.BatchNorm1d(self.win_size)
         self.ce_loss = nn.CrossEntropyLoss(ignore_index=NOT_AMB_SYMBOL)
-        self.smooth_loss = LabelSmoothingLoss(0.1, self.tagset_size, NOT_AMB_SYMBOL)
 
     def forward(self, *inputs, **kwargs):
         raise NotImplementedError("Do not use base class, use concrete classes instead.")
@@ -121,6 +120,7 @@ class RobertaDenseWSD(BaseWSD):
         self.hidden_dim = hidden_dim
         self.embedding = RobertaAlignedEmbed(device, model_path) if not cached_embeddings else None
         self.dense = DenseEncoder(self.d_embedding, self.tagset_size, self.hidden_dim)
+        self.smooth_loss = LabelSmoothingLoss(0.1, self.tagset_size, NOT_AMB_SYMBOL)
 
     def forward(self, seq_list, lengths=None, cached_embeddings=None, tags=None):
         x = self.embedding(seq_list) if cached_embeddings is None else cached_embeddings
