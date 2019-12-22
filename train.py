@@ -400,9 +400,8 @@ class BaseTrainer:
             raise ValueError(f"Could not find any best model checkpoint: {self.best_model_path}")
 
     def _save_best(self, f1, epoch_i):
-        approximate_f1 = round(f1, 2)
-        if approximate_f1 >= self.best_f1_micro:
-            self.best_f1_micro = approximate_f1
+        if f1 >= self.best_f1_micro:
+            self.best_f1_micro = f1
             torch.save({
                 'epoch': epoch_i,
                 'model_state_dict': self.model.state_dict(),
