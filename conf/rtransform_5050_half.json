@@ -13,7 +13,7 @@
   "report_path": "logs/rtransform_g_5050_half_report.txt",
   "num_layers": 2,
   "num_heads": 4,
-  "learning_rate": 0.0003,
+  "learning_rate": 0.0002,
   "window_size": 50,
   "model_path": "res/roberta.large",
   "cache_embeddings": true
