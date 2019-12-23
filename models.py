@@ -293,21 +293,21 @@ class LabelSmoothingLoss(nn.Module):
         assert 0.0 < label_smoothing <= 1.0
         self.ignore_index = ignore_index
         super(LabelSmoothingLoss, self).__init__()
-
+        self.device = device
         smoothing_value = label_smoothing / (tgt_vocab_size - 2)
-        one_hot = torch.full((tgt_vocab_size,), smoothing_value, device=device)
+        one_hot = torch.full((tgt_vocab_size,), smoothing_value, device=self.device)
         one_hot[self.ignore_index] = 0
         self.register_buffer('one_hot', one_hot.unsqueeze(0))
 
         self.confidence = 1.0 - label_smoothing
 
-    def forward(self, output, target, device):
+    def forward(self, output, target):
         """
         output (FloatTensor): batch_size x n_classes
         target (LongTensor): batch_size
         """
-        target = target.to(device)
-        model_prob = self.one_hot.repeat(target.size(0), 1).to(device)
+        target = target.to(self.device)
+        model_prob = self.one_hot.repeat(target.size(0), 1).to(self.device)
         model_prob.scatter_(1, target.unsqueeze(1), self.confidence)
         model_prob.masked_fill_((target == self.ignore_index).unsqueeze(1), 0)
 
