@@ -129,7 +129,7 @@ class RobertaDenseWSD(BaseWSD):
         if tags is None:
             return y
         else:
-            return y, self.loss(y, tags.to(y.get_device()))
+            return y, self.loss(y, tags, y.get_device())
 
     def loss(self, scores, tags, pre_training=False):
         y_true = tags.view(-1)
