@@ -172,8 +172,7 @@ class RobertaTransformerWSD(BaseWSD):
     def loss(self, scores, tags, pre_training=False):
         y_true = tags.view(-1)
         scores = scores.view(-1, self.tagset_size)
-        wsd_loss = self.ce_loss(scores, y_true)
-        return wsd_loss
+        return label_smoothing_loss(scores, y_true, NOT_AMB_SYMBOL)
 
 
 class WSDNetX(RobertaTransformerWSD):
