@@ -12,7 +12,8 @@ except ImportError:
     SPARSE = False
 
 from models import ElmoEmbeddings, WSDTransformerEncoder, \
-    RobertaAlignedEmbed, get_transformer_mask, BertEmbeddings, LSTMEncoder, DenseEncoder, LabelSmoothingLoss
+    RobertaAlignedEmbed, get_transformer_mask, BertEmbeddings, LSTMEncoder, DenseEncoder, LabelSmoothingLoss, \
+    label_smoothing_loss
 from utils.util import NOT_AMB_SYMBOL
 
 
@@ -129,12 +130,12 @@ class RobertaDenseWSD(BaseWSD):
         if tags is None:
             return y
         else:
-            return y, self.loss(y, tags)
+            return y, self.loss(y, tags.to(y.get_device()))
 
     def loss(self, scores, tags, pre_training=False):
         y_true = tags.view(-1)
         scores = scores.view(-1, self.tagset_size)
-        return self.smooth_loss(scores, y_true)
+        return label_smoothing_loss(scores, y_true, NOT_AMB_SYMBOL)
 
 
 class RobertaTransformerWSD(BaseWSD):
@@ -283,7 +284,7 @@ class WSDNetDense(RobertaDenseWSD):
                  cached_embeddings: bool = False,
                  output_vocab: str = 'res/dictionaries/syn_lemma_vocab.txt',
                  sense_lemmas: str = 'res/dictionaries/sense_lemmas.txt',
-                 sv_trainable: bool = True):
+                 sv_trainable: bool = False):
         assert not sv_trainable or SPARSE
         super().__init__(device, num_senses, max_len, model_path,
                          d_embedding, hidden_dim, cached_embeddings)
@@ -352,7 +353,7 @@ class WSDNetDense(RobertaDenseWSD):
     def loss(self, scores, tags, opt1=False):
         y_true = tags.view(-1)
         scores = scores.view(-1, self.tagset_size)
-        wsd_loss = F.cross_entropy(scores, y_true, ignore_index=NOT_AMB_SYMBOL)
+        wsd_loss = F.cross_entropy(scores, y_true, ignore_index=NOT_AMB_SYMBOL, reduction='sum')
         slm_loss = self._get_slm_loss(scores.get_device(), y_true)
         loss = wsd_loss + slm_loss * self.SLM_SCALE
         return loss

@@ -312,3 +312,20 @@ class LabelSmoothingLoss(nn.Module):
         model_prob.masked_fill_((target == self.ignore_index).unsqueeze(1), 0)
 
         return F.kl_div(output, model_prob, reduction='sum')
+
+
+def label_smoothing_loss(pred, gold, ignore_index=-100):
+    gold = gold.contiguous().view(-1)
+
+    eps = 0.1
+    n_class = pred.size(1)
+
+    one_hot = torch.zeros_like(pred).scatter(1, gold.view(-1, 1), 1)
+    one_hot = one_hot * (1 - eps) + (1 - one_hot) * eps / (n_class - 1)
+    log_prb = F.log_softmax(pred, dim=1)
+
+    non_pad_mask = gold.ne(ignore_index)
+    loss = -(one_hot * log_prb).sum(dim=1)
+    loss = loss.masked_select(non_pad_mask).sum()  # average later
+
+    return loss
