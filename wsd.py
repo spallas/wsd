@@ -135,7 +135,7 @@ class RobertaDenseWSD(BaseWSD):
     def loss(self, scores, tags, pre_training=False):
         y_true = tags.view(-1)
         scores = scores.view(-1, self.tagset_size)
-        return label_smoothing_loss(scores, y_true, NOT_AMB_SYMBOL)
+        return self.smooth_loss(scores, y_true)  # label_smoothing_loss(scores, y_true, NOT_AMB_SYMBOL)
 
 
 class RobertaTransformerWSD(BaseWSD):
