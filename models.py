@@ -283,7 +283,7 @@ class RobertaAlignedEmbed(nn.Module):
             return torch.stack(seq_embeddings, dim=0).to(self.device)
 
 
-def label_smoothing_loss(pred, gold, ignore_index=-100):
+def label_smoothing_loss(pred, gold, ignore_index=-100, reduction='mean'):
     gold = gold.contiguous().view(-1)
 
     eps = 0.1
@@ -295,6 +295,10 @@ def label_smoothing_loss(pred, gold, ignore_index=-100):
 
     non_pad_mask = gold.ne(ignore_index)
     loss = -(one_hot * log_prb).sum(dim=1)
-    loss = loss.masked_select(non_pad_mask).sum()  # average later
-
+    if reduction == 'sum':
+        loss = loss.masked_select(non_pad_mask).sum()
+    elif reduction == 'mean':
+        loss = loss.masked_select(non_pad_mask).sum() / non_pad_mask.sum()
+    else:
+        assert True, "Incorrect reduction str."
     return loss
