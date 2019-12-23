@@ -12,7 +12,7 @@ except ImportError:
     SPARSE = False
 
 from models import ElmoEmbeddings, WSDTransformerEncoder, \
-    RobertaAlignedEmbed, get_transformer_mask, BertEmbeddings, LSTMEncoder, DenseEncoder, LabelSmoothingLoss, \
+    RobertaAlignedEmbed, get_transformer_mask, BertEmbeddings, LSTMEncoder, DenseEncoder, \
     label_smoothing_loss
 from utils.util import NOT_AMB_SYMBOL
 
@@ -121,7 +121,6 @@ class RobertaDenseWSD(BaseWSD):
         self.hidden_dim = hidden_dim
         self.embedding = RobertaAlignedEmbed(device, model_path) if not cached_embeddings else None
         self.dense = DenseEncoder(self.d_embedding, self.tagset_size, self.hidden_dim)
-        self.smooth_loss = LabelSmoothingLoss(0.1, self.tagset_size, NOT_AMB_SYMBOL, device)
 
     def forward(self, seq_list, lengths=None, cached_embeddings=None, tags=None):
         x = self.embedding(seq_list) if cached_embeddings is None else cached_embeddings
@@ -135,7 +134,7 @@ class RobertaDenseWSD(BaseWSD):
     def loss(self, scores, tags, pre_training=False):
         y_true = tags.view(-1)
         scores = scores.view(-1, self.tagset_size)
-        return self.smooth_loss(scores, y_true)  # label_smoothing_loss(scores, y_true, NOT_AMB_SYMBOL)
+        return label_smoothing_loss(scores, y_true, NOT_AMB_SYMBOL)
 
 
 class RobertaTransformerWSD(BaseWSD):
