@@ -169,12 +169,12 @@ class BaseTrainer:
         for step, ((b_x, b_p, b_y, b_z), b_x_e) in enumerate(self.rnd_loader, self.last_step):
             b_x_e = b_x_e if self.cache_embeddings else None
             scores, loss = self.model(b_x, cached_embeddings=b_x_e.to(self.device), tags=b_y)
-            # loss = self.model.loss(scores, b_y.to(self.device))
             if AMP:
                 with amp.scale_loss(loss, self.optimizer) as scaled_loss:
                     scaled_loss.backward()
             else:
                 loss.sum().backward()
+            loss /= self.accumulation_steps
             parameters = self.model.parameters() if not self.has_master_params else amp.master_params(self.optimizer)
             clip_grad_norm_(parameters=parameters, max_norm=1.0)
 

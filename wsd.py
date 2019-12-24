@@ -30,8 +30,7 @@ class BaseWSD(nn.Module):
         self.tagset_size = num_senses
         self.win_size = max_len
         self.batch_size = batch_size
-        self.batch_norm = nn.BatchNorm1d(self.win_size)
-        self.ce_loss = nn.CrossEntropyLoss(ignore_index=NOT_AMB_SYMBOL)
+        # self.batch_norm = nn.BatchNorm1d(self.win_size)
 
     def forward(self, *inputs, **kwargs):
         raise NotImplementedError("Do not use base class, use concrete classes instead.")
@@ -39,7 +38,7 @@ class BaseWSD(nn.Module):
     def loss(self, scores, tags, pre_training=False):
         y_true = tags.view(-1)
         scores = scores.view(-1, self.tagset_size)
-        return self.ce_loss(scores, y_true)
+        return F.cross_entropy(scores, y_true, ignore_index=NOT_AMB_SYMBOL)
 
 
 class BaselineWSD(BaseWSD):
@@ -124,7 +123,6 @@ class RobertaDenseWSD(BaseWSD):
 
     def forward(self, seq_list, lengths=None, cached_embeddings=None, tags=None):
         x = self.embedding(seq_list) if cached_embeddings is None else cached_embeddings
-        # x = self.batch_norm(x)
         y, h = self.dense(x)
         if tags is None:
             return y
@@ -161,7 +159,6 @@ class RobertaTransformerWSD(BaseWSD):
 
     def forward(self, seq_list, lengths=None, cached_embeddings=None, tags=None):
         x = self.embedding(seq_list) if cached_embeddings is None else cached_embeddings
-        # x = self.batch_norm(x)
         mask = get_transformer_mask(lengths, self.win_size, self.device)
         x, h = self.transformer(x, mask)
         if tags is None:
@@ -249,7 +246,7 @@ class WSDNetX(RobertaTransformerWSD):
     def loss(self, scores, tags, opt1=False):
         y_true = tags.view(-1)
         scores = scores.view(-1, self.tagset_size)
-        wsd_loss = self.ce_loss(scores, y_true)
+        wsd_loss = F.cross_entropy(scores, y_true, ignore_index=NOT_AMB_SYMBOL)
         if self.double_loss:
             slm_scores = self.v.view(-1, self.slm_output_size)
             y_slm = torch.zeros_like(slm_scores).to(scores.get_device())
