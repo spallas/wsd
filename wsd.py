@@ -119,11 +119,11 @@ class RobertaDenseWSD(BaseWSD):
         self.d_embedding = d_embedding
         self.hidden_dim = hidden_dim
         self.embedding = RobertaAlignedEmbed(device, model_path) if not cached_embeddings else None
-        self.dense = DenseEncoder(self.d_embedding, self.tagset_size, self.hidden_dim)
+        self.project = DenseEncoder(self.d_embedding, self.tagset_size, self.hidden_dim)
 
     def forward(self, seq_list, lengths=None, cached_embeddings=None, tags=None):
         x = self.embedding(seq_list) if cached_embeddings is None else cached_embeddings
-        y, h = self.dense(x)
+        y, h = self.project(x)
         if tags is None:
             return y
         else:
@@ -294,7 +294,7 @@ class WSDNetDense(RobertaDenseWSD):
                 lemma_list = eval(line.strip().split('\t')[1])
                 self.sense_lemmas[sid] = lemma_list
         logging.info('WSDNetDense: dictionaries loaded.')
-        self.dense = nn.Linear(self.d_embedding, self.hidden_dim)
+        self.project = nn.Linear(self.d_embedding, self.hidden_dim)
         self.h1 = nn.Linear(self.hidden_dim, self.hidden_dim)
         self.relu1 = nn.ReLU()
         self.h2 = nn.Linear(self.hidden_dim, self.hidden_dim)
@@ -306,13 +306,10 @@ class WSDNetDense(RobertaDenseWSD):
         self.sv_size = torch.Size((len(self.sense_lemmas) + 1, len(self.out_vocab)))
         self.sv_trainable = sv_trainable
         sparse_coord, values = [], []
-        k = 32
         for syn in self.sense_lemmas:
             for j, i in enumerate(self.sense_lemmas[syn]):
-                if j > k:
-                    break
                 sparse_coord.append([syn, i])
-                values.append(1 / min(len(self.sense_lemmas[syn]), k))
+                values.append(1 / len(self.sense_lemmas[syn]))
         logging.info(f"Number of elements in SV matrix: {len(values)}")
         self.keys = torch.LongTensor(sparse_coord)
         self.vals = nn.Parameter(torch.FloatTensor(values)) if self.sv_trainable else torch.FloatTensor(values)
@@ -326,8 +323,7 @@ class WSDNetDense(RobertaDenseWSD):
 
     def _get_scores(self, seq_list, cached_embeddings=None):
         x = self.embedding(seq_list) if cached_embeddings is None else cached_embeddings
-        # x = self.batch_norm(x)
-        x = self.dense(x)
+        x = self.project(x)
         x = self.h1(x)
         x = self.relu1(x)
         x = self.h2(x)  # |B| x T x hidden_dim
@@ -359,13 +355,16 @@ class WSDNetDense(RobertaDenseWSD):
         for i in range(0, self.v.size(0), k):
             y_slm = torch.zeros_like(self.v[i:i+k]).to(device)
             mask_weights = torch.zeros_like(self.v[i:i+k]).to(device)
+            num_predictions = 0
             for y_i, y in enumerate(y_true[i:i+k]):
                 if y != NOT_AMB_SYMBOL:
                     y_slm[y_i][self.sense_lemmas[y.item()], ] = 1
                     mask_weights[y_i] = 1
+                    num_predictions += 1
                 else:
                     mask_weights[y_i] = 0
-            slm_loss += F.binary_cross_entropy_with_logits(self.v[i:i+k], y_slm, mask_weights, reduction='sum')
+            slm_loss += F.binary_cross_entropy_with_logits(self.v[i:i+k], y_slm,
+                                                           mask_weights, reduction='sum') / num_predictions
         return slm_loss
 
 

@@ -599,6 +599,7 @@ if __name__ == '__main__':
                         default='O0', choices=('O0', 'O1', 'O2'))
     parser.add_argument("-z", "--cache", type=str, help="Embeddings cache", default='res/cache')
     parser.add_argument("-s", "--sequential", action='store_true', help="Feed batches as read sequentially.")
+    parser.add_argument("-b", "--telegram", action='store_true', help="Send training loss and F1 to bot.")
     args = parser.parse_args()
     log_level = logging.DEBUG if args.debug else logging.INFO
     if args.log:
@@ -609,6 +610,7 @@ if __name__ == '__main__':
     if args.config.endswith('_half.json'):
         BATCH_MUL = CachedEmbedLoader.HALF
     RANDOMIZE = not args.sequential
+    TELEGRAM = args.telegram
     c, t = None, None
     if args.model == 'roberta':
         c = RobertaTransformerConfig.from_json_file(args.config)
