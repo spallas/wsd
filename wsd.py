@@ -236,7 +236,7 @@ class WSDNetX(RobertaTransformerWSD):
                                            self.v.view(-1, self.v.size(-1)).t())
         else:
             sv_matrix = torch.sparse.FloatTensor(self.keys.t(), self.vals, self.sv_size).to(self.v.get_device())
-            slm_logits = torch.sparse.mm(sv_matrix, self.v.t())  # |S| x T * |B|
+            slm_logits = torch.sparse.mm(sv_matrix, self.v.view(-1, self.v.size(-1)).t())  # |S| x T * |B|
         slm_logits = slm_logits.t().view(self.v.size(0), self.v.size(1), -1)
         scores = y + slm_logits * self.SLM_LOGITS_SCALE
         return scores
