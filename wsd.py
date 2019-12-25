@@ -344,7 +344,7 @@ class WSDNetDense(RobertaDenseWSD):
     def loss(self, scores, tags, opt1=False):
         y_true = tags.view(-1)
         scores = scores.view(-1, self.tagset_size)
-        wsd_loss = F.cross_entropy(scores, y_true, ignore_index=NOT_AMB_SYMBOL, reduction='sum')
+        wsd_loss = label_smoothing_loss(scores, y_true, ignore_index=NOT_AMB_SYMBOL)
         slm_loss = self._get_slm_loss(scores.get_device(), y_true)
         loss = wsd_loss + slm_loss * self.SLM_SCALE
         return loss
