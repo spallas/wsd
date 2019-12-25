@@ -283,7 +283,7 @@ class RobertaAlignedEmbed(nn.Module):
             return torch.stack(seq_embeddings, dim=0).to(self.device)
 
 
-def label_smoothing_loss(pred, gold, ignore_index=-100, reduction='mean'):
+def label_smoothing_loss(pred, gold, ignore_index=0, reduction='mean'):
     gold = gold.contiguous().view(-1)
 
     eps = 0.1

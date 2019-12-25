@@ -174,9 +174,9 @@ class RobertaTransformerWSD(BaseWSD):
 
 class WSDNetX(RobertaTransformerWSD):
 
-    SLM_SCALE = 0.0001
+    SLM_SCALE = 0.01
     FINAL_HIDDEN_SIZE = 512
-    SLM_LOGITS_SCALE = 0.1
+    SLM_LOGITS_SCALE = 1
 
     def __init__(self,
                  device,
@@ -190,7 +190,7 @@ class WSDNetX(RobertaTransformerWSD):
                  output_vocab: str = 'res/dictionaries/syn_lemma_vocab.txt',
                  sense_lemmas: str = 'res/dictionaries/sense_lemmas.txt',
                  cached_embeddings: bool = False,
-                 sv_trainable: bool = True):
+                 sv_trainable: bool = False):
         super().__init__(device, num_senses, max_len, model_path, d_embedding,
                          d_model, num_heads, num_layers, cached_embeddings)
         self.out_vocab = OrderedDict()
@@ -209,7 +209,6 @@ class WSDNetX(RobertaTransformerWSD):
         self.v = None
         self.sv_trainable = sv_trainable
         # build |S| x |V| matrix
-        self.double_loss = True
         self.sv_size = torch.Size((len(self.sense_lemmas) + 1, len(self.out_vocab)))
         sparse_coord, values = [], []
         for syn in self.sense_lemmas:
@@ -228,7 +227,6 @@ class WSDNetX(RobertaTransformerWSD):
 
     def _get_scores(self, seq_list, lengths=None, cached_embeddings=None):
         x = self.embedding(seq_list) if cached_embeddings is None else cached_embeddings
-        # x = self.batch_norm(x)
         mask = get_transformer_mask(lengths, self.win_size, self.device)
         y, h = self.transformer(x, mask)
         self.v = self.output_slm(h)  # shape: |B| x Time steps x |V|
@@ -246,26 +244,32 @@ class WSDNetX(RobertaTransformerWSD):
     def loss(self, scores, tags, opt1=False):
         y_true = tags.view(-1)
         scores = scores.view(-1, self.tagset_size)
-        wsd_loss = F.cross_entropy(scores, y_true, ignore_index=NOT_AMB_SYMBOL)
-        if self.double_loss:
-            slm_scores = self.v.view(-1, self.slm_output_size)
-            y_slm = torch.zeros_like(slm_scores).to(scores.get_device())
-            mask_weights = torch.zeros_like(slm_scores).to(scores.get_device())
-            assert y_true.size(0) == y_slm.size(0)
-            for y_i, y in enumerate(y_true):
+        wsd_loss = label_smoothing_loss(scores, y_true, ignore_index=NOT_AMB_SYMBOL)
+        wsd_loss += self._get_slm_loss(scores.get_device(), y_true) * self.SLM_SCALE
+        return wsd_loss
+
+    def _get_slm_loss(self, device, y_true):
+        k = 500
+        slm_loss = 0
+        num_predictions = 0
+        for i in range(0, self.v.size(0), k):
+            y_slm = torch.zeros_like(self.v[i:i+k]).to(device)
+            mask_weights = torch.zeros_like(self.v[i:i+k]).to(device)
+            for y_i, y in enumerate(y_true[i:i+k]):
                 if y != NOT_AMB_SYMBOL:
                     y_slm[y_i][self.sense_lemmas[y.item()], ] = 1
                     mask_weights[y_i] = 1
+                    num_predictions += 1
                 else:
                     mask_weights[y_i] = 0
-            slm_loss = F.binary_cross_entropy_with_logits(slm_scores, y_slm, mask_weights, reduction='sum')
-            wsd_loss += slm_loss * self.SLM_SCALE
-        return wsd_loss
+            slm_loss += F.binary_cross_entropy_with_logits(self.v[i:i+k], y_slm,
+                                                           mask_weights, reduction='sum')
+        return slm_loss / num_predictions
 
 
 class WSDNetDense(RobertaDenseWSD):
 
-    SLM_SCALE = 1  # 0.0001
+    SLM_SCALE = 0.01
     SLM_LOGITS_SCALE = 1
     FINAL_HIDDEN_SIZE = 64
 
