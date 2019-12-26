@@ -230,14 +230,15 @@ class WSDNetX(RobertaTransformerWSD):
         mask = get_transformer_mask(lengths, self.win_size, self.device)
         y, h = self.transformer(x, mask)
         self.v = self.output_slm(h)  # shape: |B| x Time steps x |V|
+        self.v = self.v.view(-1, self.v.size(-1))
         if self.sv_trainable:
             slm_logits = torch_sparse.spmm(self.keys.t().to(self.v.get_device()),
                                            self.vals, self.sv_size[0], self.sv_size[1],
-                                           self.v.view(-1, self.v.size(-1)).t())
+                                           self.v.t())
         else:
             sv_matrix = torch.sparse.FloatTensor(self.keys.t(), self.vals, self.sv_size).to(self.v.get_device())
-            slm_logits = torch.sparse.mm(sv_matrix, self.v.view(-1, self.v.size(-1)).t())  # |S| x T * |B|
-        slm_logits = slm_logits.t().view(self.v.size(0), self.v.size(1), -1)
+            slm_logits = torch.sparse.mm(sv_matrix, self.v.t())  # |S| x T * |B|
+        slm_logits = slm_logits.t().view(h.size(0), h.size(1), -1)
         scores = y + slm_logits * self.SLM_LOGITS_SCALE
         return scores
 
