@@ -208,7 +208,9 @@ class BaseTrainer:
                 telegram_send(f'Epoch: {epoch}')
             self.train_epoch(epoch)
             if epoch >= START_EVAL_EPOCH and BATCH_MUL == CachedEmbedLoader.HALF:
-                self._set_global_lr(self.learning_rate / 3)
+                self._set_global_lr(self.learning_rate / 2)
+                if epoch >= 20:
+                    self._set_global_lr(0.0001)
             if not RANDOMIZE:  # reinitialize iterators
                 self.rnd_loader = zip(self.data_loader, self.cached_data_loader)
             if epoch > 2:
@@ -223,7 +225,7 @@ class BaseTrainer:
             self._plot('Train_loss', loss.item(), step)
             self._gpu_mem_info()
             self._maybe_checkpoint(loss, epoch_i)
-            if epoch_i >= START_EVAL_EPOCH or epoch_i == 1:
+            if epoch_i >= START_EVAL_EPOCH:  # or epoch_i == 1:
                 f1 = self._evaluate(epoch_i)
                 self._plot('Dev_F1', f1, step)
                 self.model.train()  # return to train mode after evaluation
