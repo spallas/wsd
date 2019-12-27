@@ -174,7 +174,7 @@ class RobertaTransformerWSD(BaseWSD):
 
 class WSDNetX(RobertaTransformerWSD):
 
-    SLM_SCALE = 0.001
+    SLM_SCALE = 0.005
     FINAL_HIDDEN_SIZE = 512
     SLM_LOGITS_SCALE = 1
 
