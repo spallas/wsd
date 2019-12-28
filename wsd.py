@@ -357,10 +357,10 @@ class WSDNetDense(RobertaDenseWSD):
     def _get_slm_loss(self, device, y_true):
         k = 500
         slm_loss = 0
+        num_predictions = 0
         for i in range(0, self.v.size(0), k):
             y_slm = torch.zeros_like(self.v[i:i+k]).to(device)
             mask_weights = torch.zeros_like(self.v[i:i+k]).to(device)
-            num_predictions = 0
             for y_i, y in enumerate(y_true[i:i+k]):
                 if y != NOT_AMB_SYMBOL:
                     y_slm[y_i][self.sense_lemmas[y.item()], ] = 1
@@ -369,8 +369,8 @@ class WSDNetDense(RobertaDenseWSD):
                 else:
                     mask_weights[y_i] = 0
             slm_loss += F.binary_cross_entropy_with_logits(self.v[i:i+k], y_slm,
-                                                           mask_weights, reduction='sum') / num_predictions
-        return slm_loss
+                                                           mask_weights, reduction='sum')
+        return slm_loss / num_predictions
 
 
 class WSDNetDenseAdasoft(RobertaDenseWSD):
