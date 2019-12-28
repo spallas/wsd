@@ -71,6 +71,14 @@ class Randomized:
         self.i += 1
         return c
 
+
+def from_multigpu_state_dict(d):
+    dd = {}
+    for k, v in d.items():
+        dd[k.replace('module.', '')] = v
+    return dd
+
+
 def telegram_on_failure(function, *args, **kwargs):
     try:
         function(*args, **kwargs)

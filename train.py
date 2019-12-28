@@ -397,16 +397,23 @@ class BaseTrainer:
         if os.path.exists(self.best_model_path):
             checkpoint = torch.load(self.best_model_path, map_location=str(self.device))
             logging.info(f"Loading best model achieving {checkpoint['f1']:.5f} on validation set.")
-            self.model.load_state_dict(checkpoint['model_state_dict'])
+            try:
+                self.model.load_state_dict(checkpoint['model_state_dict'])
+            except RuntimeError:
+                self.model.load_state_dict(util.from_multigpu_state_dict(checkpoint['model_state_dict']))
         else:
             raise ValueError(f"Could not find any best model checkpoint: {self.best_model_path}")
 
     def _save_best(self, f1, epoch_i):
         if f1 >= self.best_f1_micro:
             self.best_f1_micro = f1
+            if torch.cuda.device_count() > 1 and self.multi_gpu:
+                state_dict = self.model.module.state_dict()
+            else:
+                state_dict = self.model.state_dict()
             torch.save({
                 'epoch': epoch_i,
-                'model_state_dict': self.model.state_dict(),
+                'model_state_dict': state_dict,
                 'f1': f1
             }, self.best_model_path)
 
