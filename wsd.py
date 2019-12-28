@@ -270,7 +270,7 @@ class WSDNetX(RobertaTransformerWSD):
 
 class WSDNetDense(RobertaDenseWSD):
 
-    SLM_SCALE = 0.01
+    SLM_SCALE = 0.005
     SLM_LOGITS_SCALE = 1
     FINAL_HIDDEN_SIZE = 64
 
