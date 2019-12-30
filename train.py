@@ -533,6 +533,7 @@ class WSDNetXTrainer(BaseTrainer):
                  model_path='res/roberta.large',
                  output_vocab: str = 'res/dictionaries/syn_lemma_vocab.txt',
                  sense_lemmas: str = 'res/dictionaries/sense_lemmas.txt',
+                 sv_trainable: bool = False,
                  **kwargs):
         self.num_layers = num_layers
         self.d_model = d_model
@@ -541,13 +542,14 @@ class WSDNetXTrainer(BaseTrainer):
         self.model_path = model_path
         self.output_vocab = output_vocab
         self.sense_lemmas = sense_lemmas
+        self.sv_trainable = sv_trainable
         super().__init__(**kwargs)
 
     def _build_model(self):
         self.model = WSDNetX(self.device, len(self.sense2id) + 1, self.window_size,
                              self.model_path, self.d_embeddings, self.d_model,
                              self.num_heads, self.num_layers, self.output_vocab,
-                             self.sense_lemmas, self.cache_embeddings)
+                             self.sense_lemmas, self.cache_embeddings, sv_trainable=self.sv_trainable)
 
 
 class RDenseTrainer(BaseTrainer):
@@ -578,6 +580,7 @@ class WSDDenseTrainer(BaseTrainer):
                  model_path='res/roberta.large',
                  output_vocab='res/dictionaries/syn_lemma_vocab.txt',
                  sense_lemmas='res/dictionaries/sense_lemmas.txt',
+                 sv_trainable=False,
                  **kwargs):
         self.num_layers = num_layers
         self.hidden_dim = hidden_dim
@@ -585,19 +588,20 @@ class WSDDenseTrainer(BaseTrainer):
         self.model_path = model_path
         self.output_vocab = output_vocab
         self.sense_lemmas = sense_lemmas
+        self.sv_trainable = sv_trainable
         super().__init__(**kwargs)
 
     def _build_model(self):
         self.model = WSDNetDense(self.device, len(self.sense2id) + 1, self.window_size,
                                  self.model_path, self.d_embeddings, self.hidden_dim, self.cache_embeddings,
-                                 self.output_vocab, self.sense_lemmas)
+                                 self.output_vocab, self.sense_lemmas, sv_trainable=self.sv_trainable)
 
 
 if __name__ == '__main__':
 
     parser = argparse.ArgumentParser(description="Train with different models and options")
     parser.add_argument("-m", "--model", type=str, help="model name",
-                        required=True, choices=('roberta', 'wsdnet', 'wsdnetx', 'rdense', 'wsddense'))
+                        required=True, choices=('rtransform', 'wsdnetx', 'rdense', 'wsddense'))
     parser.add_argument("-c", "--config", type=str, help="config JSON file path", required=True)
     parser.add_argument("-t", "--test", action='store_true', help="If test else run training")
     parser.add_argument("-d", "--debug", action='store_true', help="Print debug information")
@@ -621,7 +625,7 @@ if __name__ == '__main__':
     RANDOMIZE = not args.sequential
     TELEGRAM = args.telegram
     c, t = None, None
-    if args.model == 'roberta':
+    if args.model == 'rtransform':
         c = RobertaTransformerConfig.from_json_file(args.config)
     elif args.model == 'wsdnetx':
         c = WSDNetXConfig.from_json_file(args.config)
@@ -638,7 +642,7 @@ if __name__ == '__main__':
         os.remove(cd['checkpoint_path'])
         if os.path.exists(cd['checkpoint_path'] + '.best'):
             os.remove(cd['checkpoint_path'] + '.best')
-    if args.model == 'roberta':
+    if args.model == 'rtransform':
         t = RobertaTrainer(**cd)
     elif args.model == 'wsdnetx':
         t = WSDNetXTrainer(**cd)

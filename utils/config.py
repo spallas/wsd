@@ -136,6 +136,7 @@ class RDenseConfig(Config):
 class WSDNetXConfig(RobertaTransformerConfig):
     output_vocab: str = 'res/dictionaries/syn_lemma_vocab.txt'
     sense_lemmas: str = 'res/dictionaries/sense_lemmas.txt'
+    sv_trainable: bool = False
 
     @staticmethod
     def from_json_file(file_name, **kwargs):
@@ -156,6 +157,7 @@ class WSDDenseConfig(Config):
 
     output_vocab: str = 'res/dictionaries/syn_lemma_vocab.txt'
     sense_lemmas: str = 'res/dictionaries/sense_lemmas.txt'
+    sv_trainable: bool = False
 
     @staticmethod
     def from_json_file(file_name, **kwargs):
