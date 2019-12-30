@@ -35,6 +35,7 @@ np.random.seed(42)
 random.seed(42)
 TELEGRAM = True
 START_EVAL_EPOCH = 14
+SV_TRAIN_EPOCHS = 2
 BATCH_MUL = CachedEmbedLoader.SINGLE
 RANDOMIZE = False
 
@@ -213,7 +214,7 @@ class BaseTrainer:
                     self._set_global_lr(0.0001)
             if not RANDOMIZE:  # reinitialize iterators
                 self.rnd_loader = zip(self.data_loader, self.cached_data_loader)
-            if epoch > 2:
+            if epoch > SV_TRAIN_EPOCHS:
                 try:  # make sparse sv matrix non trainable
                     self.model.vals.requires_grad = False
                 except AttributeError:
