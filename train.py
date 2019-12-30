@@ -36,7 +36,7 @@ random.seed(42)
 TELEGRAM = True
 START_EVAL_EPOCH = 14
 BATCH_MUL = CachedEmbedLoader.SINGLE
-RANDOMIZE = True
+RANDOMIZE = False
 
 
 class BaseTrainer:
