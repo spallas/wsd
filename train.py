@@ -263,10 +263,10 @@ class BaseTrainer:
                     telegram_send(f'F1: {metrics:.6f}')
                 logging.info(f'F1: {metrics:.6f}')
                 self._print_predictions(pred, w_ids)  # save in Raganato's scorer format.
-                for pos in set(util.id2wnpos.values()):
+                for pos in sorted(set(util.id2wnpos.values())):
                     true_, pred_, also_true_ = [], [], []
                     for i in range(len(true)):
-                        if pos_tags[i] == pos:
+                        if pos_tags[i] == pos and true[i] != NOT_AMB_SYMBOL:
                             true_.append(true[i])
                             pred_.append(pred[i])
                             also_true_.append(also_true[i])
