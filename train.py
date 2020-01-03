@@ -135,7 +135,8 @@ class BaseTrainer:
         eval_dataset = FlatSemCorDataset(data_path=eval_data, tags_path=eval_tags)
         self.eval_loader = FlatLoader(eval_dataset, batch_size=self.batch_size, win_size=self.window_size,
                                       pad_symbol=self.pad_symbol, with_word_ids=True)
-        self.cached_eval_loader = CachedEmbedLoader(self.device, f'{self.cache_path}_eval_{self.cache_batch_size}.npz',
+        self.cached_eval_loader = CachedEmbedLoader(self.device, f'{self.cache_path}_eval_{eval_tags[-6:-4]}'
+                                                                 f'_{self.cache_batch_size}.npz',
                                                     self.embed_model_path, BATCH_MUL, self.batch_size, self.eval_loader,
                                                     to_device=True) \
             if self.cache_embeddings else count()
@@ -143,7 +144,6 @@ class BaseTrainer:
         self.model.to(self.device)
         self.optimizer = optim.Adam(self.model.parameters(), lr=self.learning_rate)
         # self.optimizer = optim.AdamW(self.model.parameters(), lr=self.learning_rate, amsgrad=True)
-
         # Use apex to make model possibly faster.
         loss_scale = 1 if self.mixed == 'O0' else 'dynamic'
         (self.model, _), self.optimizer = amp.initialize(self.model, self.optimizer,
@@ -659,7 +659,6 @@ if __name__ == '__main__':
         telegram_on_failure(t.train)
     if args.test:
         all_tests = ['se2', 'se3', 'se07', 'se13', 'se15']
-        cd['cache_embeddings'] = False
         for dataset in all_tests:
             logging.info(f"Results on dataset {dataset}:")
             cd['test_data'] = f"{args.all}/{dataset}/{dataset}.xml"
