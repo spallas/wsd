@@ -2,7 +2,7 @@
   "num_epochs": 25,
   "batch_size": 50,
   "accumulation_steps": 2,
-  "checkpoint_path": "saved_weights/wsdnetx_5050_half.pt",
+  "checkpoint_path": "saved_weights/wsdnetx_5050_sv_half.pt",
   "log_interval": 22,
   "train_data":"res/wsd-train/semcor_data.xml",
   "train_tags":"res/wsd-train/semcor_tags.txt",
