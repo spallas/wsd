@@ -533,7 +533,7 @@ class WSDNetXTrainer(BaseTrainer):
                  model_path='res/roberta.large',
                  output_vocab: str = 'res/dictionaries/syn_lemma_vocab.txt',
                  sense_lemmas: str = 'res/dictionaries/sense_lemmas.txt',
-                 sv_trainable: bool = False,
+                 sv_trainable: bool = True,
                  **kwargs):
         self.num_layers = num_layers
         self.d_model = d_model
