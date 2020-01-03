@@ -174,9 +174,9 @@ class RobertaTransformerWSD(BaseWSD):
 
 class WSDNetX(RobertaTransformerWSD):
 
-    SLM_SCALE = 0.01
+    SLM_SCALE = 0.005
     FINAL_HIDDEN_SIZE = 512
-    SLM_LOGITS_SCALE = 0.8
+    SLM_LOGITS_SCALE = 1
 
     def __init__(self,
                  device,
@@ -252,8 +252,8 @@ class WSDNetX(RobertaTransformerWSD):
     def _get_slm_loss(self, device, y_true):
         k = 500
         slm_loss = 0
+        num_predictions = 0
         for i in range(0, self.v.size(0), k):
-            num_predictions = 0
             y_slm = torch.zeros_like(self.v[i:i+k]).to(device)
             mask_weights = torch.zeros_like(self.v[i:i+k]).to(device)
             for y_i, y in enumerate(y_true[i:i+k]):
@@ -264,8 +264,8 @@ class WSDNetX(RobertaTransformerWSD):
                 else:
                     mask_weights[y_i] = 0
             slm_loss += F.binary_cross_entropy_with_logits(self.v[i:i+k], y_slm,
-                                                           mask_weights, reduction='sum') / num_predictions
-        return slm_loss  # / num_predictions
+                                                           mask_weights, reduction='sum')
+        return slm_loss / num_predictions
 
 
 class WSDNetDense(RobertaDenseWSD):
