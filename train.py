@@ -154,8 +154,7 @@ class BaseTrainer:
         test_dataset = FlatSemCorDataset(data_path=test_data, tags_path=test_tags)
         self.test_loader = FlatLoader(test_dataset, batch_size=self.batch_size, win_size=self.window_size,
                                       pad_symbol=self.pad_symbol, with_word_ids=True)
-        self.cached_test_loader = CachedEmbedLoader(self.device, f'{self.cache_path}_test_{test_data[-6:-4]}'
-                                                                 f'_{self.cache_batch_size}.npz',
+        self.cached_test_loader = CachedEmbedLoader(self.device, f'{self.cache_path}_test_{self.cache_batch_size}.npz',
                                                     self.embed_model_path, BATCH_MUL, self.batch_size, self.test_loader,
                                                     to_device=True) \
             if self.cache_embeddings else count()
@@ -614,8 +613,6 @@ if __name__ == '__main__':
     parser.add_argument("-z", "--cache", type=str, help="Embeddings cache", default='res/cache')
     parser.add_argument("-s", "--sequential", action='store_true', help="Feed batches as read sequentially.")
     parser.add_argument("-b", "--telegram", action='store_true', help="Send training loss and F1 to bot.")
-    parser.add_argument("-a", "--all", type=str, help="Test on all dataset. Provide root folder.",
-                        default="res/wsd-test/")
     args = parser.parse_args()
     log_level = logging.DEBUG if args.debug else logging.INFO
     if args.log:
@@ -657,19 +654,4 @@ if __name__ == '__main__':
         telegram_on_failure(t.test)
     else:
         telegram_on_failure(t.train)
-    if args.test:
-        all_tests = ['se2', 'se3', 'se07', 'se13', 'se15']
-        for dataset in all_tests:
-            logging.info(f"Results on dataset {dataset}:")
-            cd['test_data'] = f"{args.all}/{dataset}/{dataset}.xml"
-            cd['test_tags'] = f"{args.all}/{dataset}/{dataset}.txt"
-            if args.model == 'roberta':
-                t = RobertaTrainer(**cd)
-            elif args.model == 'wsdnetx':
-                t = WSDNetXTrainer(**cd)
-            elif args.model == 'rdense':
-                t = RDenseTrainer(**cd)
-            elif args.model == 'wsddense':
-                t = WSDDenseTrainer(**cd)
-            telegram_on_failure(t.test)
 

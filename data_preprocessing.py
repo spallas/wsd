@@ -77,7 +77,7 @@ class FlatSemCorDataset(Dataset):
                     self.all_senses.append(word_senses)
                     self.first_senses.append(word_senses[0])
                     self.train_sense_map.setdefault(lemma, Counter()).update(word_senses)
-        logging.info(f'Loaded dataset from {data_path}/{tags_path}')
+        logging.info(f'Loaded dataset from {data_path} and {tags_path}')
         logging.info(f'Sense dict in {sense_dict}')
 
     def __len__(self):
