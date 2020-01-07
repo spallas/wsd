@@ -2,17 +2,16 @@ import random
 from collections import defaultdict
 from typing import List
 
-import telegram
 from nltk.corpus import wordnet as wn
 from transformers import BertTokenizer
 random.seed(42)
 
 # MAPS for Part Of Speech #############
 
-with open('data/bot_token.txt') as f:
-    token = f.read().strip()
-bot = telegram.Bot(token=token)
-chat_id = 105475495
+# with open('data/bot_token.txt') as f:
+#     token = f.read().strip()
+# bot = telegram.Bot(token=token)
+# chat_id = 105475495
 
 tag_map = defaultdict(lambda: wn.NOUN)
 tag_map['J'] = wn.ADJ

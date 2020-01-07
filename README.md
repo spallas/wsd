@@ -1,4 +1,4 @@
-# Neural Word Sense Disambiguation integrating Lexical Knowledge
+# Neural Word Sense Disambiguation integrating synonyms in WordNet synsets
 
 ## Intro
 
@@ -12,25 +12,40 @@ inventory is taken from.
 The architecture is composed of contextualized embeddings plus 
 a Transformer on top with a final dense layer.
 
-To incorporate lexical knowledge at evaluation time where we score 
-each possible sense of a word with a Language-Model-derived score.
+The models available include a base RoBERTa embeddings and are:
+- `rdense` with only a two dense layer encoder.
+- `rtransform` with a Transformer encoder.
+- `wsddense` with a two dense layer encoder + an advanced lemma prediction net.
+- `wsdnetx` same as above but with a Transformer encoder.
 
-To calculate this score we take for each possible synset the lemmas
-of the synset and we extend this list with the lemmas of the direct
-hypernyms and hyponyms (also 'related' ones?). Then for each lemma 
-in the synset list we calculate the probability from the language
-model for that lemma to appear as the next word in the text.
-To avoid having synset with longer lists score higher we consider 
-the following ways of aggregating the scores of each lemma in the 
-list:
-- max
-- mean
-- sum top 5
-- mean top 5
+The advanced net can be represented as:
+
+![arch](img/words-pred.png)
+
+where h is the final hidden state of the encoder.
+The |S|x|V| matrix is build like in the following:
+![sv-matrix](img/sv-matrix-small.png)
 
 ## Training data
 
-As a training dataset we use both SemCor and the annotated glosses.
+As a training dataset we use both SemCor and WordNet Gloss Corpus.
+
+## Environment setup
+
+```
+git clone http://github.com/spallas/wsd.git
+
+cd wsd/ || return 1
+
+tmux new -s train
+
+python -c "import torch; print(torch.__version__)"
+
+source setup.sh
+```
+
+Get the `res/` data folder, complete with training and test sets, 
+together with prebuilt dictionaries at [LINK GOOGLE DRIVE]
 
 ## Further Details
 

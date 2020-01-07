@@ -30,7 +30,6 @@ class BaseWSD(nn.Module):
         self.tagset_size = num_senses
         self.win_size = max_len
         self.batch_size = batch_size
-        # self.batch_norm = nn.BatchNorm1d(self.win_size)
 
     def forward(self, *inputs, **kwargs):
         raise NotImplementedError("Do not use base class, use concrete classes instead.")
@@ -472,15 +471,12 @@ class BertTransformerWSD(BaseWSD):
                  d_model: int = 512,
                  num_heads: int = 4,
                  num_layers: int = 2,
-                 # pos_embed_dim: int = 32,
                  bert_model='bert-large-cased'):
         super().__init__(device, num_senses, max_len)
         self.d_model = d_model
         self.num_heads = num_heads
         self.num_layers = num_layers
         self.bert_model = bert_model
-        # self.pos_embed_dim = pos_embed_dim
-        # self.pos_embed = nn.Embedding(len(pos2id), self.pos_embed_dim, padding_idx=0)
         self.d_embedding = 768 if 'base' in bert_model else 1024
         self.bert_embedding = BertEmbeddings(device, bert_model)
         self.transformer = WSDTransformerEncoder(self.d_embedding, self.d_model,
@@ -488,8 +484,6 @@ class BertTransformerWSD(BaseWSD):
                                                  self.num_heads)
 
     def forward(self, seq_list, lengths=None):
-        # x_p = self.pos_embed(pos_tags)
-        # x = torch.cat([x, x_p], dim=-1)
         x = self.bert_embedding(seq_list, lengths)
         mask = get_transformer_mask(lengths, self.win_size, self.device)
         x, h = self.transformer(x, mask)

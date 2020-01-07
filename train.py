@@ -33,7 +33,6 @@ warnings.filterwarnings("ignore", category=UndefinedMetricWarning)
 torch.manual_seed(42)
 np.random.seed(42)
 random.seed(42)
-TELEGRAM = True
 START_EVAL_EPOCH = 14
 SV_TRAIN_EPOCHS = 2
 BATCH_MUL = CachedEmbedLoader.SINGLE
@@ -204,8 +203,6 @@ class BaseTrainer:
             end = datetime.datetime.now()
             logging.info(f'Epoch: {epoch} - time: {end - start}')
             start = end
-            if TELEGRAM:
-                telegram_send(f'Epoch: {epoch}')
             self.train_epoch(epoch)
             if epoch >= START_EVAL_EPOCH and BATCH_MUL == CachedEmbedLoader.HALF:
                 self._set_global_lr(self.learning_rate / 2)
@@ -231,8 +228,6 @@ class BaseTrainer:
                 self.model.train()  # return to train mode after evaluation
                 log_str += f'\t\t\tF1: {f1:.5f}'
             logging.info(log_str)
-            if TELEGRAM:
-                telegram_send(log_str)
 
     def test(self, loader=None):
         """
@@ -259,8 +254,6 @@ class BaseTrainer:
 
             metrics = self._get_metrics(true, pred, also_true)
             if test:
-                if TELEGRAM:
-                    telegram_send(f'F1: {metrics:.6f}')
                 logging.info(f'F1: {metrics:.6f}')
                 self._print_predictions(pred, w_ids)  # save in Raganato's scorer format.
                 for pos in sorted(set(util.id2wnpos.values())):
@@ -612,7 +605,6 @@ if __name__ == '__main__':
                         default='O0', choices=('O0', 'O1', 'O2'))
     parser.add_argument("-z", "--cache", type=str, help="Embeddings cache", default='res/cache')
     parser.add_argument("-s", "--sequential", action='store_true', help="Feed batches as read sequentially.")
-    parser.add_argument("-b", "--telegram", action='store_true', help="Send training loss and F1 to bot.")
     args = parser.parse_args()
     log_level = logging.DEBUG if args.debug else logging.INFO
     if args.log:
@@ -623,7 +615,6 @@ if __name__ == '__main__':
     if args.config.endswith('_half.json'):
         BATCH_MUL = CachedEmbedLoader.HALF
     RANDOMIZE = not args.sequential
-    TELEGRAM = args.telegram
     c, t = None, None
     if args.model == 'rtransform':
         c = RobertaTransformerConfig.from_json_file(args.config)
