@@ -44,7 +44,7 @@ python -c "import torch; print(torch.__version__)"
 source setup.sh
 ```
 
-Unzip in the `res/` folder the pre-processed training and test data that you can download [here](https://spallas-dataset.s3.eu-west-3.amazonaws.com/wsd-train-and-test.zip)
+Unzip in the `res/` folder the pre-processed training and test data that you can download [here](https://spallas-dataset.s3.eu-west-3.amazonaws.com/wsd-train-and-test.zip). Also unzip in `res` dictinaries data that you can download [here](https://spallas-dataset.s3.eu-west-3.amazonaws.com/dictionaries.zip) 
 
 ## Further Details
 
